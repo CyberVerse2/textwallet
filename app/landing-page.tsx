@@ -9,15 +9,16 @@ import { useChat } from '@/context/ChatContext';
 import { usePrivy } from '@privy-io/react-auth';
 
 interface LandingPageProps {
+  onStartChat: () => void;
 }
 
-const LandingPage = () => {
+const LandingPage = ({ onStartChat }: LandingPageProps) => {
   const { 
     inputValue, 
     setInputValue, 
     sendMessage, 
     isProcessing, 
-    isWalletConnected 
+    isWalletConnected
   } = useChat(); 
   
   // Use Privy hook to get login function and user info
@@ -33,6 +34,7 @@ const LandingPage = () => {
   const handleExampleClick = (prompt: string) => {
     if (!isProcessing && isWalletConnected) {
       sendMessage(prompt); 
+      onStartChat();
     }
   };
 
@@ -45,6 +47,7 @@ const LandingPage = () => {
     event.preventDefault();
     if (!isProcessing && isWalletConnected) {
         sendMessage(inputValue); 
+        onStartChat();
     }
   };
 
@@ -62,7 +65,7 @@ const LandingPage = () => {
 
   return (
     <div className="flex-1 flex flex-col justify-center items-center p-6">
-      <div className="max-w-2xl w-full text-center mb-12">
+      <div className="max-w-4xl w-full text-center mb-12 mx-auto">
         <div className="inline-flex items-center justify-center gap-3 mb-6 px-3 py-1.5 bg-black rounded-full">
           <div className="w-2 h-2 rounded-full bg-yellow animate-pulse shadow-[0_0_10px_rgba(255,222,0,0.7)]"></div>
           <span className="text-sm font-bold text-yellow">Powered by Base Network</span>
@@ -71,8 +74,8 @@ const LandingPage = () => {
         <p className="text-xl text-muted-foreground">Your crypto wallet, controlled by text commands.</p>
       </div>
 
-      <div className="w-full max-w-2xl">
-        <div className="flex flex-row justify-center gap-3 mb-4 w-full">
+      <div className="w-full max-w-5xl mx-auto">
+        <div className="flex flex-row flex-wrap justify-center gap-4 mb-6 w-full px-4">
           {examplePrompts.map((prompt, index) => (
             <Button
               key={index}
@@ -88,26 +91,38 @@ const LandingPage = () => {
           ))}
         </div>
 
-        <form className="relative w-full max-w-2xl" onSubmit={handleSubmit}>
-          <Input
-            type="text"
-            placeholder={placeholderText}
-            className="w-full pr-12 h-12 border-2 border-black focus:ring-2 focus:ring-yellow focus:ring-offset-2 rounded-lg font-medium text-base disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ boxShadow: "4px 4px 0px 0px #000000" }}
-            value={inputValue} 
-            onChange={handleInputChange}
-            disabled={isDisabled} 
-          />
-          <Button
-            type="submit"
-            size="icon"
-            className="absolute right-2 top-1/2 -translate-y-1/2 h-9 w-9 bg-yellow text-black hover:bg-yellow/90 active:translate-y-px active:shadow-none transition-all duration-100 border-2 border-black rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ boxShadow: "2px 2px 0px 0px #000000" }}
-            disabled={isDisabled || !inputValue.trim()} 
-          >
-            <ArrowUp className="h-5 w-5" />
-            <span className="sr-only">Send</span>
-          </Button>
+        <form className="relative w-full max-w-3xl mx-auto px-4" onSubmit={handleSubmit}>
+          <div className="relative">
+            <Input
+              type="text"
+              placeholder={placeholderText}
+              className="w-full pr-12 h-12 border-2 border-black focus:ring-2 focus:ring-yellow focus:ring-offset-2 rounded-lg font-medium text-base disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ boxShadow: "4px 4px 0px 0px #000000" }}
+              value={inputValue} 
+              onChange={handleInputChange}
+              disabled={isDisabled} 
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey && !isDisabled) {
+                  e.preventDefault();
+                  handleSubmit(e);
+                }
+              }}
+            />
+            <Button
+              type="submit"
+              size="icon"
+              className="absolute right-2 top-1/2 -translate-y-1/2 h-9 w-9 bg-yellow text-black hover:bg-yellow/90 active:translate-y-px active:shadow-none transition-all duration-100 border-2 border-black rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ boxShadow: "2px 2px 0px 0px #000000" }}
+              disabled={isDisabled || !inputValue.trim()} 
+            >
+              {isProcessing ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black"></div> 
+              ) : (
+                  <ArrowUp className="h-5 w-5" />
+              )}
+              <span className="sr-only">Send</span>
+            </Button>
+          </div>
         </form>
          {!isWalletConnected && (
            <p className="text-center text-sm text-red-600 mt-2">Please connect your wallet in the sidebar to send commands.</p>

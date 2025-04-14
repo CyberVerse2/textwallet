@@ -9,4 +9,3 @@ export default function Page() {
 
   return <>{chatStarted ? <ChatInterface /> : <LandingPage onStartChat={() => setChatStarted(true)} />}</>
 }
-

@@ -20,14 +20,14 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   return (
     <ChatProvider>
       <div className="flex h-screen bg-background p-6 overflow-hidden">
-        <div className="max-w-6xl w-full mx-auto flex gap-6 h-full">
+        <div className="w-full mx-auto flex gap-6 h-full">
           {/* Sidebar */}
           <Sidebar ref={sidebarRef} />
 
           {/* Main Content */}
           <div
             className="flex-1 bg-white rounded-2xl overflow-hidden flex flex-col relative"
-            style={{ boxShadow: "8px 8px 0px 0px #000000" }}
+            style={{ boxShadow: '8px 8px 0px 0px #000000' }}
           >
             {/* Header */}
             <header className="p-6 border-b">
@@ -38,7 +38,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         </div>
       </div>
     </ChatProvider>
-  )
+  );
 }
 
 interface SidebarProps {
