@@ -26,7 +26,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         appearance: {
           theme: "light",
           accentColor: "#000000", // Black accent
-          logo: "/logo.png", // Replace with your actual logo path
+          logo: "/placeholder-logo.png", // Use the logo found in /public
         },
         // Configure embedded wallets
         embeddedWallets: {
