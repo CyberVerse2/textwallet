@@ -4,7 +4,7 @@ import type React from "react";
 import { useEffect, useState } from "react";
 
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { ChevronDown, Image, BarChart2, Settings, LogOut, Activity, Wallet } from "lucide-react"
+import { ChevronDown, Image, BarChart2, Settings, LogOut, Activity, Wallet, Copy, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import TokenList from "./token-list"
 import ActivityList from "./activity-list"
@@ -50,9 +50,25 @@ function Sidebar(/*{}: SidebarProps*/) {
   const { ready, authenticated, user, login, logout } = usePrivy();
   const { wallets } = useWallets();
 
-  // Determine the primary connected wallet (EOA or embedded)
-  // This prioritizes an externally connected wallet if available
-  const connectedWallet = wallets.find(wallet => wallet.walletClientType !== 'privy') || wallets.find(wallet => wallet.walletClientType === 'privy');
+  // Specifically get Privy's embedded wallet
+  const connectedWallet = wallets.find(wallet => wallet.walletClientType === 'privy');
+
+  // State for copy address button
+  const [isCopied, setIsCopied] = useState(false);
+
+  // Function to copy address to clipboard
+  const copyAddressToClipboard = () => {
+    if (displayAddress) {
+      navigator.clipboard.writeText(displayAddress)
+        .then(() => {
+          setIsCopied(true);
+          setTimeout(() => setIsCopied(false), 2000); // Reset after 2 seconds
+        })
+        .catch(err => {
+          console.error('Failed to copy address: ', err);
+        });
+    }
+  };
 
   // Update context based on Privy state
   useEffect(() => {
@@ -94,8 +110,21 @@ function Sidebar(/*{}: SidebarProps*/) {
               )}
             </div>
             {displayAddress && ( // Display address if connected via Privy
-              <div className="text-sm text-muted-foreground truncate" title={displayAddress}>
-                {shortenAddress(displayAddress)}
+              <div className="flex items-center gap-1">
+                <div className="text-sm text-muted-foreground truncate" title={displayAddress}>
+                  {shortenAddress(displayAddress)}
+                </div>
+                <button 
+                  onClick={copyAddressToClipboard} 
+                  className="ml-1 p-1 hover:bg-yellow/20 rounded-full transition-colors"
+                  title="Copy wallet address"
+                >
+                  {isCopied ? (
+                    <Check className="w-3.5 h-3.5 text-green-500" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5 text-gray-500" />
+                  )}
+                </button>
               </div>
             )}
           </div>
