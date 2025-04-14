@@ -1,5 +1,5 @@
-# textwallet
-
+# Textwallet
+![text wallet](<Screen Shot 2025-04-14 at 1.50.20 AM.png>)
 TextWallet is a modular network of interoperable DeFi agents designed to bring the full functionality of EVM-compatible crypto wallets (and more) to a text-based interface. Interact with DeFi protocols, manage assets, conduct research, and get portfolio insights, all through text commands.
 
 ## Features
