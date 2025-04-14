@@ -1,17 +1,20 @@
 "use client"
 
-import type React from "react";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef, forwardRef, useImperativeHandle } from "react";
 
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { ChevronDown, Image, BarChart2, Settings, LogOut, Activity, Wallet, Copy, Check } from "lucide-react"
+import { ChevronDown, Image, BarChart2, Settings, LogOut, Activity, Wallet, Copy, Check, CreditCard, Key } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import TokenList from "./token-list"
 import ActivityList from "./activity-list"
 import "./globals.css"
 import { ChatProvider, useChat } from '@/context/ChatContext';
 import { shortenAddress } from "@/lib/utils"; // Import shortenAddress at the top
-import { usePrivy, useWallets } from "@privy-io/react-auth"; // Import Privy hooks
+import { usePrivy, useWallets, useFundWallet } from "@privy-io/react-auth"; // Import Privy hooks
+import { base } from "viem/chains"; // Import Base chain configuration
+
+// Create a ref to hold the SidebarTabs component
+const sidebarRef = React.createRef<{ refreshBalances: () => void }>();
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -19,7 +22,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       <div className="flex h-screen bg-background p-6 overflow-hidden">
         <div className="max-w-6xl w-full mx-auto flex gap-6 h-full">
           {/* Sidebar */}
-          <Sidebar />
+          <Sidebar ref={sidebarRef} />
 
           {/* Main Content */}
           <div
@@ -42,19 +45,68 @@ interface SidebarProps {
   // ... (props if any)
 }
 
-function Sidebar(/*{}: SidebarProps*/) {
+// Create a forwardRef component for Sidebar to properly handle refs
+const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar(props, ref) {
   // Use Chat context setters
   const { setIsWalletConnected, setWalletAddress } = useChat();
 
   // Use Privy hooks
-  const { ready, authenticated, user, login, logout } = usePrivy();
+  const { ready, authenticated, user, login, logout, exportWallet } = usePrivy();
   const { wallets } = useWallets();
+  const { fundWallet } = useFundWallet(); // Add fund wallet hook
 
   // Specifically get Privy's embedded wallet
   const connectedWallet = wallets.find(wallet => wallet.walletClientType === 'privy');
 
   // State for copy address button
   const [isCopied, setIsCopied] = useState(false);
+  // State for funding
+  const [isFunding, setIsFunding] = useState(false);
+  // Create a ref to the SidebarTabs component to access the refresh function
+  const tabsRef = useRef<{ refreshBalances: () => void } | null>(null);
+  
+  // Expose the refreshBalances method to parent components
+  useImperativeHandle(ref, () => ({
+    refreshBalances: () => {
+      if (tabsRef.current) {
+        tabsRef.current.refreshBalances();
+      }
+    }
+  }));
+
+  // Derived state for UI
+  const isWalletEffectivelyConnected = ready && authenticated && !!connectedWallet;
+  const displayAddress = isWalletEffectivelyConnected ? connectedWallet.address : null;
+
+  // Update context based on Privy state
+  useEffect(() => {
+    if (ready) {
+      setIsWalletConnected(authenticated && !!connectedWallet);
+      setWalletAddress(authenticated && connectedWallet ? connectedWallet.address : null);
+    }
+  }, [ready, authenticated, connectedWallet, setIsWalletConnected, setWalletAddress]);
+
+  // Handle wallet funding
+  const handleFundWallet = async () => {
+    if (displayAddress) {
+      setIsFunding(true);
+      try {
+        await fundWallet(displayAddress, {
+          chain: base, // Use Base network for lower fees and faster transactions
+          amount: '0.01', // Default funding amount in ETH
+        });
+        
+        // Refresh the assets to show updated balances after successful funding
+        if (tabsRef.current) {
+          tabsRef.current.refreshBalances();
+        }
+      } catch (error) {
+        console.error('Funding failed:', error);
+      } finally {
+        setIsFunding(false);
+      }
+    }
+  };
 
   // Function to copy address to clipboard
   const copyAddressToClipboard = () => {
@@ -67,27 +119,6 @@ function Sidebar(/*{}: SidebarProps*/) {
         .catch(err => {
           console.error('Failed to copy address: ', err);
         });
-    }
-  };
-
-  // Update context based on Privy state
-  useEffect(() => {
-    if (ready) {
-      setIsWalletConnected(authenticated && !!connectedWallet);
-      setWalletAddress(authenticated && connectedWallet ? connectedWallet.address : null);
-    }
-  }, [ready, authenticated, connectedWallet, setIsWalletConnected, setWalletAddress]);
-
-  // Derived state for UI
-  const isWalletEffectivelyConnected = ready && authenticated && !!connectedWallet;
-  const displayAddress = isWalletEffectivelyConnected ? connectedWallet.address : null;
-
-  // Simulate connecting/disconnecting wallet
-  const toggleWalletConnection = () => {
-    if (isWalletEffectivelyConnected) {
-      logout(); // Use Privy logout
-    } else {
-      login(); // Use Privy login
     }
   };
 
@@ -131,40 +162,102 @@ function Sidebar(/*{}: SidebarProps*/) {
         </div>
 
         {/* Navigation Tabs - Pass address down */}
-        <SidebarTabs isWalletConnected={isWalletEffectivelyConnected} walletAddress={displayAddress} /> {/* Pass state down */}
+        <SidebarTabs 
+          ref={tabsRef}
+          isWalletConnected={isWalletEffectivelyConnected} 
+          walletAddress={displayAddress} 
+        />
       </div>
 
       {/* Bottom Actions */}
       <div className="space-y-2">
-        <Button
-          variant="outline"
-          className="w-full justify-start border-2 border-black hover:bg-yellow/20 active:translate-y-1 active:shadow-none transition-all duration-100 rounded-xl font-bold"
-          style={{ boxShadow: "4px 4px 0px 0px #000000" }}
-          onClick={toggleWalletConnection} // Button to toggle connection
-        >
-          <Wallet className="mr-2 h-4 w-4" />
-          <span>{
-            !ready ? 'Loading...' : 
-            isWalletEffectivelyConnected ? 'Disconnect Wallet' : 'Connect Wallet'
-          }</span>
-        </Button>
+        {isWalletEffectivelyConnected && (
+          <>
+           <Button
+             variant="outline"
+             className="w-full justify-start border-2 border-black hover:bg-yellow/20 active:translate-y-1 active:shadow-none transition-all duration-100 rounded-xl font-bold"
+             style={{ boxShadow: "4px 4px 0px 0px #000000" }}
+             onClick={handleFundWallet}
+             disabled={isFunding}
+           >
+             <CreditCard className="mr-2 h-4 w-4" />
+             <span>{isFunding ? 'Processing...' : 'Fund Wallet'}</span>
+           </Button>
+          
+          <Button
+            variant="outline"
+            className="w-full justify-start border-2 border-black hover:bg-yellow/20 active:translate-y-1 active:shadow-none transition-all duration-100 rounded-xl font-bold"
+            style={{ boxShadow: "4px 4px 0px 0px #000000" }}
+            onClick={() => {
+              // This will open Privy's secure export modal
+              if (displayAddress) {
+                exportWallet({ address: displayAddress });
+              } else {
+                exportWallet(); // Default to first wallet if address not available
+              }
+            }}
+          >
+            <Key className="mr-2 h-4 w-4" />
+            <span>Export Wallet</span>
+          </Button>
+          </>
+         )}
+        {!isWalletEffectivelyConnected && (
+          <Button
+            variant="outline"
+            className="w-full justify-start border-2 border-black hover:bg-yellow/20 active:translate-y-1 active:shadow-none transition-all duration-100 rounded-xl font-bold"
+            style={{ boxShadow: "4px 4px 0px 0px #000000" }}
+            onClick={login} // Only show Connect button when not connected
+          >
+            <Wallet className="mr-2 h-4 w-4" />
+            <span>{!ready ? 'Loading...' : 'Connect Wallet'}</span>
+          </Button>
+        )}
         <Button variant="outline" className="w-full justify-start border-2 border-black hover:bg-yellow/20 active:translate-y-1 active:shadow-none transition-all duration-100 rounded-xl font-bold" style={{ boxShadow: "4px 4px 0px 0px #000000" }}>
           <Settings className="mr-2 h-4 w-4" />
           <span>Settings</span>
         </Button>
-        <Button variant="ghost" className="w-full justify-start text-red-600 hover:bg-red-100 hover:text-red-700 rounded-xl font-bold">
+        <Button 
+          variant="ghost" 
+          className="w-full justify-start text-red-600 hover:bg-red-100 hover:text-red-700 rounded-xl font-bold"
+          onClick={() => {
+            // Log the user out of Privy (which is different from just disconnecting the wallet)
+            logout();
+            // Reset the local wallet connection state
+            setIsWalletConnected(false);
+            setWalletAddress(null);
+          }}
+        >
           <LogOut className="mr-2 h-4 w-4" />
           <span>Log Out</span>
         </Button>
       </div>
     </aside>
   );
-}
+});
 
 // --- SidebarTabs Component --- (Keep as is for now)
 
-function SidebarTabs({ isWalletConnected, walletAddress }: { isWalletConnected: boolean, walletAddress: string | null }) { // Accept address prop
+// Convert SidebarTabs to use forwardRef
+const SidebarTabs = forwardRef<{ refreshBalances: () => void }, { 
+  isWalletConnected: boolean, 
+  walletAddress: string | null 
+}>(function SidebarTabs({ isWalletConnected, walletAddress }, ref) {
   const [activeTab, setActiveTab] = useState('assets');
+  // Create a ref to hold the refresh function that will be set by the AssetsSection
+  const refreshBalancesRef = useRef<(() => void) | null>(null);
+
+  // Function to trigger balance refresh that can be called from outside components
+  const refreshBalances = () => {
+    if (refreshBalancesRef.current) {
+      refreshBalancesRef.current();
+    }
+  };
+  
+  // Expose the refreshBalances method to parent components
+  useImperativeHandle(ref, () => ({
+    refreshBalances
+  }));
 
   return (
     <div className="space-y-6">
@@ -178,13 +271,17 @@ function SidebarTabs({ isWalletConnected, walletAddress }: { isWalletConnected: 
       </div>
 
       {activeTab === 'assets' ? (
-        <AssetsSection isWalletConnected={isWalletConnected} walletAddress={walletAddress} /> // Pass address down
+        <AssetsSection 
+          isWalletConnected={isWalletConnected} 
+          walletAddress={walletAddress} 
+          setRefreshBalancesRef={fn => refreshBalancesRef.current = fn} 
+        /> // Pass address and refresh function setter
       ) : (
         <ActivitySection />
       )}
     </div>
   );
-}
+});
 
 interface TabButtonProps {
   name: string;
@@ -209,51 +306,87 @@ function TabButton({ name, activeTab, setActiveTab, children }: TabButtonProps) 
 // --- AssetsSection ---
 import { type DisplayBalance } from './token-list'; // Import the type
 
-function AssetsSection({ isWalletConnected, walletAddress }: { isWalletConnected: boolean, walletAddress: string | null }) { // Accept address prop
+function AssetsSection({ 
+  isWalletConnected, 
+  walletAddress,
+  setRefreshBalancesRef
+}: { 
+  isWalletConnected: boolean, 
+  walletAddress: string | null,
+  setRefreshBalancesRef: (fn: () => void) => void
+}) { // Accept address prop
   // Add state for tokens and loading
   const [tokens, setTokens] = useState<DisplayBalance[]>([]); 
   const [isLoading, setIsLoading] = useState(false); // Start not loading
   const [error, setError] = useState<string | null>(null); // Add error state
+  const [showSmallBalances, setShowSmallBalances] = useState(false); // State to control small balances visibility
+  
+  // Calculate if we have small balances that are hidden
+  const hasSmallBalances = tokens.some(token => {
+    // Consider a balance small if its USD value is less than $0.1
+    if (typeof token.usdValue === 'number' && token.usdValue < 0.1) {
+      return true;
+    }
+    
+    // For tokens without USD value, check the formatted balance
+    const balance = parseFloat(token.formattedBalance || '0');
+    if ((token as any).isNative === true) {
+      // For native tokens (ETH), less than 0.001 is small
+      return balance < 0.001;
+    }
+    
+    // For other tokens, less than 1 is small
+    return balance < 1;
+  });
+
+  // Create a function to fetch all balances that can be called from other components
+  const fetchAllBalances = async () => {
+    if (!isWalletConnected || !walletAddress) return;
+    
+    setIsLoading(true);
+    setError(null); // Clear previous errors
+    try {
+      // Fetch both native and token balances concurrently
+      const [nativeRes, tokenRes] = await Promise.all([
+        fetch(`/api/native-balances?address=${walletAddress}`),
+        fetch(`/api/tokens?address=${walletAddress}`) // Fetch from token endpoint
+      ]);
+
+      // Process Native Balances
+      if (!nativeRes.ok) {
+        const errorData = await nativeRes.json().catch(() => ({ error: 'Failed to parse native balance error response' }));
+        throw new Error(`Native Balances Error: ${errorData.error || nativeRes.statusText}`);
+      }
+      const nativeBalances: DisplayBalance[] = await nativeRes.json();
+
+      // Process Token Balances
+      if (!tokenRes.ok) {
+        const errorData = await tokenRes.json().catch(() => ({ error: 'Failed to parse token balance error response' }));
+        throw new Error(`Token Balances Error: ${errorData.error || tokenRes.statusText}`);
+      }
+      const tokenData = await tokenRes.json();
+      const tokenBalances: DisplayBalance[] = tokenData.tokens || []; // Access the .tokens property
+
+      // Combine and set tokens
+      setTokens([...nativeBalances, ...tokenBalances]); 
+
+    } catch (err: any) {
+      console.error("Error fetching balances:", err);
+      setError(err.message || 'Failed to fetch balances.');
+      setTokens([]); // Clear tokens on error
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Register the refresh function with the parent component
+  useEffect(() => {
+    setRefreshBalancesRef(() => fetchAllBalances);
+  }, [setRefreshBalancesRef]);
 
   // Fetch data when the wallet is connected and address is available
   useEffect(() => {
     if (isWalletConnected && walletAddress) {
-      const fetchAllBalances = async () => {
-        setIsLoading(true);
-        setError(null); // Clear previous errors
-        try {
-          // Fetch both native and token balances concurrently
-          const [nativeRes, tokenRes] = await Promise.all([
-            fetch(`/api/native-balances?address=${walletAddress}`),
-            fetch(`/api/tokens?address=${walletAddress}`) // Fetch from token endpoint
-          ]);
-
-          // Process Native Balances
-          if (!nativeRes.ok) {
-            const errorData = await nativeRes.json().catch(() => ({ error: 'Failed to parse native balance error response' }));
-            throw new Error(`Native Balances Error: ${errorData.error || nativeRes.statusText}`);
-          }
-          const nativeBalances: DisplayBalance[] = await nativeRes.json();
-
-          // Process Token Balances
-          if (!tokenRes.ok) {
-            const errorData = await tokenRes.json().catch(() => ({ error: 'Failed to parse token balance error response' }));
-            throw new Error(`Token Balances Error: ${errorData.error || tokenRes.statusText}`);
-          }
-          const tokenData = await tokenRes.json();
-          const tokenBalances: DisplayBalance[] = tokenData.tokens || []; // Access the .tokens property
-
-          // Combine and set tokens
-          setTokens([...nativeBalances, ...tokenBalances]); 
-
-        } catch (err: any) {
-          console.error("Error fetching balances:", err);
-          setError(err.message || 'Failed to fetch balances.');
-          setTokens([]); // Clear tokens on error
-        } finally {
-          setIsLoading(false);
-        }
-      };
       fetchAllBalances();
     } else {
       // Clear tokens and errors if wallet disconnects or no address
@@ -279,18 +412,19 @@ function AssetsSection({ isWalletConnected, walletAddress }: { isWalletConnected
           </Button>
         </div>
         {/* Pass the state down to TokenList */}
-        <TokenList tokens={tokens} isLoading={isLoading} /> 
+        <TokenList tokens={tokens} isLoading={isLoading} showSmallBalances={showSmallBalances} /> 
         {/* Display error message if fetch fails */}
         {error && <p className="text-sm text-red-600 text-center mt-2">Error: {error}</p>}
-        {isWalletConnected && !isLoading && tokens.length > 0 && ( // Conditionally render the button, only if connected, not loading, and has tokens
+        {isWalletConnected && !isLoading && tokens.length > 0 && hasSmallBalances && ( // Show button only if there are small balances
           <Button
             variant="outline"
             size="sm"
             className="w-full justify-start mt-4 border-2 border-black hover:bg-yellow/20 active:translate-y-1 active:shadow-none transition-all duration-100 rounded-xl font-bold"
             style={{ boxShadow: "4px 4px 0px 0px #000000" }}
+            onClick={() => setShowSmallBalances(!showSmallBalances)}
           >
-            <span>Show More</span>
-            <ChevronDown className="ml-auto h-4 w-4" />
+            <span>{showSmallBalances ? 'Hide Small Balances' : 'Show Small Balances'}</span>
+            <ChevronDown className={`ml-auto h-4 w-4 transition-transform ${showSmallBalances ? 'rotate-180' : ''}`} />
           </Button>
         )}
       </div>

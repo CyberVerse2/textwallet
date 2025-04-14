@@ -30,9 +30,33 @@ export function isNativeBalance(item: DisplayBalance): item is NativeBalance {
 interface TokenListProps {
   tokens: DisplayBalance[];
   isLoading: boolean;
+  showSmallBalances?: boolean; // Add prop to control visibility of small balances
 }
 
-const TokenList: React.FC<TokenListProps> = React.memo(({ tokens, isLoading }) => {
+// Function to determine if a balance is considered "small"
+const isSmallBalance = (token: DisplayBalance): boolean => {
+  // Consider a balance small if its USD value is less than $0.1
+  if (typeof token.usdValue === 'number' && token.usdValue < 0.1) {
+    return true;
+  }
+  
+  // For tokens without USD value, check the formatted balance
+  // This is a simple heuristic - you may want to adjust based on token type
+  const balance = parseFloat(token.formattedBalance || '0');
+  if (isNativeBalance(token)) {
+    // For native tokens (ETH), less than 0.001 is small
+    return balance < 0.001;
+  }
+  
+  // For other tokens, less than 1 is small
+  return balance < 1;
+};
+
+const TokenList: React.FC<TokenListProps> = React.memo(({ tokens, isLoading, showSmallBalances = false }) => {
+  // Filter tokens to remove small balances if not showing them
+  const filteredTokens = showSmallBalances 
+    ? tokens 
+    : tokens.filter(token => !isSmallBalance(token));
 
   if (isLoading) {
     return (
@@ -60,9 +84,14 @@ const TokenList: React.FC<TokenListProps> = React.memo(({ tokens, isLoading }) =
     return <p className="text-sm text-muted-foreground text-center py-4">No token assets found in wallet.</p>;
   }
 
+  // Display message if all balances are small and filtered out
+  if (!showSmallBalances && filteredTokens.length === 0 && tokens.length > 0) {
+    return <p className="text-sm text-muted-foreground text-center py-4">Only small balances found. Click "Show More" to view them.</p>;
+  }
+
   return (
     <div className="space-y-3">
-      {tokens.map((item, index) => (
+      {filteredTokens.map((item, index) => (
         <div
           // Use a more robust key combining properties
           key={isNativeBalance(item) ? `${item.networkName}-${item.symbol}` : item.contractAddress || `${item.symbol}-${index}`}
