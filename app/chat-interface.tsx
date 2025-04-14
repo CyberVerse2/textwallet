@@ -4,7 +4,7 @@ import React from "react"
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowUp, User, Bot } from 'lucide-react';
+import { ArrowUp, User, Bot, Sparkles } from 'lucide-react';
 import { useChat } from '@/context/ChatContext';
 
 const ChatInterface = () => {
@@ -49,16 +49,16 @@ const ChatInterface = () => {
               )}
               <div
                 className={`max-w-[70%] p-3 rounded-lg border-2 border-black ${message.sender === 'user'
-                  ? 'bg-blue-100 order-1'
-                  : 'bg-gray-100'
-                  }`}
-                style={{ boxShadow: "2px 2px 0px 0px #000000" }}
+                  ? 'bg-yellow text-black ml-auto'
+                  : 'bg-white'
+                }`}
+                style={{ boxShadow: "4px 4px 0px 0px #000000" }}
               >
                 <p className="text-sm">{message.text}</p>
               </div>
               {message.sender === 'user' && (
-                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center border-2 border-black flex-shrink-0 order-2">
-                  <User className="w-5 h-5 text-black" />
+                <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center border-2 border-black flex-shrink-0">
+                  <Sparkles className="w-5 h-5 text-black" />
                 </div>
               )}
             </div>
@@ -68,7 +68,7 @@ const ChatInterface = () => {
                 <div className="w-8 h-8 rounded-full bg-yellow flex items-center justify-center border-2 border-black flex-shrink-0">
                     <Bot className="w-5 h-5 text-black" />
                 </div>
-                <div className="max-w-[70%] p-3 rounded-lg border-2 border-black bg-gray-100" style={{ boxShadow: "2px 2px 0px 0px #000000" }}>
+                <div className="max-w-[70%] p-3 rounded-lg border-2 border-black bg-white" style={{ boxShadow: "4px 4px 0px 0px #000000" }}>
                     <p className="text-sm animate-pulse">Thinking...</p> 
                 </div>
             </div>
@@ -103,7 +103,7 @@ const ChatInterface = () => {
             {isProcessing ? (
                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-black"></div> 
             ) : (
-                <ArrowUp className="h-5 w-5" />
+                <Sparkles className="h-5 w-5" />
             )}
             <span className="sr-only">Send</span>
           </Button>

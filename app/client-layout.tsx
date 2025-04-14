@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef, forwardRef, useImperativeHandle } from "react";
 
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { ChevronDown, Image, BarChart2, Settings, LogOut, Activity, Wallet, Copy, Check, CreditCard, Key } from "lucide-react"
+import { ChevronDown, Image, BarChart2, Settings, LogOut, Activity, Wallet, Copy, Check, CreditCard, Key, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import TokenList from "./token-list"
 import ActivityList from "./activity-list"
@@ -209,8 +209,8 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
             style={{ boxShadow: "4px 4px 0px 0px #000000" }}
             onClick={login} // Only show Connect button when not connected
           >
-            <Wallet className="mr-2 h-4 w-4" />
-            <span>{!ready ? 'Loading...' : 'Connect Wallet'}</span>
+            <Sparkles className="mr-2 h-4 w-4" />
+            <span>{!ready ? 'Loading...' : 'Sign In'}</span>
           </Button>
         )}
         <Button variant="outline" className="w-full justify-start border-2 border-black hover:bg-yellow/20 active:translate-y-1 active:shadow-none transition-all duration-100 rounded-xl font-bold" style={{ boxShadow: "4px 4px 0px 0px #000000" }}>
