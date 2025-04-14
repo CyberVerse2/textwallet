@@ -124,9 +124,7 @@ const LandingPage = ({ onStartChat }: LandingPageProps) => {
             </Button>
           </div>
         </form>
-         {!isWalletConnected && (
-           <p className="text-center text-sm text-red-600 mt-2">Please connect your wallet in the sidebar to send commands.</p>
-         )}
+      
       </div>
     </div>
   );

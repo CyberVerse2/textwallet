@@ -7,5 +7,5 @@ import LandingPage from "./landing-page"
 export default function Page() {
   const [chatStarted, setChatStarted] = useState(false)
 
-  return <>{chatStarted ? <ChatInterface /> : <LandingPage onStartChat={() => setChatStarted(true)} />}</>
+  return <>{chatStarted ? <ChatInterface onGoBack={() => setChatStarted(false)} /> : <LandingPage onStartChat={() => setChatStarted(true)} />}</>
 }

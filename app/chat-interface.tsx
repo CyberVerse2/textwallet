@@ -4,10 +4,16 @@ import React from "react"
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowUp, User, Bot, Sparkles } from 'lucide-react';
+import { ArrowUp, User, Bot, Sparkles, ArrowLeft } from 'lucide-react';
 import { useChat } from '@/context/ChatContext';
+import { usePrivy } from '@privy-io/react-auth';
 
-const ChatInterface = () => {
+interface ChatInterfaceProps {
+  onGoBack: () => void;
+}
+
+const ChatInterface = ({ onGoBack }: ChatInterfaceProps) => {
+  const { user } = usePrivy();
   const { 
     messages, 
     inputValue, 
@@ -33,13 +39,20 @@ const ChatInterface = () => {
     : "Ask me anything about your wallet...";
 
   return (
-    <div className="flex-1 flex flex-col bg-white rounded-2xl overflow-hidden relative" style={{ boxShadow: "8px 8px 0px 0px #000000" }}>
-      <header className="p-4 border-b border-gray-200">
-        <h2 className="font-semibold text-lg">Chat Assistant</h2>
-      </header>
+    <div className="flex-1 flex flex-col items-center bg-white rounded-2xl overflow-hidden relative" style={{ boxShadow: "8px 8px 0px 0px #000000" }}>
+      <div className="p-4 w-full max-w-[33rem] flex items-center">
+        <Button 
+          variant="outline"
+          onClick={onGoBack}
+          className="flex items-center justify-center h-auto py-2 px-4 border-2 border-black bg-yellow hover:bg-yellow/90 active:translate-y-px active:shadow-none transition-all duration-100 rounded-xl font-medium"
+          style={{ boxShadow: "2px 2px 0px 0px #000000" }}
+        >
+          <ArrowLeft className="h-4 w-4" />
 
-      <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
-        <div className="space-y-4">
+        </Button>
+      </div>
+      <ScrollArea className="flex-1 p-4 w-full max-w-[33rem]" ref={scrollAreaRef}>
+        <div className="space-y-4 w-full">
           {messages.map((message) => (
             <div key={message.id} className={`flex items-start gap-3 ${message.sender === 'user' ? 'justify-end' : ''}`}>
               {message.sender === 'bot' && (
@@ -76,8 +89,8 @@ const ChatInterface = () => {
         </div>
       </ScrollArea>
 
-      <div className="p-4 border-t border-gray-200 bg-white">
-        <form className="relative" onSubmit={handleFormSubmit}> 
+      <div className="p-4 bg-white w-full max-w-[33rem]">
+        <form className="relative w-full" onSubmit={handleFormSubmit}> 
           <Input
             type="text"
             placeholder={placeholderText}

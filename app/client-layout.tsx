@@ -29,10 +29,6 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
             className="flex-1 bg-white rounded-2xl overflow-hidden flex flex-col relative"
             style={{ boxShadow: '8px 8px 0px 0px #000000' }}
           >
-            {/* Header */}
-            <header className="p-6 border-b">
-              <h1 className="font-bold text-xl">Text Wallet Assistant</h1>
-            </header>
             {children}
           </div>
         </div>
