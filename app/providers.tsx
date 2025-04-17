@@ -1,7 +1,6 @@
 "use client";
 
 import { PrivyProvider } from "@privy-io/react-auth";
-import { ChatProvider } from "@/context/ChatContext";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const privyAppId = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
@@ -41,7 +40,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         // },
       }}
     >
-      <ChatProvider>{children}</ChatProvider>
+      {children}
     </PrivyProvider>
   );
 }
