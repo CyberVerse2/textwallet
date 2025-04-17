@@ -135,7 +135,5 @@ export async function GET(request: NextRequest) {
     }
     return a.networkName.localeCompare(b.networkName); // Fallback sort
   });
-
-  console.log("Final Native Balances Response:", JSON.stringify(balances, null, 2)); // Log final response
   return NextResponse.json(balances);
 }
