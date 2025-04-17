@@ -1,7 +1,9 @@
 'use client';
 
 import React, { createContext, useState, useContext, ReactNode, useCallback, useEffect, useRef } from 'react';
+import { useChat as useVercelAIChat } from '@ai-sdk/react';
 
+// Keep the original Message interface for compatibility with existing components
 interface Message {
   id: string;
   text: string;
@@ -11,36 +13,58 @@ interface Message {
 interface ChatContextType {
   messages: Message[];
   inputValue: string;
-  walletAddress: string | null; // Add wallet address state
+  walletAddress: string | null;
   setInputValue: (value: string) => void;
   sendMessage: (text: string) => Promise<void>;
   isProcessing: boolean;
-  isWalletConnected: boolean; // Added wallet connection status
-  setIsWalletConnected: (connected: boolean) => void; // Setter for wallet status (for simulation/actual integration)
-  setWalletAddress: (address: string | null) => void; // Setter for wallet address
-  scrollAreaRef: React.RefObject<HTMLDivElement | null>; // Allow null
+  isWalletConnected: boolean;
+  setIsWalletConnected: (connected: boolean) => void;
+  setWalletAddress: (address: string | null) => void;
+  scrollAreaRef: React.RefObject<HTMLDivElement | null>;
+  error: Error | null;
+  reload: () => void;
+  stop: () => void;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
 export const ChatProvider = ({ children }: { children: ReactNode }) => {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [inputValue, setInputValue] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [isWalletConnected, setIsWalletConnected] = useState(false); // Default to false
-  const [walletAddress, setWalletAddress] = useState<string | null>(null); // State for wallet address
-  const scrollAreaRef = useRef<HTMLDivElement>(null); // Ref for scrolling
+  // State for wallet connection
+  const [isWalletConnected, setIsWalletConnected] = useState(false);
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const [messageError, setMessageError] = useState<Error | null>(null);
 
-  // Add welcome message on mount
-  useEffect(() => {
-    setMessages([
-      {
-        id: 'welcome-message',
-        text: 'Welcome to Text Wallet! How can I help you today? Connect your wallet to get started.',
-        sender: 'bot',
-      },
-    ]);
-  }, []);
+  // Initialize Vercel AI Chat with proper naming
+  const {
+    messages: vercelMessages,
+    input,
+    handleInputChange,
+    handleSubmit,
+    isLoading,
+    append,
+    reload,
+    stop,
+    error: vercelError
+  } = useVercelAIChat({
+    api: '/api/chat',
+    initialMessages: [], 
+    onFinish: () => {
+      console.log(" Chat message completed successfully");
+      setMessageError(null);
+    },
+    onError: (error) => {
+      console.error(" Chat error:", error);
+      setMessageError(error);
+    }
+  });
+
+  // Convert Vercel AI message format to our app's format
+  const convertedMessages = vercelMessages.map((msg): Message => ({
+    id: msg.id,
+    text: msg.content,
+    sender: msg.role === 'user' ? 'user' : 'bot'
+  }));
 
   // Auto-scroll logic
   useEffect(() => {
@@ -50,61 +74,74 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         viewport.scrollTop = viewport.scrollHeight;
       }
     }
-  }, [messages]);
+  }, [convertedMessages]);
 
+  // Create a wrapper for handleInputChange to maintain compatibility
+  const setInputValue = useCallback((value: string) => {
+    console.log(" Setting input value:", value);
+    handleInputChange({ target: { value } } as React.ChangeEvent<HTMLInputElement>);
+  }, [handleInputChange]);
+
+  // Handler for sending messages
   const sendMessage = useCallback(async (text: string) => {
-    const trimmedText = text.trim();
-    if (!trimmedText || isProcessing || !isWalletConnected) return; // Check wallet connection
-
-    const newUserMessage: Message = { id: Date.now().toString(), text: trimmedText, sender: 'user' };
-
-    setIsProcessing(true);
-    setMessages((prev) => [...prev, newUserMessage]);
-    setInputValue(''); // Clear input after sending
-
-    // --- Mock Bot Response --- (Replace with actual API call)
-    try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      const botResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        text: `"${trimmedText}"`, // Simple echo
-        sender: 'bot',
-      };
-      setMessages((prev) => [...prev, botResponse]);
-    } catch (error) {
-      console.error("Error sending message:", error);
-      const errorResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        text: 'Sorry, something went wrong.',
-        sender: 'bot',
-      };
-      setMessages((prev) => [...prev, errorResponse]);
-    } finally {
-      setIsProcessing(false);
+    if (!text.trim() || isLoading || !isWalletConnected) {
+      console.log(" Cannot send message:", {
+        empty: !text.trim(),
+        isLoading,
+        isWalletConnected
+      });
+      return;
     }
-    // --- End Mock Bot Response ---
-  }, [isProcessing, isWalletConnected]); // Add dependencies
+    
+    try {
+      console.log(" Sending message:", text);
+      setMessageError(null);
+      await append({
+        content: text,
+        role: 'user'
+      });
+      console.log(" Message sent successfully");
+    } catch (error) {
+      console.error(" Error sending message:", error);
+      if (error instanceof Error) {
+        setMessageError(error);
+      } else {
+        setMessageError(new Error("Failed to send message"));
+      }
+    }
+  }, [append, isLoading, isWalletConnected]);
 
   // Clear chat on disconnect
   useEffect(() => {
     if (!isWalletConnected) {
-      setMessages([]); // Clear messages when wallet disconnects
-      setWalletAddress(null); // Clear address too
+      // We can't completely clear the chat with Vercel AI SDK,
+      // but we can reset to initial state on next connection
+      setWalletAddress(null);
     }
   }, [isWalletConnected]);
 
+  // Update error state from Vercel's error
+  useEffect(() => {
+    if (vercelError) {
+      console.error(" Vercel AI SDK error:", vercelError);
+      setMessageError(vercelError);
+    }
+  }, [vercelError]);
+
   const value = {
-    messages,
-    inputValue,
-    walletAddress, // Provide address
+    messages: convertedMessages,
+    inputValue: input,
+    walletAddress,
     setInputValue,
     sendMessage,
-    isProcessing,
+    isProcessing: isLoading,
     isWalletConnected,
     setIsWalletConnected,
-    setWalletAddress, // Provide address setter
+    setWalletAddress,
     scrollAreaRef,
+    error: messageError,
+    reload,
+    stop
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
