@@ -48,13 +48,13 @@ export default function ActivityList() {
   const getActivityIcon = (type: Activity['type']) => {
     switch (type) {
       case 'swap':
-        return <ArrowRightLeft className="h-4 w-4" />;
+        return <ArrowRightLeft className="h-3 w-3" />;
       case 'balance':
-        return <Wallet className="h-4 w-4" />;
+        return <Wallet className="h-3 w-3" />;
       case 'liquidity':
-        return <BarChart2 className="h-4 w-4" />;
+        return <BarChart2 className="h-3 w-3" />;
       default:
-        return <Clock className="h-4 w-4" />;
+        return <Clock className="h-3 w-3" />;
     }
   };
 
@@ -76,7 +76,7 @@ export default function ActivityList() {
       {activities.map((activity, index) => (
         <div
           key={index}
-          className="p-3 rounded-xl border-2 border-black hover:bg-yellow/10 transition-colors active:translate-y-1 active:shadow-none cursor-pointer transition-all duration-100"
+          className="p-3 rounded-xl border-2 border-black hover:bg-yellow/10 active:translate-y-1 active:shadow-none cursor-pointer transition-all duration-100"
           style={{ boxShadow: '4px 4px 0px 0px #000000' }}
         >
           <div className="flex items-start">
@@ -88,7 +88,7 @@ export default function ActivityList() {
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between">
-                <div className="font-bold">{activity.description}</div>
+                <div className="text-sm font-bold">{activity.description}</div>
                 <div className={cn('h-2 w-2 rounded-full', getStatusColor(activity.status))}></div>
               </div>
               <div className="text-sm text-muted-foreground">{activity.timestamp}</div>

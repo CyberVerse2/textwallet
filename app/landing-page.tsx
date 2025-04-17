@@ -66,9 +66,9 @@ const LandingPage = ({ onStartChat }: LandingPageProps) => {
   return (
     <div className="flex-1 flex flex-col justify-center items-center p-6">
       <div className="max-w-4xl w-full text-center mb-12 mx-auto">
-        <div className="inline-flex items-center justify-center gap-3 mb-6 px-3 py-1.5 bg-black rounded-full">
-          <div className="w-2 h-2 rounded-full bg-yellow animate-pulse shadow-[0_0_10px_rgba(255,222,0,0.7)]"></div>
-          <span className="text-sm font-bold text-yellow">Powered by Base Network</span>
+        <div className="inline-flex items-center justify-center gap-3 mb-6 px-3 py-1.5 bg-yellow rounded-full">
+          <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse shadow-[0_0_10px_rgba(255,222,0,0.7)]"></div>
+          <span className="text-sm font-bold text-black">Powered by Base</span>
         </div>
         <h1 className="text-5xl font-bold mb-4">Welcome to Text Wallet</h1>
         <p className="text-xl text-muted-foreground">Your crypto wallet, controlled by text commands.</p>

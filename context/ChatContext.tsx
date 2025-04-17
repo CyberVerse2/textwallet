@@ -68,7 +68,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       await new Promise(resolve => setTimeout(resolve, 1000));
       const botResponse: Message = {
         id: (Date.now() + 1).toString(),
-        text: `Received: "${trimmedText}". Wallet connected: ${isWalletConnected}.`, // Simple echo
+        text: `"${trimmedText}"`, // Simple echo
         sender: 'bot',
       };
       setMessages((prev) => [...prev, botResponse]);
