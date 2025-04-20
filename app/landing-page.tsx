@@ -24,10 +24,9 @@ const LandingPage = ({ onStartChat }: LandingPageProps) => {
   // Use Privy hook to get login function and user info
   const { login, ready, user } = usePrivy();
   
-  // Get user's name or default to "there"
+  // Get user's name or default to "there" - removed Twitter reference to avoid API init issues
   const userName = user ? (
     user.email?.address ? user.email.address.split('@')[0] : 
-    user.twitter?.username ? user.twitter.username : 
     user.wallet?.address ? `${user.wallet.address.slice(0, 6)}...` : 'there'
   ) : 'there';
 
