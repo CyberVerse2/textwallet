@@ -24,6 +24,8 @@ interface ChatContextType {
   error: Error | null;
   reload: () => void;
   stop: () => void;
+  isDelegated: boolean;
+  setIsDelegated: (delegated: boolean) => void;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -32,6 +34,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   // State for wallet connection
   const [isWalletConnected, setIsWalletConnected] = useState(false);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [isDelegated, setIsDelegated] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [messageError, setMessageError] = useState<Error | null>(null);
 
@@ -49,6 +52,10 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   } = useVercelAIChat({
     api: '/api/chat',
     initialMessages: [], 
+    body: {
+      // Pass the wallet ID to the API if wallet is connected and delegated
+      userWalletId: isDelegated && walletAddress ? walletAddress : undefined
+    },
     onFinish: () => {
       console.log(" Chat message completed successfully");
       setMessageError(null);
@@ -95,6 +102,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     
     try {
       console.log(" Sending message:", text);
+      console.log(" Using delegated wallet:", isDelegated && walletAddress ? walletAddress : 'none');
       setMessageError(null);
       await append({
         content: text,
@@ -109,7 +117,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         setMessageError(new Error("Failed to send message"));
       }
     }
-  }, [append, isLoading, isWalletConnected]);
+  }, [append, isLoading, isWalletConnected, isDelegated, walletAddress]);
 
   // Clear chat on disconnect
   useEffect(() => {
@@ -117,6 +125,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       // We can't completely clear the chat with Vercel AI SDK,
       // but we can reset to initial state on next connection
       setWalletAddress(null);
+      setIsDelegated(false);
     }
   }, [isWalletConnected]);
 
@@ -141,7 +150,9 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     scrollAreaRef,
     error: messageError,
     reload,
-    stop
+    stop,
+    isDelegated,
+    setIsDelegated
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
