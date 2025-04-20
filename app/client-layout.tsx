@@ -10,7 +10,7 @@ import ActivityList from "./activity-list"
 import "./globals.css"
 import { ChatProvider, useChat } from '@/context/ChatContext';
 import { shortenAddress } from "@/lib/utils"; // Import shortenAddress at the top
-import { usePrivy, useWallets, useFundWallet } from "@privy-io/react-auth"; // Import Privy hooks
+import { usePrivy, useWallets, useFundWallet, useHeadlessDelegatedActions } from "@privy-io/react-auth"; // Import Privy hooks
 import { base } from "viem/chains"; // Import Base chain configuration
 
 // Create a ref to hold the SidebarTabs component
@@ -44,12 +44,13 @@ interface SidebarProps {
 // Create a forwardRef component for Sidebar to properly handle refs
 const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar(props, ref) {
   // Use Chat context setters
-  const { setIsWalletConnected, setWalletAddress } = useChat();
+  const { setIsWalletConnected, setWalletAddress, setIsDelegated } = useChat();
 
   // Use Privy hooks
   const { ready, authenticated, user, login, logout, exportWallet } = usePrivy();
   const { wallets } = useWallets();
   const { fundWallet } = useFundWallet(); // Add fund wallet hook
+  const { delegateWallet } = useHeadlessDelegatedActions(); // Add delegation hook
 
   // Specifically get Privy's embedded wallet
   const connectedWallet = wallets.find(wallet => wallet.walletClientType === 'privy');
@@ -58,6 +59,8 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
   const [isCopied, setIsCopied] = useState(false);
   // State for funding
   const [isFunding, setIsFunding] = useState(false);
+  // State for delegation process
+  const [isDelegating, setIsDelegating] = useState(false);
   // Create a ref to the SidebarTabs component to access the refresh function
   const tabsRef = useRef<{ refreshBalances: () => void } | null>(null);
   
@@ -74,13 +77,77 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
   const isWalletEffectivelyConnected = ready && authenticated && !!connectedWallet;
   const displayAddress = isWalletEffectivelyConnected ? connectedWallet.address : null;
 
+  // Check localStorage for delegation status on initial load
+  useEffect(() => {
+    if (typeof window !== 'undefined' && displayAddress) {
+      const storedDelegations = localStorage.getItem('privyDelegatedWallets');
+      if (storedDelegations) {
+        const delegations = JSON.parse(storedDelegations);
+        const isCurrentWalletDelegated = delegations.includes(displayAddress);
+        setIsDelegated(isCurrentWalletDelegated);
+        console.log(`Wallet delegation status loaded from storage: ${isCurrentWalletDelegated}`);
+      }
+    }
+  }, [displayAddress, setIsDelegated]);
+
+  // Auto-delegate wallet when connected
+  useEffect(() => {
+    const checkAndDelegateWallet = async () => {
+      if (!displayAddress || isDelegating) return;
+
+      // Check local storage for delegation status
+      const storedDelegations = localStorage.getItem('privyDelegatedWallets');
+      const delegations = storedDelegations ? JSON.parse(storedDelegations) : [];
+      const isAlreadyDelegated = delegations.includes(displayAddress);
+
+      if (!isAlreadyDelegated) {
+        console.log('Automatically prompting for wallet delegation');
+        setIsDelegating(true);
+        
+        try {
+          // Delegate the wallet
+          await delegateWallet({
+            address: displayAddress,
+            chainType: 'ethereum'
+          });
+          
+          // Store delegation status in localStorage
+          const updatedDelegations = [...delegations, displayAddress];
+          localStorage.setItem('privyDelegatedWallets', JSON.stringify(updatedDelegations));
+          
+          // Update context state
+          setIsDelegated(true);
+          console.log('Wallet delegated successfully');
+        } catch (error) {
+          console.error('Failed to delegate wallet:', error);
+        } finally {
+          setIsDelegating(false);
+        }
+      } else {
+        // Already delegated, just update context
+        setIsDelegated(true);
+        console.log('Wallet already delegated, state restored');
+      }
+    };
+
+    if (isWalletEffectivelyConnected && ready) {
+      checkAndDelegateWallet();
+    }
+  }, [isWalletEffectivelyConnected, ready, displayAddress, delegateWallet, setIsDelegated]);
+
   // Update context based on Privy state
   useEffect(() => {
     if (ready) {
       setIsWalletConnected(authenticated && !!connectedWallet);
-      setWalletAddress(authenticated && connectedWallet ? connectedWallet.address : null);
+      
+      if (authenticated && connectedWallet) {
+        setWalletAddress(connectedWallet.address);
+      } else {
+        setWalletAddress(null);
+        setIsDelegated(false);
+      }
     }
-  }, [ready, authenticated, connectedWallet, setIsWalletConnected, setWalletAddress]);
+  }, [ready, authenticated, connectedWallet, setIsWalletConnected, setWalletAddress, setIsDelegated]);
 
   // Handle wallet funding
   const handleFundWallet = async () => {
