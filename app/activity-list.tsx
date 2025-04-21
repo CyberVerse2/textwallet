@@ -11,7 +11,12 @@ interface Activity {
   status: 'completed' | 'pending' | 'failed';
 }
 
-export default function ActivityList() {
+interface ActivityListProps {
+  walletAddress?: string | null;
+  refreshTrigger?: number;
+}
+
+export default function ActivityList({ walletAddress, refreshTrigger }: ActivityListProps) {
   const [activities] = useState<Activity[]>([
     {
       type: 'swap',
