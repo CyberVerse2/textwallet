@@ -1,6 +1,9 @@
 "use client";
 
 import { PrivyProvider } from "@privy-io/react-auth";
+import { Toaster } from "@/components/ui/toaster";
+import { ChatProvider } from "@/context/ChatContext";
+import { SupabaseAuthSyncProvider } from "@/components/supabase-auth-sync";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const privyAppId = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
@@ -40,7 +43,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
         // },
       }}
     >
-      {children}
+      <SupabaseAuthSyncProvider>
+        <ChatProvider>
+          <Toaster />
+          {children}
+        </ChatProvider>
+      </SupabaseAuthSyncProvider>
     </PrivyProvider>
   );
 }
