@@ -19,6 +19,11 @@ CREATE TABLE IF NOT EXISTS public.server_wallets (
   last_used TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Create unique constraint to ensure only one active wallet per user
+CREATE UNIQUE INDEX IF NOT EXISTS idx_server_wallets_unique_active 
+  ON public.server_wallets (user_id) 
+  WHERE is_active = TRUE;
+
 -- Create transactions table
 CREATE TABLE IF NOT EXISTS public.transactions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
