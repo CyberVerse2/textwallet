@@ -1,104 +1,151 @@
+import { AgentKit } from '@coinbase/agentkit';
+import { getVercelAITools } from '@coinbase/agentkit-vercel-ai-sdk';
+import { streamText, Message as VercelMessage } from 'ai';
 import { anthropic, AnthropicProviderOptions } from '@ai-sdk/anthropic';
-import { streamText, Message, generateText } from 'ai';
+import { supabase } from '@/lib/supabaseClient';
 
-// Handle AgentKit imports when needed instead of at the top level
+// Define the types for our API request body
+interface RequestBody {
+  messages: VercelMessage[];
+  useWallet?: boolean;
+  userId?: string | null;
+}
+
 export async function POST(req: Request) {
-  console.log('🤖 Chat API Route: Request received', new Date().toISOString());
-
   try {
-    const requestBody = await req.json();
-    let { messages, userWalletId } = requestBody;
-    const useOnchainTools = !!userWalletId;
+    console.log('🤖 Chat API Route: Started');
     
-    console.log('🤖 Chat API Route: Messages received', {
-      count: messages.length,
-      format: messages.length > 0 ? 
-        `role: ${messages[messages.length - 1]?.role}, content available: ${!!messages[messages.length - 1]?.content}` : 
-        'none',
-      useOnchainTools,
-      userWalletId: userWalletId ? `${userWalletId.slice(0, 6)}...${userWalletId.slice(-4)}` : 'none'
-    });
-
-    // Validate message format
-    if (!Array.isArray(messages)) {
-      throw new Error('Invalid messages format: messages must be an array');
-    }
+    const {
+      messages,
+      useWallet = true, // Always enable wallet by default
+      userId,
+    }: RequestBody = await req.json();
     
-    if (messages.length > 0 && (!messages[0].role || !messages[0].content)) {
-      console.warn('🤖 Chat API Route: Messages may have incorrect format, attempting to fix...');
+    // Default to using server wallet
+    if (useWallet && 
+        process.env.NEXT_PUBLIC_PRIVY_APP_ID &&
+        process.env.NEXT_PUBLIC_PRIVY_APP_SECRET) {
       
-      // Try to fix incorrectly formatted messages from the context
-      messages = messages.map((msg: any): Message => {
-        // If using the old format with sender/text
-        if (msg.sender && msg.text) {
-          return {
-            id: msg.id || Math.random().toString(36).substring(2, 15),
-            role: msg.sender === 'user' ? 'user' : 'assistant',
-            content: msg.text
-          };
-        }
-        // Already in the correct format
-        else if (msg.role && msg.content) {
-          return msg;
-        }
-        // Unrecognized format
-        else {
-          console.error('🤖 Chat API Route: Unrecognized message format', msg);
-          throw new Error('Invalid message format');
-        }
-      });
-    }
-
-    // Ensure ANTHROPIC_API_KEY is available
-    if (!process.env.ANTHROPIC_API_KEY) {
-      throw new Error('ANTHROPIC_API_KEY is not set');
-    }
-
-    // Check if we should use wallet features
-    if (useOnchainTools) {
       try {
-        // Validate required environment variables
-        if (!process.env.NEXT_PUBLIC_PRIVY_APP_ID || !process.env.NEXT_PUBLIC_PRIVY_APP_SECRET) {
-          throw new Error('PRIVY_APP_ID and PRIVY_APP_SECRET environment variables must be set');
+        console.log('🤖 Chat API Route: Loading AgentKit...');
+        
+        // Check if we have a valid userId
+        if (!userId) {
+          throw new Error('Missing userId for wallet operations');
         }
-
-        console.log('🔐 Setting up delegated wallet provider for address:', userWalletId);
         
-        // Dynamically import AgentKit to avoid initialization issues
-        const { AgentKit, PrivyEvmDelegatedEmbeddedWalletProvider } = await import('@coinbase/agentkit');
-        const { getVercelAITools } = await import('@coinbase/agentkit-vercel-ai-sdk');
+        // Use upsert pattern for user - only inserts if not exists
+        const { error: upsertError } = await supabase
+          .from('users')
+          .upsert(
+            {
+              privy_user_id: userId,
+              last_login: new Date().toISOString()
+            },
+            { 
+              onConflict: 'privy_user_id',
+              ignoreDuplicates: true 
+            }
+          );
+          
+        if (upsertError) {
+          console.error('Warning - user upsert issue:', upsertError);
+          // Continue anyway - user might already exist
+        }
         
-        // Configure the wallet provider with the user's delegated wallet
+        // Get the user's server wallet from Supabase
+        const { data: serverWallet, error: walletError } = await supabase
+          .from('server_wallets')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('is_active', true)
+          .single();
+        
+        if (walletError || !serverWallet) {
+          // Try to create a server wallet
+          const createResponse = await fetch(`${new URL(req.url).origin}/api/create-server-wallet`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ userId })
+          });
+          
+          if (!createResponse.ok) {
+            throw new Error('Failed to create server wallet');
+          }
+          
+          // Get the newly created wallet
+          const { data: newWallet } = await supabase
+            .from('server_wallets')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('is_active', true)
+            .single();
+          
+          if (!newWallet) {
+            throw new Error('Server wallet not found after creation');
+          }
+          
+          console.log(`🤖 Using newly created server wallet: ${newWallet.address}`);
+        } else {
+          console.log(`🤖 Using existing server wallet: ${serverWallet.address}`);
+        }
+        
+        // Dynamically import the provider to avoid issues with imports
+        const { AgentKit, PrivyEvmWalletProvider } = await import('@coinbase/agentkit');
+        
+        // Ensure environment variables exist
+        const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
+        const appSecret = process.env.NEXT_PUBLIC_PRIVY_APP_SECRET;
+        
+        if (!appId || !appSecret) {
+          throw new Error('Missing Privy credentials');
+        }
+        
+        // Create wallet config with our user-specific server wallet
         const walletConfig = {
-          appId: process.env.NEXT_PUBLIC_PRIVY_APP_ID,
-          appSecret: process.env.NEXT_PUBLIC_PRIVY_APP_SECRET,
-          chainId: process.env.PRIVY_CHAIN_ID || '84532', // Base Sepolia by default
-          walletId: userWalletId, // Use the user's delegated wallet ID
-          walletType: "embedded" as const // Required by the type definition
+          appId,
+          appSecret,
+          // Use Base mainnet
+          chainId: process.env.PRIVY_CHAIN_ID || '8453',
+          // Use deterministic ID for this user
+          userId: `server-wallet-${userId}`
         };
         
-        // Set up the delegated wallet provider
-        const walletProvider = await PrivyEvmDelegatedEmbeddedWalletProvider.configureWithWallet(walletConfig);
-        console.log('🔐 Privy delegated wallet provider configured successfully');
+        console.log('🤖 Wallet config:', {
+          appId: walletConfig.appId.substring(0, 5) + '...',
+          chainId: walletConfig.chainId
+        });
         
-        // Initialize AgentKit with the wallet provider
-        const agentKitConfig: any = { walletProvider };
+        // Configure AgentKit with server wallet
+        console.log('🤖 Chat API Route: Setting up AgentKit with server wallet...');
+        const walletProvider = await PrivyEvmWalletProvider.configureWithWallet(walletConfig);
         
-        // Add CDP API keys if available
+        const agentKitConfig: any = {
+          walletProvider
+        };
+        
+        // Add CDP API keys if present
         if (process.env.CDP_API_KEY_NAME && process.env.CDP_API_KEY_PRIVATE_KEY) {
           agentKitConfig.cdpApiKeyName = process.env.CDP_API_KEY_NAME;
           agentKitConfig.cdpApiKeyPrivateKey = process.env.CDP_API_KEY_PRIVATE_KEY;
         }
-        
+
         const agentKit = await AgentKit.from(agentKitConfig);
-        const tools = await getVercelAITools(agentKit);
+        const tools = getVercelAITools(agentKit);
         
-        console.log('🤖 Chat API Route: Generating response with wallet access...');
-        
-        // Generate a response with wallet access using Claude
-        const result = await generateText({
+        // Get wallet address
+        const serverWalletAddress = await walletProvider.getAddress();
+        console.log(`🤖 Using server wallet: ${serverWalletAddress}`);
+
+        console.log('🤖 Chat API Route: Generating response with server wallet access...');
+
+        // Generate a response with server wallet access using Claude with streaming
+        const result = await streamText({
           model: anthropic('claude-3-7-sonnet-20250219'),
-          system: 'You are an onchain AI assistant with access to a wallet. You can perform blockchain operations through the provided tools. Always explain what you are doing and why.',
+          system:
+            'You are an onchain AI assistant with access to a server wallet. You can perform blockchain operations through the provided tools. Always explain what you are doing and why.',
           messages,
           tools,
           maxSteps: 10,
@@ -108,49 +155,46 @@ export async function POST(req: Request) {
             } satisfies AnthropicProviderOptions
           }
         });
+
+        // Return the streamed response
+        return result.toDataStreamResponse();
+      } catch (walletError) {
+        // If wallet initialization fails, log the error and fall back to regular chat
+        console.error('🤖 Chat API Route: Wallet initialization failed:', walletError);
+        console.log('🤖 Chat API Route: Falling back to regular chat...');
         
-        // Return the result as a text stream
-        return new Response(result.text, {
-          headers: { 'Content-Type': 'text/plain' }
-        });
-      } catch (error) {
-        console.error('🤖 Chat API Route ERROR with wallet operations:', error);
-        throw new Error(`Failed to initialize wallet: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        // Continue to regular chat flow without wallet
+        return await regularChatResponse(messages);
       }
     } else {
-      // Standard chat without wallet access
-      const result = streamText({
-        model: anthropic('claude-3-7-sonnet-20250219'),
-        messages,
-        providerOptions: {
-          anthropic: {
-            thinking: { type: 'enabled', budgetTokens: 12000 }
-          } satisfies AnthropicProviderOptions
-        }
-      });
-
-      console.log('🤖 Chat API Route: Stream created, sending to client...');
-      
-      const response = result.toDataStreamResponse();
-      
-      setTimeout(() => {
-        console.log('🤖 Chat API Route: Stream started');
-      }, 500);
-
-      return response;
+      // If not using any wallet, just use regular chat
+      console.log('🤖 Chat API Route: Using regular chat (no wallet)...');
+      return await regularChatResponse(messages);
     }
   } catch (error) {
-    console.error('🤖 Chat API Route ERROR:', error);
-    return new Response(
-      JSON.stringify({
-        error: 'Failed to process chat request',
-        message: error instanceof Error ? error.message : 'Unknown error',
-        time: new Date().toISOString()
-      }),
-      {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      }
-    );
+    // Handle general errors
+    console.error('🤖 Chat API Route Error:', error);
+    return new Response(JSON.stringify({ error: 'Failed to process chat request' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
+}
+
+// Helper function for regular chat response without wallet
+async function regularChatResponse(messages: VercelMessage[]) {
+  const result = await streamText({
+    model: anthropic('claude-3-7-sonnet-20250219'),
+    system:
+      'You are an AI assistant that helps people understand and use crypto wallets. You cannot directly access or control wallets, but you can explain concepts and guide users.',
+    messages,
+    providerOptions: {
+      anthropic: {
+        thinking: { type: 'enabled', budgetTokens: 12000 }
+      } satisfies AnthropicProviderOptions
+    }
+  });
+  
+  // Return the streamed response
+  return result.toDataStreamResponse();
 }
