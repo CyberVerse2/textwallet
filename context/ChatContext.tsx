@@ -2,6 +2,7 @@
 
 import React, { createContext, useState, useContext, ReactNode, useCallback, useEffect, useRef } from 'react';
 import { useChat as useVercelAIChat } from '@ai-sdk/react';
+import { usePrivy } from '@privy-io/react-auth';
 
 // Keep the original Message interface for compatibility with existing components
 interface Message {
@@ -24,8 +25,6 @@ interface ChatContextType {
   error: Error | null;
   reload: () => void;
   stop: () => void;
-  isDelegated: boolean;
-  setIsDelegated: (delegated: boolean) => void;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -34,9 +33,10 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   // State for wallet connection
   const [isWalletConnected, setIsWalletConnected] = useState(false);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [isDelegated, setIsDelegated] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [messageError, setMessageError] = useState<Error | null>(null);
+
+  const { user, authenticated } = usePrivy();
 
   // Initialize Vercel AI Chat with proper naming
   const {
@@ -53,8 +53,10 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     api: '/api/chat',
     initialMessages: [], 
     body: {
-      // Pass the wallet ID to the API if wallet is connected and delegated
-      userWalletId: isDelegated && walletAddress ? walletAddress : undefined
+      // Always use the server wallet - no option to disable
+      useWallet: true,
+      // Pass the user identifier for wallet operations - use either Privy ID or wallet address
+      userId: user?.id || walletAddress || null
     },
     onFinish: () => {
       console.log(" Chat message completed successfully");
@@ -102,7 +104,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     
     try {
       console.log(" Sending message:", text);
-      console.log(" Using delegated wallet:", isDelegated && walletAddress ? walletAddress : 'none');
+      console.log(" Using server wallet:", isWalletConnected);
       setMessageError(null);
       await append({
         content: text,
@@ -117,7 +119,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         setMessageError(new Error("Failed to send message"));
       }
     }
-  }, [append, isLoading, isWalletConnected, isDelegated, walletAddress]);
+  }, [append, isLoading, isWalletConnected]);
 
   // Clear chat on disconnect
   useEffect(() => {
@@ -125,7 +127,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       // We can't completely clear the chat with Vercel AI SDK,
       // but we can reset to initial state on next connection
       setWalletAddress(null);
-      setIsDelegated(false);
     }
   }, [isWalletConnected]);
 
@@ -150,9 +151,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     scrollAreaRef,
     error: messageError,
     reload,
-    stop,
-    isDelegated,
-    setIsDelegated
+    stop
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
