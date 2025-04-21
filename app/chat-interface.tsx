@@ -36,6 +36,7 @@ const ChatInterface = ({ onGoBack }: ChatInterfaceProps) => {
     sendMessage, 
     isProcessing,
     isWalletConnected,
+    walletAddress,
     scrollAreaRef,
     error
   } = useChat();
