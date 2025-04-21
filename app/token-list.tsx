@@ -28,9 +28,11 @@ export function isNativeBalance(item: DisplayBalance): item is NativeBalance {
 }
  
 interface TokenListProps {
-  tokens: DisplayBalance[];
-  isLoading: boolean;
+  tokens?: DisplayBalance[];
+  isLoading?: boolean;
   showSmallBalances?: boolean; // Add prop to control visibility of small balances
+  walletAddress?: string | null; // Add wallet address prop
+  refreshTrigger?: number; // Add refresh trigger prop
 }
 
 // Function to determine if a balance is considered "small"
@@ -52,11 +54,11 @@ const isSmallBalance = (token: DisplayBalance): boolean => {
   return balance < 1;
 };
 
-const TokenList: React.FC<TokenListProps> = React.memo(({ tokens, isLoading, showSmallBalances = false }) => {
+const TokenList: React.FC<TokenListProps> = React.memo(({ tokens = [], isLoading, showSmallBalances = false, walletAddress, refreshTrigger }) => {
   // Filter tokens to remove small balances if not showing them
   const filteredTokens = showSmallBalances 
     ? tokens 
-    : tokens.filter(token => !isSmallBalance(token));
+    : (tokens || []).filter(token => !isSmallBalance(token));
 
   if (isLoading) {
     return (
