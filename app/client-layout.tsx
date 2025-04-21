@@ -7,10 +7,11 @@ import { ChevronDown, Image, BarChart2, Settings, LogOut, Activity, Wallet, Copy
 import { Button } from "@/components/ui/button"
 import TokenList from "./token-list"
 import ActivityList from "./activity-list"
+import WalletBridge from "@/components/wallet-bridge"
 import "./globals.css"
 import { ChatProvider, useChat } from '@/context/ChatContext';
 import { shortenAddress } from "@/lib/utils"; // Import shortenAddress at the top
-import { usePrivy, useWallets, useFundWallet, useHeadlessDelegatedActions } from "@privy-io/react-auth"; // Import Privy hooks
+import { usePrivy, useWallets, useFundWallet } from "@privy-io/react-auth"; // Remove delegation hook
 import { base } from "viem/chains"; // Import Base chain configuration
 
 // Create a ref to hold the SidebarTabs component
@@ -44,13 +45,12 @@ interface SidebarProps {
 // Create a forwardRef component for Sidebar to properly handle refs
 const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar(props, ref) {
   // Use Chat context setters
-  const { setIsWalletConnected, setWalletAddress, setIsDelegated } = useChat();
+  const { setIsWalletConnected, setWalletAddress } = useChat();
 
   // Use Privy hooks
   const { ready, authenticated, user, login, logout, exportWallet } = usePrivy();
   const { wallets } = useWallets();
   const { fundWallet } = useFundWallet(); // Add fund wallet hook
-  const { delegateWallet } = useHeadlessDelegatedActions(); // Add delegation hook
 
   // Specifically get Privy's embedded wallet
   const connectedWallet = wallets.find(wallet => wallet.walletClientType === 'privy');
@@ -59,8 +59,6 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
   const [isCopied, setIsCopied] = useState(false);
   // State for funding
   const [isFunding, setIsFunding] = useState(false);
-  // State for delegation process
-  const [isDelegating, setIsDelegating] = useState(false);
   // Create a ref to the SidebarTabs component to access the refresh function
   const tabsRef = useRef<{ refreshBalances: () => void } | null>(null);
   
@@ -77,64 +75,6 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
   const isWalletEffectivelyConnected = ready && authenticated && !!connectedWallet;
   const displayAddress = isWalletEffectivelyConnected ? connectedWallet.address : null;
 
-  // Check localStorage for delegation status on initial load
-  useEffect(() => {
-    if (typeof window !== 'undefined' && displayAddress) {
-      const storedDelegations = localStorage.getItem('privyDelegatedWallets');
-      if (storedDelegations) {
-        const delegations = JSON.parse(storedDelegations);
-        const isCurrentWalletDelegated = delegations.includes(displayAddress);
-        setIsDelegated(isCurrentWalletDelegated);
-        console.log(`Wallet delegation status loaded from storage: ${isCurrentWalletDelegated}`);
-      }
-    }
-  }, [displayAddress, setIsDelegated]);
-
-  // Auto-delegate wallet when connected
-  useEffect(() => {
-    const checkAndDelegateWallet = async () => {
-      if (!displayAddress || isDelegating) return;
-
-      // Check local storage for delegation status
-      const storedDelegations = localStorage.getItem('privyDelegatedWallets');
-      const delegations = storedDelegations ? JSON.parse(storedDelegations) : [];
-      const isAlreadyDelegated = delegations.includes(displayAddress);
-
-      if (!isAlreadyDelegated) {
-        console.log('Automatically prompting for wallet delegation');
-        setIsDelegating(true);
-        
-        try {
-          // Delegate the wallet
-          await delegateWallet({
-            address: displayAddress,
-            chainType: 'ethereum'
-          });
-          
-          // Store delegation status in localStorage
-          const updatedDelegations = [...delegations, displayAddress];
-          localStorage.setItem('privyDelegatedWallets', JSON.stringify(updatedDelegations));
-          
-          // Update context state
-          setIsDelegated(true);
-          console.log('Wallet delegated successfully');
-        } catch (error) {
-          console.error('Failed to delegate wallet:', error);
-        } finally {
-          setIsDelegating(false);
-        }
-      } else {
-        // Already delegated, just update context
-        setIsDelegated(true);
-        console.log('Wallet already delegated, state restored');
-      }
-    };
-
-    if (isWalletEffectivelyConnected && ready) {
-      checkAndDelegateWallet();
-    }
-  }, [isWalletEffectivelyConnected, ready, displayAddress, delegateWallet, setIsDelegated]);
-
   // Update context based on Privy state
   useEffect(() => {
     if (ready) {
@@ -144,10 +84,9 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
         setWalletAddress(connectedWallet.address);
       } else {
         setWalletAddress(null);
-        setIsDelegated(false);
       }
     }
-  }, [ready, authenticated, connectedWallet, setIsWalletConnected, setWalletAddress, setIsDelegated]);
+  }, [ready, authenticated, connectedWallet, setIsWalletConnected, setWalletAddress]);
 
   // Handle wallet funding
   const handleFundWallet = async () => {
@@ -306,15 +245,12 @@ const SidebarTabs = forwardRef<{ refreshBalances: () => void }, {
   isWalletConnected: boolean, 
   walletAddress: string | null 
 }>(function SidebarTabs({ isWalletConnected, walletAddress }, ref) {
-  const [activeTab, setActiveTab] = useState('assets');
-  // Create a ref to hold the refresh function that will be set by the AssetsSection
-  const refreshBalancesRef = useRef<(() => void) | null>(null);
+  const [activeTab, setActiveTab] = useState<'tokens' | 'activity' | 'bridge'>('tokens');
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  // Function to trigger balance refresh that can be called from outside components
+  // Function to refresh balances
   const refreshBalances = () => {
-    if (refreshBalancesRef.current) {
-      refreshBalancesRef.current();
-    }
+    setRefreshTrigger(prev => prev + 1);
   };
   
   // Expose the refreshBalances method to parent components
@@ -323,48 +259,50 @@ const SidebarTabs = forwardRef<{ refreshBalances: () => void }, {
   }));
 
   return (
-    <div className="space-y-6">
-      <div className="flex border-b-2 border-black mb-4">
-        <TabButton name="assets" activeTab={activeTab} setActiveTab={setActiveTab}>
-          <Wallet className="mr-2 h-4 w-4" /> Assets
-        </TabButton>
-        <TabButton name="activity" activeTab={activeTab} setActiveTab={setActiveTab}>
-          <Activity className="mr-2 h-4 w-4" /> Activity
-        </TabButton>
+    <div>
+      {/* Tab Buttons */}
+      <div className="flex mb-6 p-1 bg-gray-100 rounded-xl">
+        <button
+          onClick={() => setActiveTab('tokens')}
+          className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium ${
+            activeTab === 'tokens' ? 'bg-white border-2 border-black shadow-sm' : 'text-gray-500 hover:text-gray-900'
+          }`}
+        >
+          Tokens
+        </button>
+        <button
+          onClick={() => setActiveTab('activity')}
+          className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium ${
+            activeTab === 'activity' ? 'bg-white border-2 border-black shadow-sm' : 'text-gray-500 hover:text-gray-900'
+          }`}
+        >
+          Activity
+        </button>
+        <button
+          onClick={() => setActiveTab('bridge')}
+          className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium ${
+            activeTab === 'bridge' ? 'bg-white border-2 border-black shadow-sm' : 'text-gray-500 hover:text-gray-900'
+          }`}
+        >
+          Bridge
+        </button>
       </div>
 
-      {activeTab === 'assets' ? (
-        <AssetsSection 
-          isWalletConnected={isWalletConnected} 
-          walletAddress={walletAddress} 
-          setRefreshBalancesRef={fn => refreshBalancesRef.current = fn} 
-        /> // Pass address and refresh function setter
-      ) : (
-        <ActivitySection />
-      )}
+      {/* Tab Content */}
+      <div className="space-y-4">
+        {activeTab === 'tokens' && (
+          <TokenList walletAddress={walletAddress} refreshTrigger={refreshTrigger} />
+        )}
+        {activeTab === 'activity' && (
+          <ActivityList walletAddress={walletAddress} refreshTrigger={refreshTrigger} />
+        )}
+        {activeTab === 'bridge' && (
+          <WalletBridge />
+        )}
+      </div>
     </div>
   );
 });
-
-interface TabButtonProps {
-  name: string;
-  activeTab: string;
-  setActiveTab: (name: string) => void;
-  children: React.ReactNode;
-}
-
-function TabButton({ name, activeTab, setActiveTab, children }: TabButtonProps) {
-  const isActive = name === activeTab;
-  return (
-    <Button
-      variant="ghost"
-      className={`flex-1 justify-center rounded-none font-bold text-sm h-10 relative after:content-[''] after:absolute after:bottom-[-2px] after:left-0 after:right-0 after:h-1 ${isActive ? 'after:bg-black' : 'text-muted-foreground hover:bg-yellow/10'}`}
-      onClick={() => setActiveTab(name)}
-    >
-      {children}
-    </Button>
-  );
-}
 
 // --- AssetsSection ---
 import { type DisplayBalance } from './token-list'; // Import the type
