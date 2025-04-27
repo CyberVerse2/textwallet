@@ -55,8 +55,10 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     body: {
       // Always use the server wallet - no option to disable
       useWallet: true,
-      // Pass the user identifier for wallet operations - use either Privy ID or wallet address
-      userId: user?.id || walletAddress || null
+      // Pass the user identifier (Privy DID)
+      userId: user?.id || null, 
+      // Fetch and send the specific wallet ID as walletId
+      walletId: user?.wallet?.id || null 
     },
     onFinish: () => {
       console.log(" Chat message completed successfully");
@@ -119,7 +121,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         setMessageError(new Error("Failed to send message"));
       }
     }
-  }, [append, isLoading, isWalletConnected]);
+  }, [append, isLoading, isWalletConnected, user?.id, user?.wallet?.id]);
 
   // Clear chat on disconnect
   useEffect(() => {
