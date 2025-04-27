@@ -104,8 +104,8 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         try {
           console.log('Attempting to delegate wallet:', user.wallet.address);
           // Specify chainType if needed, assuming 'ethereum' based on context
-          await delegateWallet({ 
-            address: user.wallet.address, 
+          await delegateWallet({
+            address: user.wallet.address,
             chainType: 'ethereum' // Or derive from wallet object if available
           });
           console.log('Wallet delegation successful or already active.');
@@ -119,10 +119,16 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     };
 
     if (authenticated && user?.wallet) {
-      handleDelegate();
+      // Introduce a small delay to allow Privy proxy to initialize
+      const timer = setTimeout(() => {
+        handleDelegate();
+      }, 300); // 300ms delay
+
+      // Clear timeout if component unmounts or dependencies change
+      return () => clearTimeout(timer);
     }
-     // Run when authenticated status or user/wallet object changes
-  }, [authenticated, user, delegateWallet]); 
+    // Run when authenticated status or user/wallet object changes
+  }, [authenticated, user, delegateWallet]);
 
   // Create a wrapper for handleInputChange to maintain compatibility
   const setInputValue = useCallback(
