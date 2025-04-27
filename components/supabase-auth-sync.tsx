@@ -1,130 +1,112 @@
-'use client';
-
-import { ReactNode, useEffect, useState } from 'react';
+import { useEffect, useState, createContext, useContext, ReactNode } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
+import { useToast } from '@/components/ui/use-toast';
+// Keep the client-side supabase for other potential uses (like RLS-protected reads)
 import { supabase } from '@/lib/supabaseClient';
-import { useToast } from "@/components/ui/use-toast";
+// Import ensureServerWallet - adjust path if needed
+import { ensureServerWallet } from '@/lib/server-wallet';
 
-export function SupabaseAuthSyncProvider({ children }: { children: ReactNode }) {
-  const { ready, authenticated, user } = usePrivy();
-  const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(true);
+interface AuthContextType {
+  isInitialized: boolean;
+  isLoading: boolean;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export const SupabaseAuthSyncProvider = ({ children }: { children: ReactNode }) => {
+  const { ready, authenticated, user, getAccessToken } = usePrivy();
   const [isInitialized, setIsInitialized] = useState(false);
-  const [serverWalletAddress, setServerWalletAddress] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true); // Start loading until ready/auth state is known
+  const { toast } = useToast();
 
-  // Handle user authentication and Supabase sync
   useEffect(() => {
-    if (!ready) return;
+    // Wait for Privy to be ready
+    if (!ready) {
+      setIsLoading(true);
+      return;
+    }
 
-    const syncUserWithSupabase = async () => {
-      if (!authenticated || !user) {
-        // User is logged out, clear state
-        setServerWalletAddress(null);
+    // If ready but not authenticated, or no user object, we are done loading
+    if (!authenticated || !user) {
         setIsLoading(false);
+        setIsInitialized(true); // Consider initialized if definitely not logged in
         return;
-      }
+    }
+
+    // Define the async function to sync and setup user
+    const syncAndSetupUser = async () => {
+      // Prevent starting sync if already loading or initialized
+      if (isLoading || isInitialized) return;
+
+      setIsLoading(true);
+      console.log('[AuthSync] Privy authenticated, user:', user.id);
+      console.log('[AuthSync] Attempting backend sync...');
 
       try {
-        setIsLoading(true);
-        console.log('🔄 Syncing Privy user with Supabase:', user.id);
-        
-        // Create or update user in Supabase with upsert
-        const { error: upsertError } = await supabase
-          .from('users')
-          .upsert(
-            {
-              privy_user_id: user.id,
-              email: user.email?.address || null,
-              last_login: new Date().toISOString(),
-            },
-            { 
-              onConflict: 'privy_user_id',
-              ignoreDuplicates: false // Update the last login timestamp
-            }
-          );
-          
-        if (upsertError) {
-          console.error('❌ Error syncing user with Supabase:', upsertError);
-          toast({
-            title: "Authentication Error",
-            description: "Failed to sync your account. Please refresh and try again.",
-            variant: "destructive"
-          });
-          setIsLoading(false);
-          return;
+        // 1. Get Privy access token
+        const authToken = await getAccessToken();
+        if (!authToken) {
+          throw new Error('Could not retrieve Privy access token.');
         }
-            
-        // Now ensure they have a server wallet
-        await ensureServerWallet(user.id);
-        
-        // Mark initialization as complete
-        setIsInitialized(true);
-      } catch (err) {
-        console.error('❌ Error in auth sync:', err);
-        toast({
-          title: "Authentication Error",
-          description: "Failed to complete setup. Please refresh and try again.",
-          variant: "destructive"
+        console.log('[AuthSync] Retrieved Privy token.');
+
+        // 2. Call the backend API route to sync the user
+        const response = await fetch('/api/sync-user', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`,
+          },
         });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          console.error('❌ Error syncing user via backend:', result);
+          throw new Error(result.message || 'Failed to sync user via backend.');
+        }
+
+        console.log('[AuthSync] Backend sync successful:', result.message, 'User ID:', result.userId);
+
+        // 3. Ensure server wallet exists (after successful sync)
+        // Pass the client-side supabase instance if ensureServerWallet needs it for RLS checks
+        await ensureServerWallet(user.id, supabase);
+
+        setIsInitialized(true);
+        console.log('[AuthSync] User sync and setup complete.');
+
+      } catch (err: any) {
+        console.error('❌ Error during auth sync process:', err);
+        toast({
+          title: 'Authentication Setup Error',
+          description: err.message || 'Failed to complete setup. Please refresh and try again.',
+          variant: 'destructive',
+        });
+        // Keep loading false, but maybe set initialized false if setup is critical?
+        // For now, let's assume partial success might be okay, or user needs to refresh.
+        setIsInitialized(false); // Indicate setup didn't fully complete
       } finally {
         setIsLoading(false);
       }
     };
 
-    syncUserWithSupabase();
-  }, [ready, authenticated, user, toast]);
+    // Trigger the sync only if authenticated and not already initialized/loading
+    syncAndSetupUser();
 
-  // Fetch or create a server wallet for the user
-  const ensureServerWallet = async (privyUserId: string) => {
-    try {
-      console.log('🔑 Ensuring server wallet for user:', privyUserId);
-      
-      // First check if user already has a server wallet
-      const { data: walletData, error: walletError } = await supabase
-        .from('server_wallets')
-        .select('*')
-        .eq('user_id', privyUserId)
-        .eq('is_active', true)
-        .single();
+    // Dependencies: Run when auth state changes or essential functions become available
+  }, [ready, authenticated, user, getAccessToken, toast, isInitialized, isLoading]);
 
-      if (walletError || !walletData) {
-        console.log('🆕 Creating new server wallet');
-        // User doesn't have a server wallet, create one
-        const response = await fetch('/api/create-server-wallet', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ userId: privyUserId }),
-        });
+  return (
+    <AuthContext.Provider value={{ isInitialized, isLoading }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
 
-        if (!response.ok) {
-          throw new Error('Failed to create server wallet');
-        }
-
-        const { address } = await response.json();
-        console.log(`✅ Server wallet created: ${address}`);
-        setServerWalletAddress(address);
-        
-        toast({
-          title: "Wallet Setup Complete",
-          description: "Your personal server wallet is ready for AI interactions",
-        });
-      } else {
-        console.log(`✅ Using existing server wallet: ${walletData.address}`);
-        // User already has a server wallet
-        setServerWalletAddress(walletData.address);
-      }
-    } catch (err) {
-      console.error('❌ Error ensuring server wallet:', err);
-      toast({
-        title: "Wallet Error",
-        description: "Could not set up your AI wallet. Some features may be limited.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  // Just render children, this component only handles auth sync
-  return <>{children}</>;
-}
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};

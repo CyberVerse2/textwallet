@@ -15,7 +15,7 @@
     "@coinbase/agentkit-vercel-ai-sdk": "^0.1.0",
     "@hookform/resolvers": "^3.9.1",
     "@privy-io/react-auth": "^2.8.3",
-    "@privy-io/server-auth": "^1.21.0",
+    "@privy-io/server-auth": "^1.21.1",
     "@radix-ui/react-accordion": "^1.2.2",
     "@radix-ui/react-alert-dialog": "^1.1.4",
     "@radix-ui/react-aspect-ratio": "^1.1.1",
