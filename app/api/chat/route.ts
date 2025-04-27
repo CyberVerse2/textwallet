@@ -44,9 +44,19 @@ export async function POST(req: Request) {
         // Ensure environment variables exist
         const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
         const appSecret = process.env.NEXT_PUBLIC_PRIVY_APP_SECRET;
+        const authKeyId = process.env.PRIVY_AUTHORIZATION_KEY_ID;
+        const authPrivateKey = process.env.PRIVY_AUTHORIZATION_PRIVATE_KEY;
         
         if (!appId || !appSecret) {
-          throw new Error('Missing Privy credentials');
+          throw new Error('Missing Privy App ID or Secret');
+        }
+        
+        // Explicitly check for authorization keys if they are expected
+        if (!authKeyId) {
+          throw new Error('Missing PRIVY_AUTHORIZATION_KEY_ID environment variable');
+        }
+        if (!authPrivateKey) {
+          throw new Error('Missing PRIVY_AUTHORIZATION_PRIVATE_KEY environment variable');
         }
         
         // Create wallet config with our user-specific server wallet
@@ -60,6 +70,9 @@ export async function POST(req: Request) {
           userId: userId,
           // Add the specific wallet ID
           walletId: walletId,
+          authorizationKeyId: authKeyId, 
+          // Add the authorization private key
+          authorizationPrivateKey: authPrivateKey 
         };
         
         console.log('🤖 Wallet config:', {
