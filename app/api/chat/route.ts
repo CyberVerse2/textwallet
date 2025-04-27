@@ -51,7 +51,8 @@ export async function POST(req: Request) {
           // Use Base mainnet
           chainId: process.env.PRIVY_CHAIN_ID || '8453',
           // Use deterministic ID for this user
-          userId: `server-wallet-${userId}`
+          // Pass the actual Privy User ID to consistently use the user's embedded wallet
+          userId: userId
         };
         
         console.log('🤖 Wallet config:', {
