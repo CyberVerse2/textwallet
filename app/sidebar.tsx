@@ -13,7 +13,8 @@ import {
   ChevronDown,
   ChevronUp,
   BarChart2,
-  Power
+  Power,
+  Image as ImageIcon
 } from 'lucide-react';
 
 import type { NativeBalance } from './api/native-balances/route'; // Import NativeBalance type
@@ -228,7 +229,7 @@ function SidebarTabs({}: SidebarTabsProps) {
           style={activeTab === 'assets' ? { boxShadow: 'inset 0px -2px 0px 0px #000000' } : {}}
         >
           <div className="flex items-center justify-center gap-2">
-            <Wallet className="h-4 w-4" />
+            <Wallet className="h-5 w-5" />
             <span>Assets</span>
           </div>
         </button>
@@ -240,7 +241,7 @@ function SidebarTabs({}: SidebarTabsProps) {
           style={activeTab === 'activity' ? { boxShadow: 'inset 0px -2px 0px 0px #000000' } : {}}
         >
           <div className="flex items-center justify-center gap-2">
-            <Activity className="h-4 w-4" />
+            <Activity className="h-5 w-5" />
             <span>Activity</span>
           </div>
         </button>
@@ -284,60 +285,75 @@ function SidebarTabs({}: SidebarTabsProps) {
           {activeTab === 'assets' ? (
             <div className="flex flex-col h-full">
               {/* Assets Section Header */}
-              <div className="flex items-center justify-between mb-4 px-1">
-                <h3 className="font-bold text-lg flex items-center space-x-1">
-                  <span>Assets</span>
-                  {account && !isLoadingTokens && totalValue !== null && (
-                    <span className="text-sm font-normal text-muted-foreground">
-                      (${totalValue.toFixed(2)})
-                    </span>
-                  )}
-                  {account && isLoadingTokens && (
-                    <span className="text-sm font-normal text-muted-foreground ml-1">
-                      (Loading...)
-                    </span>
-                  )}
-                </h3>
-                {/* Placeholder for potential chart button */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-muted-foreground hover:text-foreground h-8 w-8"
+              <div className="mb-6">
+                <h3 className="font-bold text-2xl mb-4">Assets</h3>
+                
+                {/* ETH Token Card */}
+                {nativeTokenData.length > 0 ? (
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between p-4 rounded-xl border-2 border-black mb-3"
+                      style={{ boxShadow: "4px 4px 0px 0px #000000" }}>
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center">
+                          <div className="h-6 w-6 rounded-full bg-white flex items-center justify-center">
+                            <div className="w-4 h-1 bg-blue-500"></div>
+                          </div>
+                        </div>
+                        <div>
+                          <div className="font-bold">ETH <span className="text-gray-500 font-normal">(Base)</span></div>
+                          <div className="text-gray-500 text-sm">Native Balance</div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold">{parseFloat(nativeTokenData[0]?.formattedBalance || '0').toFixed(3)}</div>
+                        <div className="text-gray-500 text-sm">${parseFloat(nativeTokenData[0]?.usdValue?.toFixed(2) || '0')}</div>
+                      </div>
+                    </div>
+                  </div>
+                ) : isLoadingTokens ? (
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between p-4 rounded-xl border-2 border-black mb-3 animate-pulse"
+                      style={{ boxShadow: "4px 4px 0px 0px #000000" }}>
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-gray-200"></div>
+                        <div>
+                          <div className="h-4 w-24 bg-gray-200 rounded mb-2"></div>
+                          <div className="h-3 w-20 bg-gray-200 rounded"></div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="h-4 w-16 bg-gray-200 rounded mb-2"></div>
+                        <div className="h-3 w-12 bg-gray-200 rounded"></div>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+                
+                {/* Show Small Balances Button */}
+                <button
+                  onClick={() => setShowAllTokens(!showAllTokens)}
+                  className="w-full flex items-center justify-between p-3 rounded-xl border-2 border-black bg-yellow text-black font-bold"
+                  style={{ boxShadow: "4px 4px 0px 0px #000000" }}
                 >
-                  <BarChart2 className="h-4 w-4" />
-                </Button>
+                  <span>Show Small Balances</span>
+                  <ChevronDown className="h-5 w-5" />
+                </button>
               </div>
-
-              {/* Error Message */}
-              {fetchError && <p className="text-red-500 text-sm mb-2 px-1">{fetchError}</p>}
-
-              {/* Token List Area - Force scrollbar track to maintain width */}
-              {/* Apply custom class to hide the scrollbar visually */}
-              <div className="flex-grow overflow-y-scroll overflow-x-hidden mb-2 max-h-72 scrollbar-hide pr-1">
-                <TokenList tokens={displayTokens} isLoading={isLoadingTokens} />
-              </div>
-
-              {/* Show More/Less Button (Moved Outside Scroll Area) */}
-              {canShowMore && (
-                <div className="mt-2 px-1">
-                  {' '}
-                  {/* Added padding and margin */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowAllTokens(!showAllTokens)}
-                    className="w-full justify-start border-2 border-black hover:bg-yellow/20 active:translate-y-px active:shadow-none transition-all duration-100 rounded-xl font-bold"
-                    style={{ boxShadow: '3px 3px 0px 0px #000000' }}
-                  >
-                    <span>{showAllTokens ? 'Show Less' : 'Show More'}</span>
-                    {showAllTokens ? (
-                      <ChevronUp className="ml-auto h-4 w-4" />
-                    ) : (
-                      <ChevronDown className="ml-auto h-4 w-4" />
-                    )}
-                  </Button>
+              
+              {/* Separator Line */}
+              <div className="border-b-2 border-black mb-6"></div>
+              
+              {/* NFTs Section */}
+              <button
+                className="w-full flex items-center justify-between p-3 rounded-xl border-2 border-black text-black font-bold"
+                style={{ boxShadow: "4px 4px 0px 0px #000000" }}
+              >
+                <div className="flex items-center gap-2">
+                  <ImageIcon className="h-5 w-5" />
+                  <span>NFTs</span>
                 </div>
-              )}
+                <ChevronDown className="h-5 w-5" />
+              </button>
             </div>
           ) : (
             <div>
