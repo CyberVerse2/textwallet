@@ -11,6 +11,7 @@ import React, {
 } from 'react';
 import { useChat as useVercelAIChat } from '@ai-sdk/react';
 import { usePrivy } from '@privy-io/react-auth';
+import { useDelegatedActions } from '@privy-io/react-auth';
 
 // Keep the original Message interface for compatibility with existing components
 interface Message {
@@ -45,6 +46,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const [messageError, setMessageError] = useState<Error | null>(null);
 
   const { user, authenticated } = usePrivy();
+  const { delegateWallet } = useDelegatedActions();
 
   // Initialize Vercel AI Chat with proper naming
   const {
@@ -94,6 +96,33 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       }
     }
   }, [convertedMessages]);
+
+  // Effect to trigger delegation when user and wallet are available
+  useEffect(() => {
+    const handleDelegate = async () => {
+      if (user?.wallet?.address) {
+        try {
+          console.log('Attempting to delegate wallet:', user.wallet.address);
+          // Specify chainType if needed, assuming 'ethereum' based on context
+          await delegateWallet({ 
+            address: user.wallet.address, 
+            chainType: 'ethereum' // Or derive from wallet object if available
+          });
+          console.log('Wallet delegation successful or already active.');
+        } catch (error) {
+          console.error('Failed to delegate wallet:', error);
+          // Optionally, set an error state to inform the user
+        }
+      } else {
+        console.log('User or wallet address not available for delegation.');
+      }
+    };
+
+    if (authenticated && user?.wallet) {
+      handleDelegate();
+    }
+     // Run when authenticated status or user/wallet object changes
+  }, [authenticated, user, delegateWallet]); 
 
   // Create a wrapper for handleInputChange to maintain compatibility
   const setInputValue = useCallback(

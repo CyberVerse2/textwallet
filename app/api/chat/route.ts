@@ -1,4 +1,4 @@
-import { AgentKit } from '@coinbase/agentkit';
+import { AgentKit, PrivyEvmWalletConfig, PrivyEvmWalletProvider } from '@coinbase/agentkit';
 import { getVercelAITools } from '@coinbase/agentkit-vercel-ai-sdk';
 import { streamText, Message as VercelMessage } from 'ai';
 import { anthropic, AnthropicProviderOptions } from '@ai-sdk/anthropic';
@@ -64,19 +64,19 @@ export async function POST(req: Request) {
           appSecret,
           // Use Base mainnet
           chainId: process.env.PRIVY_CHAIN_ID || '8453',
-          // Use deterministic ID for this user
-          // Pass the actual Privy User ID to consistently use the user's embedded wallet
-          userId: userId,
-          // Add the specific wallet ID
           walletId: walletId,
+          userId: userId,
           authorizationKeyId: authKeyId,
-          // Add the authorization private key
           authorizationPrivateKey: authPrivateKey
         };
 
         console.log('🤖 Wallet config:', {
           appId: walletConfig.appId.substring(0, 5) + '...',
-          chainId: walletConfig.chainId
+          chainId: walletConfig.chainId,
+          walletId: walletConfig.walletId,
+          userId: walletConfig.userId, // Log the userId being used
+          authorizationKeyId: walletConfig.authorizationKeyId,
+          authorizationPrivateKey: walletConfig.authorizationPrivateKey.substring(0, 5) + '...'
         });
 
         // Configure AgentKit with server wallet
