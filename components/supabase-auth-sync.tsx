@@ -3,8 +3,6 @@ import { usePrivy } from '@privy-io/react-auth';
 import { useToast } from '@/components/ui/use-toast';
 // Keep the client-side supabase for other potential uses (like RLS-protected reads)
 import { supabase } from '@/lib/supabaseClient';
-// Import ensureServerWallet - adjust path if needed
-import { ensureServerWallet } from '@/lib/server-wallet';
 
 interface AuthContextType {
   isInitialized: boolean;
@@ -67,10 +65,6 @@ export const SupabaseAuthSyncProvider = ({ children }: { children: ReactNode }) 
         }
 
         console.log('[AuthSync] Backend sync successful:', result.message, 'User ID:', result.userId);
-
-        // 3. Ensure server wallet exists (after successful sync)
-        // Pass the client-side supabase instance if ensureServerWallet needs it for RLS checks
-        await ensureServerWallet(user.id, supabase);
 
         setIsInitialized(true);
         console.log('[AuthSync] User sync and setup complete.');

@@ -2,7 +2,6 @@ import { AgentKit } from '@coinbase/agentkit';
 import { getVercelAITools } from '@coinbase/agentkit-vercel-ai-sdk';
 import { streamText, Message as VercelMessage } from 'ai';
 import { anthropic, AnthropicProviderOptions } from '@ai-sdk/anthropic';
-import { supabase } from '@/lib/supabaseClient';
 
 // Define the types for our API request body
 interface RequestBody {
@@ -34,45 +33,6 @@ export async function POST(req: Request) {
           throw new Error('Missing userId for wallet operations');
         }
         
-        // Get the user's server wallet from Supabase
-        const { data: serverWallet, error: walletError } = await supabase
-          .from('server_wallets')
-          .select('*')
-          .eq('user_id', userId)
-          .eq('is_active', true)
-          .single();
-        
-        if (walletError || !serverWallet) {
-          // Try to create a server wallet
-          const createResponse = await fetch(`${new URL(req.url).origin}/api/create-server-wallet`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ userId })
-          });
-          
-          if (!createResponse.ok) {
-            throw new Error('Failed to create server wallet');
-          }
-          
-          // Get the newly created wallet
-          const { data: newWallet } = await supabase
-            .from('server_wallets')
-            .select('*')
-            .eq('user_id', userId)
-            .eq('is_active', true)
-            .single();
-          
-          if (!newWallet) {
-            throw new Error('Server wallet not found after creation');
-          }
-          
-          console.log(`🤖 Using newly created server wallet: ${newWallet.address}`);
-        } else {
-          console.log(`🤖 Using existing server wallet: ${serverWallet.address}`);
-        }
-        
         // Dynamically import the provider to avoid issues with imports
         const { AgentKit, PrivyEvmWalletProvider } = await import('@coinbase/agentkit');
         
@@ -100,7 +60,7 @@ export async function POST(req: Request) {
         });
         
         // Configure AgentKit with server wallet
-        console.log('🤖 Chat API Route: Setting up AgentKit with server wallet...');
+        console.log('🤖 Chat API Route: Setting up AgentKit with server wallet provider...');
         const walletProvider = await PrivyEvmWalletProvider.configureWithWallet(walletConfig);
         
         const agentKitConfig: any = {
@@ -116,11 +76,11 @@ export async function POST(req: Request) {
         const agentKit = await AgentKit.from(agentKitConfig);
         const tools = getVercelAITools(agentKit);
         
-        // Get wallet address
-        const serverWalletAddress = await walletProvider.getAddress();
-        console.log(`🤖 Using server wallet: ${serverWalletAddress}`);
+        // Get wallet address (from Privy provider)
+        const privyManagedWalletAddress = await walletProvider.getAddress();
+        console.log(`🤖 Agent configured with Privy-managed wallet: ${privyManagedWalletAddress}`);
 
-        console.log('🤖 Chat API Route: Generating response with server wallet access...');
+        console.log('🤖 Chat API Route: Generating response with Privy wallet access...');
 
         // Generate a response with server wallet access using Claude with streaming
         const result = await streamText({
