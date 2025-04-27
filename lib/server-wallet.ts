@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabaseClient';
 import { Wallet } from 'ethers';
 import { SupabaseClient } from '@supabase/supabase-js'; // Import SupabaseClient type
+import supabaseAdmin from './supabaseAdmin'; // Import the admin client
 
 // Core logic for creating a server wallet (likely used by API route)
 export async function _createServerWalletLogic(userId: string): Promise<{ address: string } | { error: any, status?: number }> {
@@ -12,14 +13,14 @@ export async function _createServerWalletLogic(userId: string): Promise<{ addres
     const address = wallet.address;
     const privateKey = wallet.privateKey;
 
-    // 3. Insert into the database with the raw private key
-    const { error: insertError } = await supabase
+    // 3. Insert into the database with the raw private key using ADMIN client
+    const { error: insertError } = await supabaseAdmin // Use admin client here
       .from('server_wallets')
       .insert({
         user_id: userId,
         address: address,
-        // Storing raw private key - BE VERY CAREFUL
-        private_key: privateKey, 
+        // Storing raw private key - ensure column name matches DB exactly
+        private_key: privateKey,
         is_active: true, // Ensure new wallets are marked active
       });
 
@@ -27,8 +28,8 @@ export async function _createServerWalletLogic(userId: string): Promise<{ addres
       // Handle potential race condition or unique constraint violation
       if (insertError.code === '23505') { // Unique violation code
         console.warn(`Race condition or duplicate wallet creation attempt for user ${userId}`);
-        // Attempt to fetch the existing active wallet
-        const { data: raceWallet, error: fetchError } = await supabase
+        // Attempt to fetch the existing active wallet using ADMIN client
+        const { data: raceWallet, error: fetchError } = await supabaseAdmin // Use admin client here
           .from('server_wallets')
           .select('address')
           .eq('user_id', userId)

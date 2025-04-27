@@ -34,25 +34,6 @@ export async function POST(req: Request) {
           throw new Error('Missing userId for wallet operations');
         }
         
-        // Use upsert pattern for user - only inserts if not exists
-        const { error: upsertError } = await supabase
-          .from('users')
-          .upsert(
-            {
-              privy_user_id: userId,
-              last_login: new Date().toISOString()
-            },
-            { 
-              onConflict: 'privy_user_id',
-              ignoreDuplicates: true 
-            }
-          );
-          
-        if (upsertError) {
-          console.error('Warning - user upsert issue:', upsertError);
-          // Continue anyway - user might already exist
-        }
-        
         // Get the user's server wallet from Supabase
         const { data: serverWallet, error: walletError } = await supabase
           .from('server_wallets')
