@@ -125,7 +125,7 @@ const ChatInterface = ({ onGoBack }: ChatInterfaceProps) => {
 
   return (
     <div className="flex-1 flex flex-col items-center bg-white rounded-2xl overflow-hidden relative" style={{ boxShadow: "8px 8px 0px 0px #000000" }}>
-      <div className="p-4 w-full max-w-[33rem] flex items-center">
+      <div className="p-4 w-full max-w-[50rem] flex items-center">
         <Button 
           variant="outline"
           onClick={() => {
@@ -140,7 +140,7 @@ const ChatInterface = ({ onGoBack }: ChatInterfaceProps) => {
       </div>
       <ScrollArea ref={scrollAreaRef} className="flex-1 p-4 w-full max-w-[33rem]">
         <div className="space-y-4 w-full">
-          {messages.length === 0 && (
+          {messages.length === 0 && ( 
             <div className="text-center text-gray-500 my-8">
               <p>No messages yet. Start a conversation!</p>
               <p className="text-xs mt-2">
@@ -162,7 +162,7 @@ const ChatInterface = ({ onGoBack }: ChatInterfaceProps) => {
                 </div>
               )}
               <div
-                className={`max-w-[70%] p-3 rounded-lg border-2 border-black ${message.sender === 'user'
+                className={`max-w-[90%] p-3 rounded-lg border-2 border-black ${message.sender === 'user'
                   ? 'bg-yellow text-black ml-auto'
                   : 'bg-white'
                 }`}
