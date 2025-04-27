@@ -7,7 +7,8 @@ import React, {
   ReactNode,
   useCallback,
   useEffect,
-  useRef
+  useRef,
+  useMemo,
 } from 'react';
 import { useChat as useVercelAIChat } from '@ai-sdk/react';
 import { usePrivy } from '@privy-io/react-auth';
@@ -44,9 +45,17 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [messageError, setMessageError] = useState<Error | null>(null);
+  const [delegationAttempted, setDelegationAttempted] = useState(false); // Track delegation attempt
 
   const { user, authenticated } = usePrivy();
   const { delegateWallet } = useDelegatedActions();
+
+  // Reset delegation attempt status on logout
+  useEffect(() => {
+    if (!authenticated) {
+      setDelegationAttempted(false);
+    }
+  }, [authenticated]);
 
   // Initialize Vercel AI Chat with proper naming
   const {
@@ -101,6 +110,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const handleDelegate = async () => {
       if (user?.wallet?.address) {
+        setDelegationAttempted(true); // Mark attempt initiated
         try {
           console.log('Attempting to delegate wallet:', user.wallet.address);
           // Specify chainType if needed, assuming 'ethereum' based on context
@@ -118,7 +128,8 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       }
     };
 
-    if (authenticated && user?.wallet) {
+    // Only attempt delegation if authenticated, wallet exists, and hasn't been attempted yet
+    if (authenticated && user?.wallet && !delegationAttempted) {
       // Introduce a small delay to allow Privy proxy to initialize
       const timer = setTimeout(() => {
         handleDelegate();
@@ -127,8 +138,8 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       // Clear timeout if component unmounts or dependencies change
       return () => clearTimeout(timer);
     }
-    // Run when authenticated status or user/wallet object changes
-  }, [authenticated, user, delegateWallet]);
+    // Run when authenticated status, user/wallet object, or attempt status changes
+  }, [authenticated, user, delegateWallet, delegationAttempted]);
 
   // Create a wrapper for handleInputChange to maintain compatibility
   const setInputValue = useCallback(
