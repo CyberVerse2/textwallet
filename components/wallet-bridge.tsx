@@ -1,14 +1,15 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ConnectedWallet, usePrivy, useWallets } from '@privy-io/react-auth';
 import { useToast } from "@/components/ui/use-toast";
 import { formatEther, parseEther } from 'ethers';
 import { shortenAddress } from '@/lib/utils';
-import { Loader2, ArrowRight, RefreshCw } from 'lucide-react';
+import { Loader2, RefreshCw, Wallet, Activity, ChevronDown, ImageIcon } from 'lucide-react';
 
 export default function WalletBridge() {
   const { toast } = useToast();
@@ -23,6 +24,7 @@ export default function WalletBridge() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isFetching, setIsFetching] = useState<boolean>(false);
   const [isFunding, setIsFunding] = useState<boolean>(false);
+  const [showSmallBalances, setShowSmallBalances] = useState<boolean>(false);
 
   useEffect(() => {
     if (ready && authenticated) {
@@ -182,108 +184,97 @@ export default function WalletBridge() {
     );
   }
 
+  // Render the wallet info UI with Assets and Activity tabs
   return (
     <Card className="w-full">
-      <CardHeader>
-        <CardTitle>Wallet Bridge</CardTitle>
+      <CardHeader className="pb-0">
+        <CardTitle>My Wallet</CardTitle>
         <CardDescription>
-          TextWallet uses a secure server wallet for AI interactions. You need to add funds to your server wallet.
+          Your AI-enabled blockchain wallet
         </CardDescription>
       </CardHeader>
       
-      <CardContent>
-        {/* Server Wallet Section - Primary Focus */}
-        <div className="mb-8 p-4 border-2 border-black rounded-md">
-          <h3 className="text-xl font-bold mb-2">📱 Your AI Server Wallet</h3>
-          <p className="text-sm text-gray-600 mb-4">
-            This is your dedicated server wallet that the AI will use for all blockchain interactions.
-          </p>
+      <CardContent className="p-0">
+        <Tabs defaultValue="assets" className="w-full">
+          <TabsList className="w-full grid grid-cols-2 mb-2">
+            <TabsTrigger value="assets" className="flex items-center gap-2">
+              <Wallet className="h-4 w-4" />
+              Assets
+            </TabsTrigger>
+            <TabsTrigger value="activity" className="flex items-center gap-2">
+              <Activity className="h-4 w-4" />
+              Activity
+            </TabsTrigger>
+          </TabsList>
           
-          {serverWalletAddress ? (
-            <>
-              <div className="grid grid-cols-2 gap-2 mb-4">
-                <div>
-                  <p className="text-sm font-medium">Address:</p>
-                  <p className="text-xs overflow-hidden text-ellipsis">{shortenAddress(serverWalletAddress)}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Balance:</p>
-                  <p className="font-bold">{parseFloat(formatEther(BigInt(serverBalance || '0'))).toFixed(4)} ETH</p>
-                </div>
-              </div>
-              <Button 
-                variant="outline" 
-                className="w-full" 
-                onClick={fetchBalances} 
-                disabled={isFetching}
-              >
-                {isFetching ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-                Refresh Balance
+          <TabsContent value="assets" className="px-6 py-2">
+            <h3 className="text-xl font-bold mb-4">Assets</h3>
+            
+            <div className="flex justify-between items-center mb-2">
+              <div className="flex-1"></div>
+              <Button variant="outline" size="icon" className="rounded-full">
+                <RefreshCw className="h-4 w-4" onClick={fetchBalances} />
               </Button>
-            </>
-          ) : (
-            <p>Server wallet not available</p>
-          )}
-        </div>
-        
-        {/* Embedded Wallet Section - Secondary */}
-        <div className="mb-4 p-4 border border-black rounded-md bg-white">
-          <h3 className="text-lg font-medium mb-2">💼 Funding Source Wallet</h3>
-          <p className="text-sm text-gray-600 mb-4">
-            This embedded wallet is only used for funding your server wallet.
-          </p>
-          
-          {embeddedWalletAddress ? (
-            <>
-              <div className="grid grid-cols-2 gap-2 mb-4">
-                <div>
-                  <p className="text-sm font-medium">Address:</p>
-                  <p className="text-xs overflow-hidden text-ellipsis">{shortenAddress(embeddedWalletAddress)}</p>
+            </div>
+            
+            <div className="border-2 border-black rounded-xl p-3 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center">
+                  <span className="text-white font-bold">E</span>
                 </div>
-                <div>
-                  <p className="text-sm font-medium">Balance:</p>
-                  <p>{parseFloat(formatEther(BigInt(embeddedBalance || '0'))).toFixed(4)} ETH</p>
+                <div className="flex-1">
+                  <div className="flex justify-between">
+                    <div>
+                      <span className="font-bold text-lg">ETH</span>{" "}
+                      <span className="text-gray-500">(Base)</span>
+                    </div>
+                    <div className="font-bold text-lg">
+                      {parseFloat(formatEther(BigInt(serverBalance || '0'))).toFixed(3)}
+                    </div>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Native Balance</span>
+                    <span className="text-gray-500">
+                      ${(parseFloat(formatEther(BigInt(serverBalance || '0'))) * 1630).toFixed(2)}
+                    </span>
+                  </div>
                 </div>
               </div>
-              
-              {/* Fund Server Wallet Section */}
-              {serverWalletAddress && (
-                <div className="mt-4 p-4 border border-black rounded bg-white">
-                  <h4 className="font-medium mb-2">Fund Your AI Server Wallet</h4>
-                  <div className="flex gap-2 mb-2">
-                    <Input
-                      type="number"
-                      step="0.001"
-                      min="0.001"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      className="flex-1"
-                    />
-                    <Button 
-                      onClick={fundServerWallet} 
-                      disabled={isFunding || isFetching || parseFloat(formatEther(BigInt(embeddedBalance || '0'))) < parseFloat(amount)}
-                    >
-                      {isFunding ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-                      {isFunding ? 'Sending...' : 'Send Funds'}
-                    </Button>
-                  </div>
-                  <p className="text-xs text-gray-600">
-                    Fund your server wallet to enable AI blockchain interactions
-                  </p>
-                </div>
-              )}
-            </>
-          ) : (
-            <p>Embedded wallet not connected</p>
-          )}
-        </div>
+            </div>
+            
+            <Button 
+              variant="outline" 
+              className="w-full mb-4 border-2 border-yellow bg-yellow rounded-xl flex items-center justify-between"
+              onClick={() => setShowSmallBalances(!showSmallBalances)}
+            >
+              <span className="font-bold">Show Small Balances</span>
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+            
+            <div className="border-t border-gray-200 my-4"></div>
+            
+            <Button 
+              variant="outline" 
+              className="w-full mb-2 border-2 border-yellow bg-yellow rounded-xl flex items-center justify-between"
+              onClick={() => {}}
+            >
+              <div className="flex items-center gap-2">
+                <ImageIcon className="h-5 w-5" />
+                <span className="font-bold">NFTs</span>
+              </div>
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+          </TabsContent>
+          
+          <TabsContent value="activity" className="px-6 py-2">
+            <h3 className="text-xl font-bold mb-4">Activity</h3>
+            
+            <div className="text-center text-gray-500 py-6">
+              No activity yet
+            </div>
+          </TabsContent>
+        </Tabs>
       </CardContent>
-      
-      <CardFooter className="flex justify-between">
-        <p className="text-xs text-gray-600">
-          All AI interactions use your server wallet
-        </p>
-      </CardFooter>
     </Card>
   );
 }

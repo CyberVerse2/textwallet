@@ -222,7 +222,7 @@ function SidebarTabs({}: SidebarTabsProps) {
       <div className="flex border-b-2 border-black">
         <button
           className={`flex-1 py-3 font-bold text-center transition-all duration-200 relative ${
-            activeTab === 'assets' ? 'bg-yellow text-black' : 'hover:bg-yellow/10'
+            activeTab === 'assets' ? '' : 'hover:bg-yellow/10'
           }`}
           onClick={() => setActiveTab('assets')}
           style={activeTab === 'assets' ? { boxShadow: 'inset 0px -2px 0px 0px #000000' } : {}}
@@ -234,7 +234,7 @@ function SidebarTabs({}: SidebarTabsProps) {
         </button>
         <button
           className={`flex-1 py-3 font-bold text-center transition-all duration-200 relative ${
-            activeTab === 'activity' ? 'bg-yellow text-black' : 'hover:bg-yellow/10'
+            activeTab === 'activity' ? '' : 'hover:bg-yellow/10'
           }`}
           onClick={() => setActiveTab('activity')}
           style={activeTab === 'activity' ? { boxShadow: 'inset 0px -2px 0px 0px #000000' } : {}}
