@@ -220,30 +220,35 @@ function SidebarTabs({}: SidebarTabsProps) {
 
   return (
     <>
-      <div className="flex border-b-2 border-black">
+      {/* New container for tab buttons with desired styling */}
+      <div
+        className="bg-muted rounded-xl p-1 mb-6 border-2 border-black flex space-x-1"
+        style={{ boxShadow: '4px 4px 0px 0px #000000' }}
+      >
+        {/* Assets Button */}
         <button
-          className={`flex-1 py-3 font-bold text-center transition-all duration-200 relative ${
-            activeTab === 'assets' ? '' : 'hover:bg-yellow/10'
+          className={`flex-1 py-2 px-3 rounded-lg font-bold text-center transition-all duration-150 flex items-center justify-center gap-2 ${
+            activeTab === 'assets'
+              ? 'bg-yellow text-black shadow-inner-sm' // Active state
+              : 'text-muted-foreground hover:bg-black/5 active:bg-black/10' // Inactive state
           }`}
           onClick={() => setActiveTab('assets')}
-          style={activeTab === 'assets' ? { boxShadow: 'inset 0px -2px 0px 0px #000000' } : {}}
         >
-          <div className="flex items-center justify-center gap-2">
-            <Wallet className="h-5 w-5" />
-            <span>Assets</span>
-          </div>
+          <Wallet className="h-5 w-5" />
+          <span>Assets</span>
         </button>
+
+        {/* Activity Button */}
         <button
-          className={`flex-1 py-3 font-bold text-center transition-all duration-200 relative ${
-            activeTab === 'activity' ? '' : 'hover:bg-yellow/10'
+          className={`flex-1 py-2 px-3 rounded-lg font-bold text-center transition-all duration-150 flex items-center justify-center gap-2 ${
+            activeTab === 'activity'
+              ? 'bg-yellow text-black shadow-inner-sm' // Active state
+              : 'text-muted-foreground hover:bg-black/5 active:bg-black/10' // Inactive state
           }`}
           onClick={() => setActiveTab('activity')}
-          style={activeTab === 'activity' ? { boxShadow: 'inset 0px -2px 0px 0px #000000' } : {}}
         >
-          <div className="flex items-center justify-center gap-2">
-            <Activity className="h-5 w-5" />
-            <span>Activity</span>
-          </div>
+          <Activity className="h-5 w-5" />
+          <span>Activity</span>
         </button>
       </div>
 
