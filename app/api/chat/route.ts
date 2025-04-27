@@ -8,7 +8,7 @@ interface RequestBody {
   messages: VercelMessage[];
   useWallet?: boolean;
   userId?: string | null;
-  walletClientId?: string;
+  walletId?: string;
 }
 
 export async function POST(req: Request) {
@@ -19,7 +19,7 @@ export async function POST(req: Request) {
       messages,
       useWallet = true, // Always enable wallet by default
       userId,
-      walletClientId,
+      walletId,
     }: RequestBody = await req.json();
     
     // Default to using server wallet
@@ -30,12 +30,12 @@ export async function POST(req: Request) {
       try {
         console.log('🤖 Chat API Route: Loading AgentKit...');
         
-        // Check if we have a valid userId and walletClientId
+        // Check if we have a valid userId and walletId
         if (!userId) {
           throw new Error('Missing userId for wallet operations');
         }
-        if (!walletClientId) {
-          throw new Error('Missing walletClientId for wallet operations');
+        if (!walletId) {
+          throw new Error('Missing walletId for wallet operations');
         }
         
         // Dynamically import the provider to avoid issues with imports
@@ -58,8 +58,8 @@ export async function POST(req: Request) {
           // Use deterministic ID for this user
           // Pass the actual Privy User ID to consistently use the user's embedded wallet
           userId: userId,
-          // Add the specific wallet client ID
-          walletId: walletClientId,
+          // Add the specific wallet ID
+          walletId: walletId,
         };
         
         console.log('🤖 Wallet config:', {
