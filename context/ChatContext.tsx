@@ -1,6 +1,14 @@
 'use client';
 
-import React, { createContext, useState, useContext, ReactNode, useCallback, useEffect, useRef } from 'react';
+import React, {
+  createContext,
+  useState,
+  useContext,
+  ReactNode,
+  useCallback,
+  useEffect,
+  useRef
+} from 'react';
 import { useChat as useVercelAIChat } from '@ai-sdk/react';
 import { usePrivy } from '@privy-io/react-auth';
 
@@ -51,31 +59,31 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     error: vercelError
   } = useVercelAIChat({
     api: '/api/chat',
-    initialMessages: [], 
+    initialMessages: [],
     body: {
-      // Always use the server wallet - no option to disable
-      useWallet: true,
       // Pass the user identifier (Privy DID)
-      userId: user?.id || null, 
+      userId: user?.id || null,
       // Fetch and send the specific wallet ID as walletId
-      walletId: user?.wallet?.id || null 
+      walletId: user?.wallet?.id || null
     },
     onFinish: () => {
-      console.log(" Chat message completed successfully");
+      console.log(' Chat message completed successfully');
       setMessageError(null);
     },
     onError: (error) => {
-      console.error(" Chat error:", error);
+      console.error(' Chat error:', error);
       setMessageError(error);
     }
   });
 
   // Convert Vercel AI message format to our app's format
-  const convertedMessages = vercelMessages.map((msg): Message => ({
-    id: msg.id,
-    text: msg.content,
-    sender: msg.role === 'user' ? 'user' : 'bot'
-  }));
+  const convertedMessages = vercelMessages.map(
+    (msg): Message => ({
+      id: msg.id,
+      text: msg.content,
+      sender: msg.role === 'user' ? 'user' : 'bot'
+    })
+  );
 
   // Auto-scroll logic
   useEffect(() => {
@@ -88,40 +96,46 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   }, [convertedMessages]);
 
   // Create a wrapper for handleInputChange to maintain compatibility
-  const setInputValue = useCallback((value: string) => {
-    console.log(" Setting input value:", value);
-    handleInputChange({ target: { value } } as React.ChangeEvent<HTMLInputElement>);
-  }, [handleInputChange]);
+  const setInputValue = useCallback(
+    (value: string) => {
+      console.log(' Setting input value:', value);
+      handleInputChange({ target: { value } } as React.ChangeEvent<HTMLInputElement>);
+    },
+    [handleInputChange]
+  );
 
   // Handler for sending messages
-  const sendMessage = useCallback(async (text: string) => {
-    if (!text.trim() || isLoading || !isWalletConnected) {
-      console.log(" Cannot send message:", {
-        empty: !text.trim(),
-        isLoading,
-        isWalletConnected
-      });
-      return;
-    }
-    
-    try {
-      console.log(" Sending message:", text);
-      console.log(" Using server wallet:", isWalletConnected);
-      setMessageError(null);
-      await append({
-        content: text,
-        role: 'user'
-      });
-      console.log(" Message sent successfully");
-    } catch (error) {
-      console.error(" Error sending message:", error);
-      if (error instanceof Error) {
-        setMessageError(error);
-      } else {
-        setMessageError(new Error("Failed to send message"));
+  const sendMessage = useCallback(
+    async (text: string) => {
+      if (!text.trim() || isLoading || !isWalletConnected) {
+        console.log(' Cannot send message:', {
+          empty: !text.trim(),
+          isLoading,
+          isWalletConnected
+        });
+        return;
       }
-    }
-  }, [append, isLoading, isWalletConnected, user?.id, user?.wallet?.id]);
+
+      try {
+        console.log(' Sending message:', text);
+        console.log(' Using server wallet:', isWalletConnected);
+        setMessageError(null);
+        await append({
+          content: text,
+          role: 'user'
+        });
+        console.log(' Message sent successfully');
+      } catch (error) {
+        console.error(' Error sending message:', error);
+        if (error instanceof Error) {
+          setMessageError(error);
+        } else {
+          setMessageError(new Error('Failed to send message'));
+        }
+      }
+    },
+    [append, isLoading, isWalletConnected, user?.id, user?.wallet?.id]
+  );
 
   // Clear chat on disconnect
   useEffect(() => {
@@ -135,7 +149,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   // Update error state from Vercel's error
   useEffect(() => {
     if (vercelError) {
-      console.error(" Vercel AI SDK error:", vercelError);
+      console.error(' Vercel AI SDK error:', vercelError);
       setMessageError(vercelError);
     }
   }, [vercelError]);
