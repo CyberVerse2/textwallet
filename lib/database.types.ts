@@ -39,6 +39,8 @@ export interface Database {
           user_id: string
           address: string
           chain_id: number
+          // Renamed from encrypted_private_key
+          private_key: string 
           is_active: boolean
           balance: string | null
           last_used: string | null
@@ -49,6 +51,8 @@ export interface Database {
           user_id: string
           address: string
           chain_id: number
+          // Renamed from encrypted_private_key
+          private_key: string 
           is_active?: boolean
           balance?: string | null
           last_used?: string | null
@@ -59,6 +63,8 @@ export interface Database {
           user_id?: string
           address?: string
           chain_id?: number
+          // Renamed from encrypted_private_key
+          private_key?: string 
           is_active?: boolean
           balance?: string | null
           last_used?: string | null

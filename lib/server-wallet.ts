@@ -1,6 +1,5 @@
 import { supabase } from '@/lib/supabaseClient';
 import { Wallet } from 'ethers';
-import { encrypt } from '@/lib/encryption'; // Assuming encryption utility exists
 
 // Core logic for creating a server wallet
 export async function _createServerWalletLogic(userId: string): Promise<{ address: string } | { error: any, status?: number }> {
@@ -12,20 +11,14 @@ export async function _createServerWalletLogic(userId: string): Promise<{ addres
     const address = wallet.address;
     const privateKey = wallet.privateKey;
 
-    // 2. Encrypt the private key
-    if (!process.env.WALLET_ENCRYPTION_KEY) {
-      console.error('Missing WALLET_ENCRYPTION_KEY');
-      return { error: 'Server configuration error: Missing encryption key', status: 500 };
-    }
-    const encryptedPrivateKey = encrypt(privateKey, process.env.WALLET_ENCRYPTION_KEY);
-
-    // 3. Insert into the database
+    // 3. Insert into the database with the raw private key
     const { error: insertError } = await supabase
       .from('server_wallets')
       .insert({
         user_id: userId,
         address: address,
-        encrypted_private_key: encryptedPrivateKey,
+        // Storing raw private key - BE VERY CAREFUL
+        private_key: privateKey, 
         is_active: true, // Ensure new wallets are marked active
       });
 
