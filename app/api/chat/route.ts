@@ -1,4 +1,11 @@
-import { AgentKit, PrivyEvmWalletConfig, PrivyEvmWalletProvider } from '@coinbase/agentkit';
+import {
+  AgentKit,
+  AgentKitOptions,
+  erc721ActionProvider,
+  PrivyEvmWalletConfig,
+  PrivyEvmWalletProvider,
+  pythActionProvider
+} from '@coinbase/agentkit';
 import { getVercelAITools } from '@coinbase/agentkit-vercel-ai-sdk';
 import { streamText, Message as VercelMessage } from 'ai';
 import { anthropic, AnthropicProviderOptions } from '@ai-sdk/anthropic';
@@ -73,8 +80,12 @@ export async function POST(req: Request) {
         console.log('🤖 Chat API Route: Setting up AgentKit with server wallet provider...');
         const walletProvider = await PrivyEvmWalletProvider.configureWithWallet(walletConfig);
 
-        const agentKitConfig: any = {
-          walletProvider
+        const erc721 = erc721ActionProvider();
+        const pyth = pythActionProvider();
+        
+        const agentKitConfig: AgentKitOptions = {
+          walletProvider,
+          actionProviders: [erc721, pyth]
         };
 
         // Add CDP API keys if present
