@@ -81,11 +81,13 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       walletId: user?.wallet?.id || null
     },
     onFinish: async (message: VercelMessage) => {
-      console.log(' Chat message completed successfully:', message);
+      console.log(' Chat History: [onFinish] Triggered. Bot message received:', message);
       setMessageError(null);
 
       // --- Save Chat History --- 
+      console.log(' Chat History: [onFinish] Attempting to save history...');
       if (user?.id) {
+        console.log(' Chat History: [onFinish] User authenticated with ID:', user.id);
         // Get the last user message and the new bot message
         const lastUserMessage = convertedMessages[convertedMessages.length - 1];
         const newBotMessage: Message = { 
@@ -93,6 +95,9 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
           text: message.content, 
           sender: 'txt' 
         };
+
+        console.log(' Chat History: [onFinish] Identified lastUserMessage:', lastUserMessage);
+        console.log(' Chat History: [onFinish] Identified newBotMessage:', newBotMessage);
 
         if (lastUserMessage && lastUserMessage.sender === 'user' && newBotMessage) {
           // Prepare data for Supabase insertion
@@ -111,25 +116,27 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
             }
           ];
 
+          console.log(' Chat History: [onFinish] Payload to save:', JSON.stringify(messagesToSave));
           try {
-            console.log(' Chat History: Saving messages to Supabase for user:', user.id, messagesToSave);
+            console.log(' Chat History: [onFinish] Calling supabase.insert...');
             const { error: insertError } = await supabase
               .from('chat_history')
               .insert(messagesToSave);
 
             if (insertError) {
+              console.error(' Chat History: [onFinish] Supabase insert error:', insertError);
               throw insertError;
             }
-            console.log(' Chat History: Messages saved successfully.');
+            console.log(' Chat History: [onFinish] Messages saved successfully.');
           } catch (error) {
-            console.error(' Chat History: Save error:', error);
+            console.error(' Chat History: [onFinish] Generic save error caught:', error);
             // Optional: Set an error state or notify the user
           }
         } else {
-          console.warn(' Chat History: Could not determine last user message or bot message for saving.');
+          console.warn(' Chat History: [onFinish] Skipping save: Conditions not met (lastUserMessage valid? Bot message valid?)');
         }
       } else {
-        console.warn(' Chat History: User ID not available, cannot save history.');
+        console.warn(' Chat History: [onFinish] Skipping save: User ID not available.');
       }
     },
     onError: (error) => {
