@@ -10,6 +10,7 @@ import { ChatProvider, useChatContext } from '@/context/ChatContext';
 import { shortenAddress } from "@/lib/utils"; // Import shortenAddress at the top
 import { usePrivy, useWallets, useFundWallet } from "@privy-io/react-auth"; // Remove delegation hook
 import { base } from "viem/chains"; // Import Base chain configuration
+import { EnrichedTokenBalance } from './token-list'; // Import the correct type
 
 // Create a ref to hold the SidebarTabs component
 const sidebarRef = React.createRef<{ refreshBalances: () => void }>();
@@ -303,8 +304,6 @@ const SidebarTabs = forwardRef<{ refreshBalances: () => void }, {
 });
 
 // --- AssetsSection ---
-import { type DisplayBalance } from './token-list'; // Import the type
-
 function AssetsSection({ 
   isWalletConnected, 
   walletAddress
@@ -313,7 +312,7 @@ function AssetsSection({
   walletAddress: string | null
 }) { // Accept address prop
   // Add state for tokens and loading
-  const [tokens, setTokens] = useState<DisplayBalance[]>([]); 
+  const [tokens, setTokens] = useState<EnrichedTokenBalance[]>([]); 
   const [isLoading, setIsLoading] = useState(false); // Start not loading
   const [error, setError] = useState<string | null>(null); // Add error state
   const [showSmallBalances, setShowSmallBalances] = useState(false); // State to control small balances visibility
@@ -338,75 +337,45 @@ function AssetsSection({
 
   // Create a function to fetch all balances that can be called from other components
   const fetchAllBalances = async () => {
-    console.log('[AssetsSection Fetch] Starting fetchAllBalances. Wallet Address:', walletAddress);
     if (!walletAddress) {
-      console.log('[AssetsSection Fetch] No wallet address provided, aborting fetch.');
-      setTokens([]); // Clear tokens if no address
       setIsLoading(false);
-      setError(null);
       return;
     }
     
     setIsLoading(true);
     setError(null);
-    console.log('[AssetsSection Fetch] Set loading to true.');
 
     try {
       const nativeUrl = `/api/native-balances?address=${walletAddress}`;
       const tokenUrl = `/api/tokens?address=${walletAddress}`;
-      console.log(`[AssetsSection Fetch] Fetching Native Balances from: ${nativeUrl}`);
-      console.log(`[AssetsSection Fetch] Fetching Tokens from: ${tokenUrl}`);
 
-      // Fetch Native Balances
-      const nativeRes = await fetch(nativeUrl);
-      console.log('[AssetsSection Fetch] Native Balances response received:', nativeRes);
-      // Fetch Token Balances
-      const tokenRes = await fetch(tokenUrl);
-      console.log('[AssetsSection Fetch] Token Balances response received:', tokenRes);
+      const [nativeRes, tokenRes] = await Promise.all([
+        fetch(nativeUrl),
+        fetch(tokenUrl),
+      ]);
 
-      // Process Native Balances
-      if (!nativeRes.ok) {
-        const errorData = await nativeRes.json().catch(() => ({ error: 'Failed to parse native balance error response' }));
-        console.error('[AssetsSection Fetch] Native Balances API Error:', nativeRes.status, nativeRes.statusText, errorData);
-        throw new Error(`Native Balances Error: ${errorData.error || nativeRes.statusText}`);
-      }
-      const nativeData = await nativeRes.json();
-      console.log('[AssetsSection Fetch] Parsed Native Balances data:', nativeData);
-      const nativeBalances: DisplayBalance[] = nativeData || []; // Assuming nativeData is already in DisplayBalance format or similar
+      const nativeData: EnrichedTokenBalance | null = await nativeRes.json();
+      const tokenData: { tokens: EnrichedTokenBalance[] } | null = await tokenRes.json();
 
-      // Process Token Balances
-      if (!tokenRes.ok) {
-        const errorData = await tokenRes.json().catch(() => ({ error: 'Failed to parse token balance error response' }));
-        console.error('[AssetsSection Fetch] Token Balances API Error:', tokenRes.status, tokenRes.statusText, errorData);
-        throw new Error(`Token Balances Error: ${errorData.error || tokenRes.statusText}`);
-      }
-      const tokenData = await tokenRes.json();
-      console.log('[AssetsSection Fetch] Parsed Token Balances data:', tokenData);
-      const tokenBalances: DisplayBalance[] = tokenData.tokens || []; // Access the .tokens property
+      const nativeToken = nativeData;
+      const erc20Tokens = tokenData?.tokens || [];
 
-      // Combine and set tokens
-      let combinedTokens = [...nativeBalances, ...tokenBalances];
-      console.log('[AssetsSection Fetch] Combined Native + Token balances (raw):', combinedTokens);
+      let combinedTokens = nativeToken ? [nativeToken, ...erc20Tokens] : erc20Tokens;
 
-      // Filter out assets with null/undefined usdValue
-      combinedTokens = combinedTokens.filter(token => token.usdValue != null);
-      console.log('[AssetsSection Fetch] Filtered balances (non-null USD value):', combinedTokens);
+      // Filter out tokens with null USD value BEFORE sorting
+      combinedTokens = combinedTokens.filter((token: EnrichedTokenBalance) => 
+        typeof token.usdPricePerToken === 'number' && token.usdPricePerToken > 0
+      );
 
-      // Sort by USD value (descending)
-      combinedTokens.sort((a, b) => (b.usdValue ?? 0) - (a.usdValue ?? 0));
-      console.log('[AssetsSection Fetch] Sorted filtered balances:', combinedTokens);
+      // Sort by USD value, descending
+      combinedTokens.sort((a: EnrichedTokenBalance, b: EnrichedTokenBalance) => (b.usdValue ?? 0) - (a.usdValue ?? 0));
 
-      console.log('[AssetsSection Fetch] Setting tokens state.');
-      setTokens(combinedTokens); 
-
+      setTokens(combinedTokens);
     } catch (err: any) {
-      console.error("[AssetsSection Fetch] Error caught during fetch/processing:", err);
-      setError(err.message || 'Failed to fetch balances.');
-      console.log('[AssetsSection Fetch] Clearing tokens state due to error.');
+      setError(`Failed to fetch balances: ${err.message}`);
       setTokens([]); // Clear tokens on error
     } finally {
       setIsLoading(false);
-      console.log('[AssetsSection Fetch] Finished fetchAllBalances. Set loading to false.');
     }
   };
 
