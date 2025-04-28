@@ -43,7 +43,14 @@ export async function GET(request: Request) {
   const alchemyUrl = `https://api.g.alchemy.com/data/v1/${apiKey}/assets/tokens/by-address`;
 
   // Define networks to query
-  const networks = ['eth-mainnet', 'base-mainnet', 'matic-mainnet']; // Add/remove as needed
+  const networks = [
+    'eth-mainnet',    // Ethereum (Alchemy ID)
+    'opt-mainnet',    // Optimism (Alchemy ID)
+    'arb-mainnet',    // Arbitrum One (Alchemy ID)
+    'matic-mainnet',  // Polygon PoS (Alchemy ID)
+    'base-mainnet',   // Base (Alchemy ID)
+    'zora-mainnet',   // Zora (Alchemy ID)
+  ];
 
   const requestBody = {
     addresses: [
