@@ -156,7 +156,7 @@ const ChatInterface = ({ onGoBack }: ChatInterfaceProps) => {
               key={message.id} 
               className={`flex items-start gap-3 ${message.sender === 'user' ? 'justify-end' : ''}`}
             >
-              {message.sender === 'bot' && (
+              {message.sender === 'txt' && (
                 <div className="w-8 h-8 rounded-full bg-yellow flex items-center justify-center border-2 border-black flex-shrink-0">
                   <Bot className="w-5 h-5 text-black" />
                 </div>

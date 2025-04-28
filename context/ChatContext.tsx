@@ -9,16 +9,18 @@ import React, {
   useEffect,
   useRef,
   useMemo,
+  useLayoutEffect,
 } from 'react';
-import { useChat as useVercelAIChat } from '@ai-sdk/react';
+import { useChat as useVercelAIChat, type UseChatOptions, type Message as VercelMessage } from '@ai-sdk/react';
 import { usePrivy } from '@privy-io/react-auth';
 import { useDelegatedActions } from '@privy-io/react-auth';
+import { supabase } from '@/lib/supabaseClient';
 
 // Keep the original Message interface for compatibility with existing components
 interface Message {
   id: string;
   text: string;
-  sender: 'user' | 'bot';
+  sender: 'user' | 'txt';
   description?: string;
 }
 
@@ -78,9 +80,57 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       // Fetch and send the specific wallet ID as walletId
       walletId: user?.wallet?.id || null
     },
-    onFinish: () => {
-      console.log(' Chat message completed successfully');
+    onFinish: async (message: VercelMessage) => {
+      console.log(' Chat message completed successfully:', message);
       setMessageError(null);
+
+      // --- Save Chat History --- 
+      if (user?.id) {
+        // Get the last user message and the new bot message
+        const lastUserMessage = convertedMessages[convertedMessages.length - 1];
+        const newBotMessage: Message = { 
+          id: message.id, 
+          text: message.content, 
+          sender: 'txt' 
+        };
+
+        if (lastUserMessage && lastUserMessage.sender === 'user' && newBotMessage) {
+          // Prepare data for Supabase insertion
+          const messagesToSave = [
+            {
+              user_id: user.id,
+              message: lastUserMessage.text,
+              sender: 'user', // Use 'user' for DB
+              // id: lastUserMessage.id // Optional: If you want to store Vercel AI SDK ID
+            },
+            {
+              user_id: user.id,
+              message: newBotMessage.text,
+              sender: 'ai', // Use 'ai' for DB
+              id: newBotMessage.id // Store Vercel AI SDK ID for the bot message
+            }
+          ];
+
+          try {
+            console.log(' Chat History: Saving messages to Supabase for user:', user.id, messagesToSave);
+            const { error: insertError } = await supabase
+              .from('chat_history')
+              .insert(messagesToSave);
+
+            if (insertError) {
+              throw insertError;
+            }
+            console.log(' Chat History: Messages saved successfully.');
+          } catch (error) {
+            console.error(' Chat History: Save error:', error);
+            // Optional: Set an error state or notify the user
+          }
+        } else {
+          console.warn(' Chat History: Could not determine last user message or bot message for saving.');
+        }
+      } else {
+        console.warn(' Chat History: User ID not available, cannot save history.');
+      }
     },
     onError: (error) => {
       console.error(' Chat error:', error);
@@ -89,58 +139,73 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   });
 
   // Convert Vercel AI message format to our app's format
-  const convertedMessages = vercelMessages.map(
-    (msg): Message => ({
-      id: msg.id,
-      text: msg.content,
-      sender: msg.role === 'user' ? 'user' : 'bot'
-    })
-  );
+  // Use useMemo to prevent unnecessary recalculations
+  const convertedMessages = useMemo(() => {
+    return vercelMessages.map(
+      (msg): Message => ({
+        id: msg.id,
+        text: msg.content,
+        sender: msg.role === 'user' ? 'user' : 'txt'
+      })
+    );
+  }, [vercelMessages]);
 
-  // Auto-scroll logic
-  useEffect(() => {
-    if (scrollAreaRef.current) {
-      const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
-      if (viewport) {
-        viewport.scrollTop = viewport.scrollHeight;
-      }
-    }
-  }, [convertedMessages]);
+  // Fetch chat history from Supabase
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<Error | null>(null);
+  const [initialHistory, setInitialHistory] = useState<Message[]>([]);
 
-  // Effect to trigger delegation when user and wallet are available
   useEffect(() => {
-    const handleDelegate = async () => {
-      if (user?.wallet?.address) {
-        setDelegationAttempted(true); // Mark attempt initiated
+    const fetchAndSetHistory = async () => {
+      if (authenticated && user?.id) {
+        setHistoryLoading(true);
+        setHistoryError(null);
+        console.log(' Chat History: Fetching for user:', user.id);
         try {
-          console.log('Attempting to delegate wallet:', user.wallet.address);
-          // Specify chainType if needed, assuming 'ethereum' based on context
-          await delegateWallet({
-            address: user.wallet.address,
-            chainType: 'ethereum' // Or derive from wallet object if available
-          });
-          console.log('Wallet delegation successful or already active.');
+          // Fetch history from Supabase
+          const { data, error } = await supabase
+            .from('chat_history')
+            .select('id, message, sender, created_at')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: true });
+
+          if (error) {
+            throw error;
+          }
+
+          // Define expected row type
+          type ChatHistoryRow = {
+            id: string;
+            message: string;
+            sender: 'user' | 'ai';
+            created_at: string;
+          };
+
+          // Map Supabase data to our Message format
+          const fetchedMessages: Message[] = (data || []).map((row: ChatHistoryRow) => ({
+            id: row.id, // Use Supabase ID
+            text: row.message,
+            sender: row.sender === 'ai' ? 'txt' : 'user', // Map 'ai' to 'txt'
+          }));
+
+          console.log(' Chat History: Fetched messages:', fetchedMessages);
+          setInitialHistory(fetchedMessages);
         } catch (error) {
-          console.error('Failed to delegate wallet:', error);
-          // Optionally, set an error state to inform the user
+          console.error(' Chat History: Fetch error:', error);
+          // Check if error is an instance of Error before setting state
+          if (error instanceof Error) {
+            setHistoryError(error);
+          } else {
+            setHistoryError(new Error('An unknown error occurred while fetching history.'));
+          }
+        } finally {
+          setHistoryLoading(false);
         }
-      } else {
-        console.log('User or wallet address not available for delegation.');
       }
     };
 
-    // Only attempt delegation if authenticated, wallet exists, and hasn't been attempted yet
-    if (authenticated && user?.wallet && !delegationAttempted) {
-      // Introduce a small delay to allow Privy proxy to initialize
-      const timer = setTimeout(() => {
-        handleDelegate();
-      }, 300); // 300ms delay
-
-      // Clear timeout if component unmounts or dependencies change
-      return () => clearTimeout(timer);
-    }
-    // Run when authenticated status, user/wallet object, or attempt status changes
-  }, [authenticated, user, delegateWallet, delegationAttempted]);
+    fetchAndSetHistory();
+  }, [authenticated, user]);
 
   // Create a wrapper for handleInputChange to maintain compatibility
   const setInputValue = useCallback(
