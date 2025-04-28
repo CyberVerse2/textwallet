@@ -106,7 +106,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
           <ArrowLeft className="h-4 w-4" />
         </Button>
       </div>
-      <ScrollArea ref={scrollAreaRef} className="flex-1 p-4 w-full max-w-[33rem]">
+      <ScrollArea ref={scrollAreaRef} className="flex-1 p-4 w-full max-w-[46rem]">
         <div className="space-y-4 w-full">
           {messages.length === 0 && ( 
             <div className="text-center text-gray-500 my-8">
@@ -213,7 +213,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
         </div>
       </ScrollArea>
 
-      <div className="p-4 bg-white w-full max-w-[33rem]">
+      <div className="p-4 bg-white w-full max-w-[46rem]">
         <form className="relative w-full" onSubmit={handleSubmit}> 
           <Input
             type="text"
