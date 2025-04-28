@@ -126,6 +126,9 @@ export async function GET(request: Request) {
           return null;
         }
 
+        // DEBUG: Log raw token object received from Alchemy
+        console.log('[API Tokens Route] Processing Raw Token:', JSON.stringify(token, null, 2));
+
         const balanceRaw = token.tokenBalance;
         const contractAddressLower = token.contractAddress?.toLowerCase();
 
@@ -136,11 +139,16 @@ export async function GET(request: Request) {
         let logo: string | undefined = undefined;
 
         if (contractAddressLower && KNOWN_TOKEN_METADATA[contractAddressLower]) {
+          // DEBUG: Log successful lookup
+          console.log(`[API Tokens Route] Found known metadata for address: ${contractAddressLower}`);
           const knownMeta = KNOWN_TOKEN_METADATA[contractAddressLower];
           name = knownMeta.name;
           symbol = knownMeta.symbol;
           decimals = knownMeta.decimals;
           logo = knownMeta.logo;
+        } else if (contractAddressLower) {
+          // DEBUG: Log failed lookup
+          console.log(`[API Tokens Route] No known metadata found for address: ${contractAddressLower}`);
         } // else: use placeholders defined above
 
         // Filter out spam tokens
@@ -166,7 +174,7 @@ export async function GET(request: Request) {
         }
 
         // Create the enriched object
-        return {
+        const enrichedToken = {
           network: 'Unknown', // Placeholder - Network info location TBD from logs
           contractAddress: token.contractAddress,
           balanceRaw: token.tokenBalance,
@@ -178,6 +186,11 @@ export async function GET(request: Request) {
           usdPricePerToken: usdPricePerToken,
           usdValue: usdValue, // Use calculated USD value
         } as EnrichedTokenBalance; // Assert type here
+
+        // DEBUG: Log the final enriched token object before returning from map
+        console.log('[API Tokens Route] Enriched Token:', JSON.stringify(enrichedToken, null, 2));
+
+        return enrichedToken;
       }).filter((token): token is EnrichedTokenBalance => token !== null); // Filter out null values
     }
 
