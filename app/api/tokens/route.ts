@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import { formatUnits } from 'ethers'; // Import ethers utility
 import type { EnrichedTokenBalance } from "../../token-list"; // Import the type
+import { Alchemy, Network, Utils, type TokenBalance } from "alchemy-sdk"; // Import TokenBalance type
+import { CHAIN_CONFIG } from '../../../lib/chain-config'; // Use relative path
+
+// Define USDC contract address on Base network
+const USDC_BASE_ADDRESS = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 
 // Spam keywords (lowercase) - adjust as needed
 const SPAM_KEYWORDS = [
@@ -168,6 +173,21 @@ export async function GET(request: Request) {
     }
 
     console.log(`API Route: Fetch successful. Processed ${processedTokens.length} non-spam tokens. Total Value: ${totalCalculatedUsdValue}`);
+
+    // Log details specifically for USDC if found
+    // Find raw USDC by contract address (case-insensitive comparison)
+    const usdcTokenRaw = rawTokens.find((t: TokenBalance) => 
+      !t.error && t.contractAddress?.toLowerCase() === USDC_BASE_ADDRESS.toLowerCase()
+    );
+    if (usdcTokenRaw) {
+      console.log('[API Tokens Route] Raw USDC Data from Alchemy:', JSON.stringify(usdcTokenRaw, null, 2));
+    }
+    const usdcTokenEnriched = processedTokens.find((t: EnrichedTokenBalance) => t.contractAddress?.toLowerCase() === USDC_BASE_ADDRESS.toLowerCase());
+    if (usdcTokenEnriched) {
+      console.log('[API Tokens Route] Enriched USDC Data before sending:', JSON.stringify(usdcTokenEnriched, null, 2));
+    } else if (usdcTokenRaw) {
+      console.log('[API Tokens Route] USDC was found in raw data but not in enriched data (likely filtered as spam).');
+    }
 
     return NextResponse.json({ 
       tokens: processedTokens, // Return the processed tokens
