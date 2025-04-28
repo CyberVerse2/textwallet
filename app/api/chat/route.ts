@@ -30,9 +30,6 @@ export async function POST(req: Request) {
           throw new Error('Missing walletId for wallet operations');
         }
 
-        // Dynamically import the provider to avoid issues with imports
-        const { AgentKit, PrivyEvmWalletProvider } = await import('@coinbase/agentkit');
-
         // Ensure environment variables exist
         const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
         const appSecret = process.env.NEXT_PUBLIC_PRIVY_APP_SECRET;
