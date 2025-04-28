@@ -3,30 +3,30 @@ import { twMerge } from "tailwind-merge"
 import { createCoin } from '@zoralabs/coins-sdk';
 import { Address, createPublicClient, http, Hex, WalletClient, PublicClient } from 'viem';
 import { baseSepolia } from 'viem/chains';
-import { EIP1193Provider } from "@privy-io/react-auth";
 
-const coinParams = {
-  name: 'My Awesome Coin',
-  symbol: 'MAC',
-  uri: 'ipfs://bafybeigoxzqzbnxsn35vq7lls3ljxdcwjafxvbvkivprsodzrptpiguysy',
-  payoutRecipient: '0xYourAddress' as Address, // TODO: Replace with actual dynamic address
-  platformReferrer: '0xOptionalPlatformReferrerAddress' as Address, // TODO: Replace or remove if not needed
-  initialPurchaseWei: 0n
-};
+type CoinParams = {
+  name: string;
+  symbol: string;
+  uri: string;
+  payoutRecipient: Address;
+  platformReferrer?: Address;
+  initialPurchaseWei: bigint;
+}
 
 export async function createMyCoin(
-  walletClient: WalletClient, // Pass the WalletClient created from Privy provider
-  publicClient: PublicClient  // Pass a configured PublicClient
+  params: CoinParams,
+  walletClient: WalletClient,
+  publicClient: PublicClient
 ) {
-  // TODO: Ensure coinParams uses appropriate addresses before calling this function
-  if (coinParams.payoutRecipient === '0xYourAddress') {
-    console.warn("createMyCoin called with placeholder payoutRecipient address. Please update coinParams.");
-    // Consider throwing an error or returning early if the address is invalid
-    // throw new Error("Payout recipient address is not set.");
+  if (!params.name || !params.symbol || !params.uri || !params.payoutRecipient) {
+    throw new Error("Missing required coin parameters (name, symbol, uri, payoutRecipient).");
+  }
+  if (params.payoutRecipient === '0xYourAddress') {
+    console.warn("createMyCoin called with placeholder payoutRecipient address.");
   }
 
   try {
-    const result = await createCoin(coinParams, walletClient, publicClient);
+    const result = await createCoin(params, walletClient, publicClient);
 
     console.log('Coin creation successful!');
     console.log('Transaction hash:', result.hash);
@@ -36,7 +36,6 @@ export async function createMyCoin(
     return result;
   } catch (error) {
     console.error('Error creating coin:', error);
-    // Re-throw the error or handle it as needed
     throw error;
   }
 }
@@ -47,7 +46,7 @@ export function cn(...inputs: ClassValue[]) {
 
 export function shortenAddress(address: string | undefined, chars = 4): string {
   if (!address) return "";
-  if (address.length <= chars * 2 + 2) return address; // No need to shorten if already short
+  if (address.length <= chars * 2 + 2) return address;
   return `${address.substring(0, chars + 2)}...${address.substring(address.length - chars)}`;
 }
 
@@ -75,29 +74,27 @@ export function formatApproximateValue(value: string | number | null | undefined
   const absNum = Math.abs(num);
   const sign = num < 0 ? "-" : "";
 
-  if (absNum < 0.0001) { // Handle very small numbers
-    return num.toExponential(2); // Use scientific notation for very small decimals
+  if (absNum < 0.0001) { 
+    return num.toExponential(2); 
   } 
   
-  if (absNum < 1) { // Handle numbers between 0.0001 and 1
-      return sign + absNum.toFixed(maxDecimals).replace(/\.?0+$/, ""); // Show decimals, remove trailing zeros
+  if (absNum < 1) { 
+      return sign + absNum.toFixed(maxDecimals).replace(/\.?0+$/, ""); 
   }
   
-  if (absNum < 1000) { // Numbers less than 1000, show decimals if needed
-    return sign + absNum.toFixed(maxDecimals).replace(/\.0+$/, ""); // Remove .000 if no decimals
+  if (absNum < 1000) { 
+    return sign + absNum.toFixed(maxDecimals).replace(/\.0+$/, ""); 
   }
 
   const tier = Math.floor(Math.log10(absNum) / 3);
 
-  // If tier is invalid (e.g., due to very large numbers beyond reasonable formatting)
-  if (tier === 0) return sign + absNum.toFixed(1); // Fallback for numbers just below 1000
-  if (tier >= 5) return num.toExponential(2); // Use scientific notation for very large numbers (Quadrillion+)
+  if (tier === 0) return sign + absNum.toFixed(1); 
+  if (tier >= 5) return num.toExponential(2); 
   
   const suffix = ['', 'K', 'M', 'B', 'T'][tier];
   const scale = Math.pow(10, tier * 3);
   const scaled = absNum / scale;
 
-  // Determine decimal places based on the scaled value
   let formattedScaled: string;
   if (scaled < 10) {
       formattedScaled = scaled.toFixed(2);
@@ -107,7 +104,6 @@ export function formatApproximateValue(value: string | number | null | undefined
       formattedScaled = scaled.toFixed(0);
   }
   
-  // Remove trailing .0 or .00
   formattedScaled = formattedScaled.replace(/\.0+$/, ""); 
 
   return sign + formattedScaled + suffix;
