@@ -170,7 +170,11 @@ export async function GET(request: Request) {
             name: name,
             symbol: symbol,
             decimals: decimals,
-            logo: metadata.logo,
+            logo: `${
+              name.includes('usd')
+                ? 'https://token.metaswap.codefi.network/assets/networkLogos/usdcoin.svg'
+                : 'https://token.metaswap.codefi.network/assets/networkLogos/base.svg'
+            }`,
             usdPricePerToken: usdPricePerToken,
             usdValue: usdValue // Use calculated USD value
           };
