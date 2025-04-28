@@ -11,6 +11,7 @@ if (!supabaseServiceRoleKey) {
   throw new Error('Missing environment variable SUPABASE_SERVICE_ROLE_KEY');
 }
 
+
 // Create a single supabase admin client for interacting with your database
 // Note: this admin client bypasses RLS policies
 const supabaseAdmin: SupabaseClient = createClient(
