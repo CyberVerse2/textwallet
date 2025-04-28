@@ -2,10 +2,20 @@ import { NextResponse } from 'next/server';
 import { formatUnits } from 'ethers'; // Import ethers utility
 import type { EnrichedTokenBalance } from "../../token-list"; // Import the type
 import { Alchemy, Network, Utils, type TokenBalance } from "alchemy-sdk"; // Import TokenBalance type
-import { CHAIN_CONFIG } from '../../../lib/chain-config'; // Use relative path
+// import { CHAIN_CONFIG } from '../../../lib/chain-config'; // Temporarily commented out - file not found
 
 // Define USDC contract address on Base network
 const USDC_BASE_ADDRESS = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+
+// Simple map for known token metadata (expand as needed)
+const KNOWN_TOKEN_METADATA: { [address: string]: { name: string; symbol: string; decimals: number; logo?: string } } = {
+  [USDC_BASE_ADDRESS.toLowerCase()]: { // Use lowercase address for case-insensitive matching
+    name: 'USD Coin',
+    symbol: 'USDC',
+    decimals: 6,
+    logo: 'https://token.metaswap.codefi.network/assets/tokens/usdc/logo.svg' // Assuming this URL pattern works
+  }
+};
 
 // Spam keywords (lowercase) - adjust as needed
 const SPAM_KEYWORDS = [
@@ -103,73 +113,72 @@ export async function GET(request: Request) {
     const rawTokens = responseData?.data?.tokens;
 
     if (rawTokens && Array.isArray(rawTokens)) {
-      processedTokens = rawTokens.map((token: any): EnrichedTokenBalance | null => {
-        const metadata = token.tokenMetadata;
-        const decimals = metadata?.decimals;
-        const balanceRaw = token.tokenBalance;
-        const name = metadata?.name;
-        const symbol = metadata?.symbol;
-        const usdPricePerToken = getUsdPrice(token.tokenPrices);
-
-        // --- Filtering ---
-        // 1. Skip if essential data missing or zero balance
-        if (!metadata || typeof decimals !== 'number' || !balanceRaw || balanceRaw === '0x0000000000000000000000000000000000000000000000000000000000000000') {
-          // console.log(`Skipping token (missing data/zero balance): ${symbol || name || token.tokenAddress}`);
-          return null; // Skip this token
-        }
-
-        // 2. Skip potential spam tokens
-        if (isPotentiallySpam(name, symbol)) {
-          console.log(`Filtering potential spam token: ${symbol || name}`);
+      processedTokens = rawTokens.map((token: TokenBalance) => {
+        // Ensure we only process successful token balance fetches
+        if (token.error) {
+          console.warn(`API Route: Error fetching balance for token ${token.contractAddress}: ${token.error}`);
           return null;
         }
 
-        // 3. Optional: Skip tokens with no price? (Could filter legit tokens too)
-        // if (usdPricePerToken === null) return null;
-
-        // --- Formatting & Calculation ---
-        let formattedBalance = '0';
-        let usdValue = null;
-
-        try {
-          // Format balance using ethers
-          formattedBalance = formatUnits(balanceRaw, decimals);
-          const balanceValue = parseFloat(formattedBalance);
-
-          // Calculate USD value for this specific token holding
-          if (usdPricePerToken !== null && !isNaN(balanceValue)) {
-            usdValue = balanceValue * usdPricePerToken;
-            if (!isNaN(usdValue)) {
-              totalCalculatedUsdValue += usdValue; // Add to overall total
-            } else {
-              usdValue = null; // Ensure NaN doesn't sneak through
-            }
-          }
-        } catch (formatError) {
-          console.warn(`Could not format/calculate value for ${symbol || token.tokenAddress}:`, formatError);
-          // Keep formattedBalance as '0' and usdValue as null
+        // Validate essential data
+        if (!token.contractAddress || typeof token.tokenBalance !== 'string') {
+          console.warn(`API Route: Skipping token due to missing contract address or balance.`);
+          return null;
         }
 
+        const balanceRaw = token.tokenBalance;
+        const contractAddressLower = token.contractAddress?.toLowerCase();
+
+        // Get metadata from known map or use placeholders
+        let name: string | undefined = 'Unknown Token';
+        let symbol: string | undefined = '???';
+        let decimals: number = 18; // Default
+        let logo: string | undefined = undefined;
+
+        if (contractAddressLower && KNOWN_TOKEN_METADATA[contractAddressLower]) {
+          const knownMeta = KNOWN_TOKEN_METADATA[contractAddressLower];
+          name = knownMeta.name;
+          symbol = knownMeta.symbol;
+          decimals = knownMeta.decimals;
+          logo = knownMeta.logo;
+        } // else: use placeholders defined above
+
+        // Filter out spam tokens
+        const nameLower = name?.toLowerCase() || '';
+        const symbolLower = symbol?.toLowerCase() || '';
+        if (SPAM_KEYWORDS.some(keyword => nameLower.includes(keyword) || symbolLower.includes(keyword))) {
+          console.log(`Filtering potential spam token: ${name} - ${symbol}`);
+          return null;
+        }
+
+        // Format balance using ethers
+        const formattedBalance = formatUnits(balanceRaw, decimals);
+
+        // --- Calculate USD value (Placeholder - requires price source) ---
+        let usdValue: number | null = null;
+        const usdPricePerToken: number | null = null; // TODO: Implement price fetching if needed
+        if (usdPricePerToken !== null) {
+          const balanceNumber = parseFloat(formattedBalance);
+          if (!isNaN(balanceNumber)) {
+            usdValue = balanceNumber * usdPricePerToken;
+            totalCalculatedUsdValue += usdValue; // Accumulate total value
+          }
+        }
+
+        // Create the enriched object
         return {
-          network: token.network,
-          contractAddress: token.tokenAddress,
-          balanceRaw: balanceRaw,
-          formattedBalance: formattedBalance, // Use calculated formatted balance
+          network: 'Unknown', // Placeholder - Network info location TBD from logs
+          contractAddress: token.contractAddress,
+          balanceRaw: token.tokenBalance,
+          formattedBalance: formattedBalance,
           name: name,
           symbol: symbol,
           decimals: decimals,
-          logo: metadata.logo,
+          logo: logo, // Use constructed fallback URL or undefined
           usdPricePerToken: usdPricePerToken,
           usdValue: usdValue, // Use calculated USD value
-        };
-      }).filter((token): token is EnrichedTokenBalance => token !== null); // Filter out nulls
-
-      // --- Sorting --- Sort by USD value descending
-      processedTokens.sort((a, b) => {
-        const valueA = a.usdValue ?? -1; // Treat null/undefined USD value as lowest
-        const valueB = b.usdValue ?? -1;
-        return valueB - valueA; // Sort descending by USD value
-      });
+        } as EnrichedTokenBalance; // Assert type here
+      }).filter((token): token is EnrichedTokenBalance => token !== null); // Filter out null values
     }
 
     console.log(`API Route: Fetch successful. Processed ${processedTokens.length} non-spam tokens. Total Value: ${totalCalculatedUsdValue}`);
