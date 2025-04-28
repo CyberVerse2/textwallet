@@ -47,29 +47,16 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
   useEffect(() => {
     // Check if messages changed
     if (messages.length !== prevMessagesLengthRef.current) {
-      console.log('💬 Chat UI: Messages updated', {
-        count: messages.length,
-        previousCount: prevMessagesLengthRef.current,
-        newMessages: messages.slice(prevMessagesLengthRef.current)
-      });
       prevMessagesLengthRef.current = messages.length;
     }
     
     // Check if input changed
     if (input !== prevInputRef.current) {
-      console.log('💬 Chat UI: Input changed', { 
-        from: prevInputRef.current, 
-        to: input 
-      });
       prevInputRef.current = input;
     }
     
     // Check if loading state changed
     if (isLoading !== prevIsLoadingRef.current) {
-      console.log('💬 Chat UI: Loading state changed', { 
-        from: prevIsLoadingRef.current, 
-        to: isLoading 
-      });
       prevIsLoadingRef.current = isLoading;
     }
   }, [messages, input, isLoading]);
