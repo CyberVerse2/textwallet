@@ -332,41 +332,66 @@ function AssetsSection({
 
   // Create a function to fetch all balances that can be called from other components
   const fetchAllBalances = async () => {
-    if (!isWalletConnected || !walletAddress) return;
+    console.log('[AssetsSection Fetch] Starting fetchAllBalances. Wallet Address:', walletAddress);
+    if (!walletAddress) {
+      console.log('[AssetsSection Fetch] No wallet address provided, aborting fetch.');
+      setTokens([]); // Clear tokens if no address
+      setIsLoading(false);
+      setError(null);
+      return;
+    }
     
     setIsLoading(true);
-    setError(null); // Clear previous errors
+    setError(null);
+    console.log('[AssetsSection Fetch] Set loading to true.');
+
     try {
-      // Fetch both native and token balances concurrently
-      const [nativeRes, tokenRes] = await Promise.all([
-        fetch(`/api/native-balances?address=${walletAddress}`),
-        fetch(`/api/tokens?address=${walletAddress}`) // Fetch from token endpoint
-      ]);
+      const nativeUrl = `/api/native-balances?address=${walletAddress}`;
+      const tokenUrl = `/api/tokens?address=${walletAddress}`;
+      console.log(`[AssetsSection Fetch] Fetching Native Balances from: ${nativeUrl}`);
+      console.log(`[AssetsSection Fetch] Fetching Tokens from: ${tokenUrl}`);
+
+      // Fetch Native Balances
+      const nativeRes = await fetch(nativeUrl);
+      console.log('[AssetsSection Fetch] Native Balances response received:', nativeRes);
+      // Fetch Token Balances
+      const tokenRes = await fetch(tokenUrl);
+      console.log('[AssetsSection Fetch] Token Balances response received:', tokenRes);
 
       // Process Native Balances
       if (!nativeRes.ok) {
         const errorData = await nativeRes.json().catch(() => ({ error: 'Failed to parse native balance error response' }));
+        console.error('[AssetsSection Fetch] Native Balances API Error:', nativeRes.status, nativeRes.statusText, errorData);
         throw new Error(`Native Balances Error: ${errorData.error || nativeRes.statusText}`);
       }
-      const nativeBalances: DisplayBalance[] = await nativeRes.json();
+      const nativeData = await nativeRes.json();
+      console.log('[AssetsSection Fetch] Parsed Native Balances data:', nativeData);
+      const nativeBalances: DisplayBalance[] = nativeData || []; // Assuming nativeData is already in DisplayBalance format or similar
 
       // Process Token Balances
       if (!tokenRes.ok) {
         const errorData = await tokenRes.json().catch(() => ({ error: 'Failed to parse token balance error response' }));
+        console.error('[AssetsSection Fetch] Token Balances API Error:', tokenRes.status, tokenRes.statusText, errorData);
         throw new Error(`Token Balances Error: ${errorData.error || tokenRes.statusText}`);
       }
       const tokenData = await tokenRes.json();
+      console.log('[AssetsSection Fetch] Parsed Token Balances data:', tokenData);
       const tokenBalances: DisplayBalance[] = tokenData.tokens || []; // Access the .tokens property
 
       // Combine and set tokens
-      setTokens([...nativeBalances, ...tokenBalances]); 
+      const combinedTokens = [...nativeBalances, ...tokenBalances];
+      console.log('[AssetsSection Fetch] Combined Native + Token balances:', combinedTokens);
+      console.log('[AssetsSection Fetch] Setting tokens state.');
+      setTokens(combinedTokens); 
 
     } catch (err: any) {
-      console.error("Error fetching balances:", err);
+      console.error("[AssetsSection Fetch] Error caught during fetch/processing:", err);
       setError(err.message || 'Failed to fetch balances.');
+      console.log('[AssetsSection Fetch] Clearing tokens state due to error.');
       setTokens([]); // Clear tokens on error
     } finally {
       setIsLoading(false);
+      console.log('[AssetsSection Fetch] Finished fetchAllBalances. Set loading to false.');
     }
   };
 
