@@ -184,39 +184,9 @@ function SidebarTabs({}: SidebarTabsProps) {
     return combined;
   }, [nativeTokenData, erc20TokenData]);
 
-  // Determine which tokens to display based on the 'showAllTokens' state
-  const displayTokens = useMemo(() => {
-    return showAllTokens ? allBalances : allBalances.slice(0, 3);
-  }, [allBalances, showAllTokens]);
-
-  // Determine if the 'Show More' button should be visible
-  const canShowMore = useMemo(() => {
-    return allBalances.length > 3;
-  }, [allBalances.length]);
-
-  const connectWallet = async () => {
-    if (window.ethereum) {
-      try {
-        setIsLoadingTokens(true);
-        const accounts = await window.ethereum.request({
-          method: 'eth_requestAccounts'
-        });
-        setIsLoadingTokens(false);
-      } catch (error: any) {
-        console.error('User denied account access', error);
-        setIsLoadingTokens(false);
-      }
-    } else {
-      alert('No Ethereum provider found. Install MetaMask.');
-    }
-  };
-
-  const formatAddress = (address: string) => {
+  // Renamed for clarity as it's just for display formatting
+  const formatDisplayAddress = (address: string) => {
     return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
-  };
-
-  const disconnectWallet = () => {
-    // Optional: Add any other cleanup logic if needed, e.g., clearing local storage
   };
 
   return (
@@ -265,7 +235,7 @@ function SidebarTabs({}: SidebarTabsProps) {
                 <span className="text-sm font-semibold">Connected Wallet</span>
                 <div className="h-2 w-2 rounded-full bg-green-500"></div>
               </div>
-              <div className="text-sm text-muted-foreground truncate">{formatAddress(walletAddress)}</div>
+              <div className="text-sm text-muted-foreground truncate">{formatDisplayAddress(walletAddress)}</div>
             </div>
           ) : (
             <div className="flex flex-col items-center p-4 mb-6 rounded-xl border-2 border-dashed border-muted-foreground text-center">
@@ -273,17 +243,6 @@ function SidebarTabs({}: SidebarTabsProps) {
               <p className="text-sm text-muted-foreground mb-3">
                 Connect your wallet to view assets and activity.
               </p>
-              <Button
-                onClick={connectWallet}
-                disabled={isLoadingTokens}
-                variant="outline"
-                size="sm"
-                className="gap-2 rounded-lg border-2 border-black bg-yellow text-black hover:bg-yellow-dark active:translate-y-px active:shadow-none transition-all duration-100 font-bold"
-                style={{ boxShadow: '2px 2px 0px 0px #000000' }}
-              >
-                <Power className="h-4 w-4" />
-                {isLoadingTokens ? 'Connecting...' : 'Connect Wallet'}
-              </Button>
             </div>
           )}
 
@@ -386,7 +345,6 @@ function SidebarTabs({}: SidebarTabsProps) {
             {walletAddress && (
               <Button
                 variant="outline"
-                onClick={disconnectWallet} // onClick handler remains
                 className="w-full justify-start text-red-500 border-2 border-red-500 hover:bg-red-50 active:translate-y-px active:shadow-none transition-all duration-100 rounded-xl font-bold"
                 style={{ boxShadow: '3px 3px 0px 0px #000000' }}
               >
