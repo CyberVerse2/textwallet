@@ -79,7 +79,8 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     api: '/api/chat', // Your backend endpoint
     id: user?.id ? `chat_${user.id}` : undefined, // Unique ID for the chat session
     body: {
-      // Pass data if needed
+      userId: user?.id, // Pass the authenticated user's ID
+      walletId: walletAddress, // Pass the connected wallet address as walletId
     },
     onResponse: (response: Response) => { // Add type to response
       if (!response.ok) {

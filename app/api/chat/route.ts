@@ -24,7 +24,7 @@ export async function POST(req: Request) {
     // Default to using server wallet
     if (
       process.env.NEXT_PUBLIC_PRIVY_APP_ID &&
-      process.env.NEXT_PUBLIC_PRIVY_APP_SECRET
+      process.env.PRIVY_APP_SECRET
     ) {
       try {
         console.log('🤖 Chat API Route: Loading AgentKit...');
@@ -40,14 +40,18 @@ export async function POST(req: Request) {
         // Dynamically import the provider to avoid issues with imports
         const { AgentKit, PrivyEvmWalletProvider } = await import('@coinbase/agentkit');
 
-        // Ensure environment variables exist
+        // Ensure necessary environment variables exist
         const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
-        const appSecret = process.env.NEXT_PUBLIC_PRIVY_APP_SECRET;
+        const appSecret = process.env.PRIVY_APP_SECRET; // Use the actual server-side secret
         const authKeyId = process.env.PRIVY_AUTHORIZATION_KEY_ID;
         const authPrivateKey = process.env.PRIVY_AUTHORIZATION_PRIVATE_KEY;
 
-        if (!appId || !appSecret) {
-          throw new Error('Missing Privy App ID or Secret');
+        if (!appId) {
+          throw new Error('Missing NEXT_PUBLIC_PRIVY_APP_ID environment variable');
+        }
+
+        if (!appSecret) { // Check for the correct secret variable
+          throw new Error('Missing PRIVY_APP_SECRET environment variable');
         }
 
         // Explicitly check for authorization keys if they are expected
@@ -58,13 +62,15 @@ export async function POST(req: Request) {
           throw new Error('Missing PRIVY_AUTHORIZATION_PRIVATE_KEY environment variable');
         }
 
+        // Log the received userId
+        console.log(`🤖 Chat API Route: Received userId from request: ${userId}`);
+
         // Create wallet config with our user-specific server wallet
         const walletConfig = {
           appId,
           appSecret,
           // Use Base mainnet
           chainId: process.env.PRIVY_CHAIN_ID || '8453',
-          walletId: walletId,
           userId: userId,
           authorizationKeyId: authKeyId,
           authorizationPrivateKey: authPrivateKey
@@ -73,7 +79,6 @@ export async function POST(req: Request) {
         console.log('🤖 Wallet config:', {
           appId: walletConfig.appId.substring(0, 5) + '...',
           chainId: walletConfig.chainId,
-          walletId: walletConfig.walletId,
           userId: walletConfig.userId, // Log the userId being used
           authorizationKeyId: walletConfig.authorizationKeyId,
           authorizationPrivateKey: walletConfig.authorizationPrivateKey.substring(0, 5) + '...'
@@ -120,9 +125,15 @@ export async function POST(req: Request) {
         // Return the streamed response
         return result.toDataStreamResponse();
       } catch (walletError) {
-        // If wallet initialization fails, log the error and fall back to regular chat
+        // If wallet initialization fails, log the error and return an error response
         console.error('🤖 Chat API Route: Wallet initialization failed:', walletError);
-        console.log('🤖 Chat API Route: Falling back to regular chat...');
+        return Response.json(
+          {
+            error: 'Failed to initialize server-side wallet context.',
+            details: walletError instanceof Error ? walletError.message : String(walletError)
+          },
+          { status: 500 }
+        );
       }
     }
   } catch (error) {
