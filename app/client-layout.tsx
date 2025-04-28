@@ -9,7 +9,7 @@ import TokenList from "./token-list"
 import ActivityList from "./activity-list"
 import WalletBridge from "@/components/wallet-bridge"
 import "./globals.css"
-import { ChatProvider, useChat } from '@/context/ChatContext';
+import { ChatProvider, useChatContext } from '@/context/ChatContext';
 import { shortenAddress } from "@/lib/utils"; // Import shortenAddress at the top
 import { usePrivy, useWallets, useFundWallet } from "@privy-io/react-auth"; // Remove delegation hook
 import { base } from "viem/chains"; // Import Base chain configuration
@@ -45,7 +45,7 @@ interface SidebarProps {
 // Create a forwardRef component for Sidebar to properly handle refs
 const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar(props, ref) {
   // Use Chat context setters
-  const { setIsWalletConnected, setWalletAddress } = useChat();
+  const { setIsWalletConnected, setWalletAddress } = useChatContext();
 
   // Use Privy hooks
   const { ready, authenticated, user, login, logout, exportWallet } = usePrivy();

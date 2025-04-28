@@ -2,42 +2,44 @@
 
 import React, {
   createContext,
-  useState,
   useContext,
-  ReactNode,
-  useCallback,
+  useState,
   useEffect,
-  useRef,
-  useMemo,
-  useLayoutEffect,
+  useCallback,
+  ReactNode,
+  useRef
 } from 'react';
-import { useChat as useVercelAIChat, type UseChatOptions, type Message as VercelMessage } from '@ai-sdk/react';
 import { usePrivy } from '@privy-io/react-auth';
-import { useDelegatedActions } from '@privy-io/react-auth';
-import { supabase } from '@/lib/supabaseClient';
+import { useDelegatedActions } from '@privy-io/react-auth'; // Import useDelegatedActions
+import { supabase } from '@/lib/supabaseClient'; // Corrected import path
+import { Message as SdkMessage, useChat, UseChatHelpers } from '@ai-sdk/react'; // Renamed import
 
-// Keep the original Message interface for compatibility with existing components
-interface Message {
-  id: string;
-  text: string;
-  sender: 'user' | 'txt';
-  description?: string;
+// Define the structure matching the chat_history table
+interface DbMessage {
+  message_id: string;
+  user_id: string; // Ensure this matches your table column if it exists
+  sender: 'user' | 'ai';
+  content: string;
+  created_at: string; // ISO string format
 }
 
 interface ChatContextType {
-  messages: Message[];
-  inputValue: string;
-  walletAddress: string | null;
-  setInputValue: (value: string) => void;
-  sendMessage: (text: string) => Promise<void>;
-  isProcessing: boolean;
+  messages: SdkMessage[];
+  input: UseChatHelpers['input'];
+  handleInputChange: UseChatHelpers['handleInputChange'];
+  handleSubmit: UseChatHelpers['handleSubmit'];
+  isLoading: UseChatHelpers['isLoading'];
+  reload: UseChatHelpers['reload'];
+  stop: UseChatHelpers['stop'];
+  setInput: UseChatHelpers['setInput'];
+  error: UseChatHelpers['error'];
+  append: UseChatHelpers['append'];
+  loadingHistory: boolean;
   isWalletConnected: boolean;
   setIsWalletConnected: (connected: boolean) => void;
+  walletAddress: string | null;
   setWalletAddress: (address: string | null) => void;
-  scrollAreaRef: React.RefObject<HTMLDivElement | null>;
-  error: Error | null;
-  reload: () => void;
-  stop: () => void;
+  scrollAreaRef: React.RefObject<HTMLDivElement | null>; // For scrolling UI
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -50,8 +52,8 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const [messageError, setMessageError] = useState<Error | null>(null);
   const [delegationAttempted, setDelegationAttempted] = useState(false); // Track delegation attempt
 
-  const { user, authenticated } = usePrivy();
-  const { delegateWallet } = useDelegatedActions();
+  const { user, authenticated, logout } = usePrivy(); // Keep usePrivy for auth state
+  const { delegateWallet } = useDelegatedActions(); // Use useDelegatedActions for delegateWallet
 
   // Reset delegation attempt status on logout
   useEffect(() => {
@@ -62,239 +64,189 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
   // Initialize Vercel AI Chat with proper naming
   const {
-    messages: vercelMessages,
+    messages,
     input,
     handleInputChange,
     handleSubmit,
     isLoading,
-    append,
     reload,
     stop,
-    error: vercelError
-  } = useVercelAIChat({
-    api: '/api/chat',
-    initialMessages: [],
+    error,
+    setInput,
+    setMessages,
+    append
+  } = useChat({
+    api: '/api/chat', // Your backend endpoint
+    id: user?.id ? `chat_${user.id}` : undefined, // Unique ID for the chat session
     body: {
-      // Pass the user identifier (Privy DID)
-      userId: user?.id || null,
-      // Fetch and send the specific wallet ID as walletId
-      walletId: user?.wallet?.id || null
+      // Pass data if needed
     },
-    onFinish: async (message: VercelMessage) => {
+    onResponse: (response: Response) => { // Add type to response
+      if (!response.ok) {
+        console.error(' Chat History: [onResponse] Error response:', response.status, response.statusText);
+      }
+    },
+    onFinish: async (message: SdkMessage) => { // Add type to message
       console.log(' Chat History: [onFinish] Triggered. Bot message received:', message);
       setMessageError(null);
 
-      // --- Save Chat History --- 
-      console.log(' Chat History: [onFinish] Attempting to save history...');
-      if (user?.id) {
+      // Find the user message that preceded this assistant response
+      const userMessageFromSdk = messages.findLast(m => m.role === 'user');
+      const botMessageFromSdk = message; // The AI response passed to onFinish
+
+      console.log(' Chat History: [onFinish] Found user message from state:', userMessageFromSdk);
+      console.log(' Chat History: [onFinish] Bot message from arg:', botMessageFromSdk);
+
+      // Ensure we have both messages and the user is authenticated
+      if (user?.id && userMessageFromSdk && botMessageFromSdk && botMessageFromSdk.role === 'assistant') {
         console.log(' Chat History: [onFinish] User authenticated with ID:', user.id);
-        // Get the last user message and the new bot message
-        // The user message should be the second-to-last one when onFinish runs
-        const lastUserMessage = convertedMessages[convertedMessages.length - 2];
-        // The bot message is the one passed to onFinish
-        const newBotMessage = message;
 
-        console.log(' Chat History: [onFinish] Identified lastUserMessage:', lastUserMessage);
-        console.log(' Chat History: [onFinish] Identified newBotMessage:', newBotMessage);
-        console.log(' Chat History: [onFinish] Current convertedMessages state:', convertedMessages);
-        // Check if the second-to-last message exists and is from the user
-        if (lastUserMessage && lastUserMessage.sender === 'user' && newBotMessage.role === 'assistant') {
-          // Prepare data for Supabase insertion
-          const messagesToSave = [
-            {
-              user_id: user.id,
-              message: lastUserMessage.text,
-              sender: 'user', // Use 'user' for DB
-              // id: lastUserMessage.id // Optional: If you want to store Vercel AI SDK ID
-            },
-            {
-              user_id: user.id,
-              message: newBotMessage.content, // Use content from the VercelMessage
-              sender: 'ai', // Match the database CHECK constraint ('user' or 'ai')
-              created_at: new Date().toISOString() // Use bot message arrival time
-            }
-          ];
+        // Convert SDK messages to DB format
+        const userMessageForDb = convertSdkToDbMessage(userMessageFromSdk, user.id);
+        const botMessageForDb = convertSdkToDbMessage(botMessageFromSdk, user.id);
 
-          console.log(' Chat History: [onFinish] Payload to save:', JSON.stringify(messagesToSave));
-          try {
-            console.log(' Chat History: [onFinish] Calling supabase.insert...');
-            const { error: insertError } = await supabase
-              .from('chat_history')
-              .insert(messagesToSave);
+        console.log(` Chat History: [onFinish] Checking save condition: userMessageForDb valid? ${!!userMessageForDb}, user sender === 'user'? ${userMessageForDb?.sender === 'user'}, botMessageForDb role === 'ai'? ${botMessageForDb?.sender === 'ai'}`);
 
-            if (insertError) {
-              console.error(' Chat History: [onFinish] Supabase insert error:', insertError);
-              throw insertError;
-            }
-            console.log(' Chat History: [onFinish] Messages saved successfully.');
-          } catch (error) {
-            console.error(' Chat History: [onFinish] Generic save error caught:', error);
-            // Optional: Set an error state or notify the user
+        // Prepare data for Supabase insertion
+        const messagesToSave = [
+          userMessageForDb,
+          botMessageForDb
+        ];
+
+        console.log(' Chat History: [onFinish] Payload to save:', JSON.stringify(messagesToSave));
+        try {
+          console.log(' Chat History: [onFinish] Calling supabase.insert...');
+          const { error: insertError } = await supabase
+            .from('chat_history')
+            .insert(messagesToSave);
+
+          if (insertError) {
+            console.error(' Chat History: [onFinish] Supabase insert error:', insertError);
+            throw insertError;
           }
-        } else {
-          console.warn(' Chat History: [onFinish] Skipping save: Conditions not met (lastUserMessage valid? Bot message valid?)');
+          console.log(' Chat History: [onFinish] Messages saved successfully.');
+        } catch (error) {
+          console.error(' Chat History: [onFinish] Generic save error caught:', error);
+          // Optional: Set an error state or notify the user
         }
       } else {
-        console.warn(' Chat History: [onFinish] Skipping save: User ID not available.');
+        console.warn(' Chat History: [onFinish] Skipping save: Conditions not met (lastUserMessage valid? Bot message valid?)');
       }
     },
-    onError: (error) => {
-      console.error(' Chat error:', error);
-      setMessageError(error);
-    }
+    onError: (error: Error) => { // Add type to error parameter
+      console.error(' Chat History: [onError] Vercel AI SDK error:', error);
+    },
   });
 
-  // Convert Vercel AI message format to our app's format
-  // Use useMemo to prevent unnecessary recalculations
-  const convertedMessages = useMemo(() => {
-    return vercelMessages.map(
-      (msg): Message => ({
-        id: msg.id,
-        text: msg.content,
-        sender: msg.role === 'user' ? 'user' : 'txt'
-      })
-    );
-  }, [vercelMessages]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [initialHistoryLoaded, setInitialHistoryLoaded] = useState(false);
 
-  // Fetch chat history from Supabase
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [historyError, setHistoryError] = useState<Error | null>(null);
-  const [initialHistory, setInitialHistory] = useState<Message[]>([]);
+  // Function to fetch chat history - useCallback to prevent re-creation
+  const fetchChatHistory = useCallback(async (userId: string): Promise<SdkMessage[]> => {
+    console.log(' Chat History: Fetching history for user:', userId);
+    setLoadingHistory(true);
+    try {
+      const { data, error: dbError } = await supabase
+        .from('chat_history')
+        .select('*') // Select all needed fields (message_id, content, sender, created_at)
+        .eq('user_id', userId)
+        .order('created_at', { ascending: true });
 
+      if (dbError) throw dbError;
+
+      if (data) {
+        console.log(' Chat History: Fetched raw history:', data);
+        // Ensure data matches DbMessage structure before conversion
+        const formattedMessages = convertDbMessagesToVercelFormat(data as DbMessage[]);
+        console.log(' Chat History: Formatted history for useChat:', formattedMessages);
+        return formattedMessages;
+      } else {
+        console.log(' Chat History: No history found for user.');
+        return [];
+      }
+    } catch (err) {
+      console.error(' Chat History: Error fetching chat history:', err);
+      // Handle error appropriately, maybe set an error state in context?
+      return [];
+    } finally {
+      setLoadingHistory(false);
+      console.log(' Chat History: Finished fetching history.');
+    }
+  }, [supabase]); // Add supabase as dependency
+
+  // Effect to load history when user authenticates
   useEffect(() => {
-    const fetchAndSetHistory = async () => {
-      if (authenticated && user?.id) {
-        setHistoryLoading(true);
-        setHistoryError(null);
-        console.log(' Chat History: Fetching for user:', user.id);
-        try {
-          // Fetch history from Supabase
-          const { data, error } = await supabase
-            .from('chat_history')
-            .select('id, message, sender, created_at')
-            .eq('user_id', user.id)
-            .order('created_at', { ascending: true });
-
-          if (error) {
-            throw error;
-          }
-
-          // Define expected row type
-          type ChatHistoryRow = {
-            id: string;
-            message: string;
-            sender: 'user' | 'ai';
-            created_at: string;
-          };
-
-          // Map Supabase data to our Message format
-          const fetchedMessages: Message[] = (data || []).map((row: ChatHistoryRow) => ({
-            id: row.id, // Use Supabase ID
-            text: row.message,
-            sender: row.sender === 'ai' ? 'txt' : 'user', // Map 'ai' to 'txt'
-          }));
-
-          console.log(' Chat History: Fetched messages:', fetchedMessages);
-          setInitialHistory(fetchedMessages);
-        } catch (error) {
-          console.error(' Chat History: Fetch error:', error);
-          // Check if error is an instance of Error before setting state
-          if (error instanceof Error) {
-            setHistoryError(error);
-          } else {
-            setHistoryError(new Error('An unknown error occurred while fetching history.'));
-          }
-        } finally {
-          setHistoryLoading(false);
-        }
-      }
-    };
-
-    fetchAndSetHistory();
-  }, [authenticated, user]);
-
-  // Create a wrapper for handleInputChange to maintain compatibility
-  const setInputValue = useCallback(
-    (value: string) => {
-      console.log(' Setting input value:', value);
-      handleInputChange({ target: { value } } as React.ChangeEvent<HTMLInputElement>);
-    },
-    [handleInputChange]
-  );
-
-  // Handler for sending messages
-  const sendMessage = useCallback(
-    async (text: string) => {
-      if (!text.trim() || isLoading || !isWalletConnected) {
-        console.log(' Cannot send message:', {
-          empty: !text.trim(),
-          isLoading,
-          isWalletConnected
-        });
-        return;
-      }
-
-      try {
-        console.log(' Sending message:', text);
-        console.log(' Using server wallet:', isWalletConnected);
-        setMessageError(null);
-        await append({
-          content: text,
-          role: 'user'
-        });
-        console.log(' Message sent successfully');
-      } catch (error) {
-        console.error(' Error sending message:', error);
-        if (error instanceof Error) {
-          setMessageError(error);
+    if (user?.id && !initialHistoryLoaded) {
+      console.log(' Chat History: User authenticated, loading initial history...');
+      fetchChatHistory(user.id).then(history => {
+        if (history.length > 0) {
+          console.log(' Chat History: Setting initial messages from fetched history:', history);
+          setMessages(history); // Update internal messages state with fetched history
         } else {
-          setMessageError(new Error('Failed to send message'));
+          console.log(' Chat History: No initial history found, starting fresh.');
         }
-      }
-    },
-    [append, isLoading, isWalletConnected, user?.id, user?.wallet?.id]
-  );
-
-  // Clear chat on disconnect
-  useEffect(() => {
-    if (!isWalletConnected) {
-      // We can't completely clear the chat with Vercel AI SDK,
-      // but we can reset to initial state on next connection
-      setWalletAddress(null);
+        setInitialHistoryLoaded(true); // Mark history as loaded
+      });
     }
-  }, [isWalletConnected]);
+  }, [user, initialHistoryLoaded, fetchChatHistory, setMessages]); // Add fetchChatHistory and setMessages
 
-  // Update error state from Vercel's error
-  useEffect(() => {
-    if (vercelError) {
-      console.error(' Vercel AI SDK error:', vercelError);
-      setMessageError(vercelError);
-    }
-  }, [vercelError]);
-
+  // Combine Vercel AI state with custom state
   const value = {
-    messages: convertedMessages,
-    inputValue: input,
-    walletAddress,
-    setInputValue,
-    sendMessage,
-    isProcessing: isLoading,
+    messages,
+    input,
+    handleInputChange,
+    handleSubmit,
+    isLoading,
+    reload,
+    stop,
+    setInput,
+    error,
+    append,
+    loadingHistory,
     isWalletConnected,
     setIsWalletConnected,
+    walletAddress,
     setWalletAddress,
-    scrollAreaRef,
-    error: messageError,
-    reload,
-    stop
+    scrollAreaRef
   };
 
-  return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
+  return (
+    <ChatContext.Provider value={value}>
+      {children}
+    </ChatContext.Provider>
+  );
 };
 
-export const useChat = () => {
+export const useChatContext = () => { // Rename the exported hook
   const context = useContext(ChatContext);
-  if (context === undefined) {
-    throw new Error('useChat must be used within a ChatProvider');
+  if (!context) {
+    throw new Error('useChatContext must be used within a ChatProvider');
   }
   return context;
+};
+
+// Helper function to convert DB messages to Vercel AI SDK format
+const convertDbMessagesToVercelFormat = (dbMessages: DbMessage[]): SdkMessage[] => {
+  return dbMessages.map((msg): SdkMessage => ({
+    id: msg.message_id, // Use message_id from DB as the id for SDK
+    content: msg.content,
+    role: msg.sender === 'user' ? 'user' : 'assistant', // Map 'ai' to 'assistant'
+    createdAt: msg.created_at ? new Date(msg.created_at) : undefined,
+  }));
+};
+
+// Helper function to convert a single Vercel AI SDK message to DB format
+const convertSdkToDbMessage = (msg: SdkMessage, userId: string): DbMessage | null => {
+  // Add a check to ensure the message has an ID, which is needed for the DB schema
+  if (!msg.id) {
+    console.warn(' Chat History: [convertSdkToDbMessage] Skipping message without ID:', msg);
+    return null;
+  }
+  return {
+    message_id: msg.id,
+    user_id: userId,
+    sender: msg.role === 'user' ? 'user' : 'ai', // Map 'assistant' role to 'ai'
+    content: msg.content,
+    created_at: msg.createdAt?.toISOString() || new Date().toISOString(),
+  };
 };
