@@ -66,10 +66,8 @@ function SidebarTabs({}: SidebarTabsProps) {
 
   useEffect(() => {
     let isMounted = true; // Flag to prevent state updates on unmounted component
-    console.log('[Sidebar Effect] Running effect. Wallet Address:', walletAddress, 'Authenticated:', authenticated);
 
     if (walletAddress) { // Use walletAddress from Privy
-      console.log('[Sidebar Effect] Wallet address present, proceeding to fetch data for:', walletAddress);
       setIsLoadingTokens(true);
       setFetchError(null);
       setErc20TokenData([]); // Clear previous ERC20 data
@@ -77,10 +75,8 @@ function SidebarTabs({}: SidebarTabsProps) {
 
       // Fetch data when address changes
       const fetchData = async () => {
-        console.log('[Sidebar Fetch] Starting fetchData...');
         // Only fetch if address is defined
         if (!walletAddress) {
-          console.log('[Sidebar Fetch] Wallet address became undefined, skipping fetch and clearing data.');
           setErc20TokenData([]); // Clear balances if address becomes undefined
           setNativeTokenData([]); // Clear balances if address becomes undefined
           setTotalValue(null);
@@ -91,20 +87,16 @@ function SidebarTabs({}: SidebarTabsProps) {
 
         const erc20Url = `/api/tokens?address=${walletAddress}`;
         const nativeUrl = `/api/native-balances?address=${walletAddress}`;
-        console.log(`[Sidebar Fetch] Fetching ERC20 from: ${erc20Url}`);
-        console.log(`[Sidebar Fetch] Fetching Native Balances from: ${nativeUrl}`);
 
         // Fetch ERC20 tokens
         const fetchErc20 = fetch(erc20Url).then(async (res) => {
           if (!res.ok) {
             const errorData = await res.json().catch(() => ({})); // Try to parse error JSON
-            console.error('[Sidebar Fetch] Error fetching ERC20:', res.status, res.statusText, errorData);
             throw new Error(
               `ERC20 API Error ${res.status}: ${res.statusText} - ${errorData?.message || 'Unknown error'}`
             );
           }
           const data = await res.json();
-          console.log('[Sidebar Fetch] ERC20 data received:', data);
           return data;
         });
 
@@ -112,13 +104,11 @@ function SidebarTabs({}: SidebarTabsProps) {
         const fetchNative = fetch(nativeUrl).then(async (res) => {
           if (!res.ok) {
             const errorData = await res.json().catch(() => ({})); // Try to parse error JSON
-            console.error('[Sidebar Fetch] Error fetching Native Balances:', res.status, res.statusText, errorData);
             throw new Error(
               `Native Balances API Error ${res.status}: ${res.statusText} - ${errorData?.message || 'Unknown error'}`
             );
           }
           const data = await res.json();
-          console.log('[Sidebar Fetch] Native Balances data received:', data);
           return data;
         });
 
@@ -127,14 +117,11 @@ function SidebarTabs({}: SidebarTabsProps) {
 
           if (!isMounted) return; // Don't update state if component unmounted
 
-          console.log('[Sidebar Fetch] Promise.allSettled results:', { erc20Result, nativeResult });
-
           let combinedValue = 0;
           let currentError = null;
 
           if (erc20Result.status === 'fulfilled') {
             const processedTokens = erc20Result.value.tokens || [];
-            console.log('[Sidebar Fetch] Setting ERC20 state with:', processedTokens);
             setErc20TokenData(processedTokens);
 
             combinedValue += (erc20Result.value.tokens || []).reduce(
@@ -144,21 +131,18 @@ function SidebarTabs({}: SidebarTabsProps) {
               0
             );
           } else if (erc20Result.status === 'rejected') {
-            console.error("[Sidebar Fetch] ERC20 fetch failed:", erc20Result.reason);
             setErc20TokenData([]); // Clear data on error
             currentError = erc20Result.reason?.message || 'Failed to fetch ERC20 tokens';
           }
 
           if (nativeResult.status === 'fulfilled') {
             const filteredNativeData = nativeResult.value || [];
-            console.log('[Sidebar Fetch] Setting Native Balances state with:', filteredNativeData);
             setNativeTokenData(filteredNativeData);
 
             combinedValue += filteredNativeData.reduce((sum: number, balance: NativeBalance) => {
               return sum + (balance.usdValue || 0);
             }, 0);
           } else if (nativeResult.status === 'rejected') {
-            console.error("[Sidebar Fetch] Native balance fetch failed:", nativeResult.reason);
             setNativeTokenData([]); // Clear data on error
             // Append to existing error or set if no previous error
             currentError = currentError
@@ -169,36 +153,27 @@ function SidebarTabs({}: SidebarTabsProps) {
           setTotalValue(combinedValue);
           setFetchError(currentError);
         } catch (error: any) {
-          console.error('[Sidebar Fetch] General error in fetchData:', error);
-          if (isMounted) {
-            setFetchError(error.message || 'An unexpected error occurred while fetching data');
-            setErc20TokenData([]); // Clear data on error
-            setNativeTokenData([]); // Clear data on error
-            setTotalValue(null);    // Clear total value on error
-            console.log('[Sidebar Fetch] Clearing state due to general error.');
-          }
+          setFetchError(error.message || 'An unexpected error occurred while fetching data');
+          setErc20TokenData([]); // Clear data on error
+          setNativeTokenData([]); // Clear data on error
+          setTotalValue(null);    // Clear total value on error
         } finally {
           if (isMounted) {
             setIsLoadingTokens(false);
-            console.log('[Sidebar Fetch] Finished fetchData. Loading set to false.');
           }
         }
       };
       fetchData();
     } else if (authenticated) {
       // Clear data if authenticated but no wallet connected via Privy
-      console.log('[Sidebar Effect] Authenticated but no wallet address. Clearing data.');
       setErc20TokenData([]);
       setNativeTokenData([]);
       setTotalValue(null);
       setIsLoadingTokens(false);
     }
 
-    console.log('[Sidebar Effect] Reaching end of effect.');
-
     return () => {
       isMounted = false; // Cleanup function to set flag on unmount
-      console.log('[Sidebar Effect] Cleanup: Component unmounting or dependencies changed.');
     };
   }, [walletAddress, authenticated]); // Depend on walletAddress and authenticated status from Privy
 
