@@ -110,8 +110,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
             {
               user_id: user.id,
               message: newBotMessage.content, // Use content from the VercelMessage
-              sender: 'txt', // Ensure this matches DB expectation ('txt' or 'bot')
-              message_id: newBotMessage.id, // Store Vercel AI SDK ID for the bot message
+              sender: 'ai', // Match the database CHECK constraint ('user' or 'ai')
               created_at: new Date().toISOString() // Use bot message arrival time
             }
           ];
