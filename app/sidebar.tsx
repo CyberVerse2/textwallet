@@ -60,7 +60,7 @@ function SidebarTabs({}: SidebarTabsProps) {
   const [showAllTokens, setShowAllTokens] = useState(false);
 
   // Get user and wallet info from Privy
-  const { user, authenticated } = usePrivy();
+  const { user, authenticated, logout } = usePrivy();
   // Use optional chaining and memoization for stability
   const walletAddress = useMemo(() => user?.wallet?.address, [user?.wallet?.address]);
 
@@ -238,12 +238,19 @@ function SidebarTabs({}: SidebarTabsProps) {
               <div className="text-sm text-muted-foreground truncate">{formatDisplayAddress(walletAddress)}</div>
             </div>
           ) : (
-            <div className="flex flex-col items-center p-4 mb-6 rounded-xl border-2 border-dashed border-muted-foreground text-center">
-              <Wallet className="h-8 w-8 mb-3 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground mb-3">
-                Connect your wallet to view assets and activity.
-              </p>
-            </div>
+            authenticated ? (
+              <div className="flex flex-col items-center p-4 mb-6 rounded-xl border-2 border-dashed border-muted-foreground text-center">
+                <Wallet className="h-8 w-8 mb-3 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground mb-3">
+                  Connect your wallet via the main login/connect button to view assets.
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center p-4 mb-6 rounded-xl border-2 border-dashed border-muted-foreground text-center">
+                <Wallet className="h-8 w-8 mb-3 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground mb-3">Please log in to connect a wallet.</p>
+              </div>
+            )
           )}
 
           {/* Tab Content */}
@@ -345,8 +352,9 @@ function SidebarTabs({}: SidebarTabsProps) {
             {walletAddress && (
               <Button
                 variant="outline"
+                onClick={logout}
                 className="w-full justify-start text-red-500 border-2 border-red-500 hover:bg-red-50 active:translate-y-px active:shadow-none transition-all duration-100 rounded-xl font-bold"
-                style={{ boxShadow: '3px 3px 0px 0px #000000' }}
+                style={{ boxShadow: '3px 3px 0px 0px #dc2626' }}
               >
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Disconnect</span>
