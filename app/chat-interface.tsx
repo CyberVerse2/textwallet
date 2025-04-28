@@ -12,7 +12,6 @@ import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 
 interface ChatInterfaceProps {
-  onGoBack: () => void;
 }
 
 // Define type for code component props to fix TypeScript error
@@ -22,7 +21,7 @@ interface CodeProps {
   children?: React.ReactNode;
 }
 
-const ChatInterface = ({ onGoBack }: ChatInterfaceProps) => {
+const ChatInterface: React.FC<ChatInterfaceProps> = () => {
   const { user } = usePrivy();
   const prevMessagesLengthRef = useRef<number>(0);
   const prevInputRef = useRef<string>('');
@@ -123,16 +122,15 @@ const ChatInterface = ({ onGoBack }: ChatInterfaceProps) => {
     ? "Connect your wallet to send commands..." 
     : "Ask me anything about your wallet...";
 
+  // Log messages from useChat for debugging
+  console.log(' Chat UI: Rendering messages. Count:', messages.length, 'Content:', messages);
+
   return (
     <div className="flex-1 flex flex-col items-center bg-white rounded-2xl overflow-hidden relative" style={{ boxShadow: "8px 8px 0px 0px #000000" }}>
       <div className="p-4 w-full max-w-[50rem] flex items-center">
         <Button 
           variant="outline"
-          onClick={() => {
-            console.log('💬 Chat UI: Go back button clicked');
-            onGoBack();
-          }}
-          className="flex items-center justify-center h-auto py-2 px-4 border-2 border-black bg-yellow hover:bg-yellow/90 active:translate-y-px active:shadow-none transition-all duration-100 rounded-xl font-medium"
+          className="hidden items-center justify-center h-auto py-2 px-4 border-2 border-black bg-yellow hover:bg-yellow/90 active:translate-y-px active:shadow-none transition-all duration-100 rounded-xl font-medium"
           style={{ boxShadow: "2px 2px 0px 0px #000000" }}
         >
           <ArrowLeft className="h-4 w-4" />
