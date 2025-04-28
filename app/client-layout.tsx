@@ -245,7 +245,7 @@ const SidebarTabs = forwardRef<{ refreshBalances: () => void }, {
   isWalletConnected: boolean, 
   walletAddress: string | null 
 }>(function SidebarTabs({ isWalletConnected, walletAddress }, ref) {
-  const [activeTab, setActiveTab] = useState<'tokens' | 'activity' | 'bridge'>('tokens');
+  const [activeTab, setActiveTab] = useState<'tokens' | 'activity'>('tokens');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Function to refresh balances
@@ -278,26 +278,18 @@ const SidebarTabs = forwardRef<{ refreshBalances: () => void }, {
         >
           Activity
         </button>
-        <button
-          onClick={() => setActiveTab('bridge')}
-          className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium ${
-            activeTab === 'bridge' ? 'bg-white border-2 border-black shadow-sm' : 'text-gray-500 hover:text-gray-900'
-          }`}
-        >
-          Bridge
-        </button>
       </div>
 
       {/* Tab Content */}
       <div className="space-y-4">
         {activeTab === 'tokens' && (
-          <TokenList walletAddress={walletAddress} refreshTrigger={refreshTrigger} />
+          <AssetsSection 
+            isWalletConnected={isWalletConnected} 
+            walletAddress={walletAddress}
+          />
         )}
         {activeTab === 'activity' && (
           <ActivityList walletAddress={walletAddress} refreshTrigger={refreshTrigger} />
-        )}
-        {activeTab === 'bridge' && (
-          <WalletBridge />
         )}
       </div>
     </div>
@@ -309,12 +301,10 @@ import { type DisplayBalance } from './token-list'; // Import the type
 
 function AssetsSection({ 
   isWalletConnected, 
-  walletAddress,
-  setRefreshBalancesRef
+  walletAddress
 }: { 
   isWalletConnected: boolean, 
-  walletAddress: string | null,
-  setRefreshBalancesRef: (fn: () => void) => void
+  walletAddress: string | null
 }) { // Accept address prop
   // Add state for tokens and loading
   const [tokens, setTokens] = useState<DisplayBalance[]>([]); 
@@ -379,11 +369,6 @@ function AssetsSection({
       setIsLoading(false);
     }
   };
-
-  // Register the refresh function with the parent component
-  useEffect(() => {
-    setRefreshBalancesRef(() => fetchAllBalances);
-  }, [setRefreshBalancesRef]);
 
   // Fetch data when the wallet is connected and address is available
   useEffect(() => {
