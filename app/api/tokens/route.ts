@@ -99,6 +99,9 @@ export async function GET(request: Request) {
 
     const responseData = await response.json(); // Renamed to avoid conflict with 'data' below
 
+    // DEBUG: Log the raw response from Alchemy Data API
+    console.log('[API Tokens Route] Raw Alchemy Data API Response:', JSON.stringify(responseData, null, 2));
+
     // Check for API-level errors
     if (!responseData || responseData.error) {
       console.error('Alchemy Data API Error:', responseData?.error || 'Unknown API error');
