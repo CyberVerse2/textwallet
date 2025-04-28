@@ -1,59 +1,44 @@
 import { type ClassValue, clsx } from "clsx"
-import { base } from 'viem/chains';
 import { twMerge } from "tailwind-merge"
-import { createPublicClient, createWalletClient, custom, http, Hex } from 'viem';
-
-
-
-
-
-async function setupProvider() {
-  const wallet = wallets[0];
-  await wallet.switchChain(base.id);
-  const provider = await wallet.getEthereumProvider();
-  return provider;
-}
-
-
-// Your public RPC client (unchanged)
-const publicClient = createPublicClient({
-  chain: base,
-  transport: http('<RPC_URL>')
-});
-
-// Build the wallet client using Privy’s provider
-async function createPrivyWalletClient(provider: EIP1193Provider, account: Hex) {
-  return createWalletClient({
-    account,
-    chain: base,
-    transport: custom(provider)
-  });
-}
-
-
 import { createCoin } from '@zoralabs/coins-sdk';
-import { Address } from 'viem';
+import { Address, createPublicClient, http, Hex, WalletClient, PublicClient } from 'viem';
+import { baseSepolia } from 'viem/chains';
 import { EIP1193Provider } from "@privy-io/react-auth";
 
 const coinParams = {
   name: 'My Awesome Coin',
   symbol: 'MAC',
   uri: 'ipfs://bafybeigoxzqzbnxsn35vq7lls3ljxdcwjafxvbvkivprsodzrptpiguysy',
-  payoutRecipient: '0xYourAddress' as Address,
-  platformReferrer: '0xOptionalPlatformReferrerAddress' as Address,
+  payoutRecipient: '0xYourAddress' as Address, // TODO: Replace with actual dynamic address
+  platformReferrer: '0xOptionalPlatformReferrerAddress' as Address, // TODO: Replace or remove if not needed
   initialPurchaseWei: 0n
 };
 
-async function createMyCoinWithPrivy() {
-  const provider = await setupProvider();
-  const walletClient = await createPrivyWalletClient(provider, provider.selectedAddress as Hex);
-  const result = await createCoin(coinParams, walletClient, publicClient);
-  
-  console.log('Transaction hash:', result.hash);
-  console.log('Coin address:', result.address);
-  console.log('Deployment details:', result.deployment);
-  
-  return result;
+export async function createMyCoin(
+  walletClient: WalletClient, // Pass the WalletClient created from Privy provider
+  publicClient: PublicClient  // Pass a configured PublicClient
+) {
+  // TODO: Ensure coinParams uses appropriate addresses before calling this function
+  if (coinParams.payoutRecipient === '0xYourAddress') {
+    console.warn("createMyCoin called with placeholder payoutRecipient address. Please update coinParams.");
+    // Consider throwing an error or returning early if the address is invalid
+    // throw new Error("Payout recipient address is not set.");
+  }
+
+  try {
+    const result = await createCoin(coinParams, walletClient, publicClient);
+
+    console.log('Coin creation successful!');
+    console.log('Transaction hash:', result.hash);
+    console.log('Coin address:', result.address);
+    console.log('Deployment details:', result.deployment);
+
+    return result;
+  } catch (error) {
+    console.error('Error creating coin:', error);
+    // Re-throw the error or handle it as needed
+    throw error;
+  }
 }
 
 export function cn(...inputs: ClassValue[]) {
