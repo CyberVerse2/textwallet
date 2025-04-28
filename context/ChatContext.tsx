@@ -88,25 +88,17 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       }
     },
     onFinish: async (message: SdkMessage) => { // Add type to message
-      console.log(' Chat History: [onFinish] Triggered. Bot message received:', message);
       setMessageError(null);
 
       // Find the user message that preceded this assistant response
       const userMessageFromSdk = messages.findLast(m => m.role === 'user');
       const botMessageFromSdk = message; // The AI response passed to onFinish
 
-      console.log(' Chat History: [onFinish] Found user message from state:', userMessageFromSdk);
-      console.log(' Chat History: [onFinish] Bot message from arg:', botMessageFromSdk);
-
       // Ensure we have both messages and the user is authenticated
       if (user?.id && userMessageFromSdk && botMessageFromSdk && botMessageFromSdk.role === 'assistant') {
-        console.log(' Chat History: [onFinish] User authenticated with ID:', user.id);
-
         // Convert SDK messages to DB format
         const userMessageForDb = convertSdkToDbMessage(userMessageFromSdk, user.id);
         const botMessageForDb = convertSdkToDbMessage(botMessageFromSdk, user.id);
-
-        console.log(` Chat History: [onFinish] Checking save condition: userMessageForDb valid? ${!!userMessageForDb}, user sender === 'user'? ${userMessageForDb?.sender === 'user'}, botMessageForDb role === 'ai'? ${botMessageForDb?.sender === 'ai'}`);
 
         // Prepare data for Supabase insertion
         const messagesToSave = [
@@ -114,9 +106,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
           botMessageForDb
         ];
 
-        console.log(' Chat History: [onFinish] Payload to save:', JSON.stringify(messagesToSave));
         try {
-          console.log(' Chat History: [onFinish] Calling supabase.insert...');
           const { error: insertError } = await supabase
             .from('chat_history')
             .insert(messagesToSave);
@@ -125,7 +115,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
             console.error(' Chat History: [onFinish] Supabase insert error:', insertError);
             throw insertError;
           }
-          console.log(' Chat History: [onFinish] Messages saved successfully.');
         } catch (error) {
           console.error(' Chat History: [onFinish] Generic save error caught:', error);
           // Optional: Set an error state or notify the user
@@ -144,7 +133,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
   // Function to fetch chat history - useCallback to prevent re-creation
   const fetchChatHistory = useCallback(async (userId: string): Promise<SdkMessage[]> => {
-    console.log(' Chat History: Fetching history for user:', userId);
     setLoadingHistory(true);
     try {
       const { data, error: dbError } = await supabase
@@ -156,13 +144,10 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       if (dbError) throw dbError;
 
       if (data) {
-        console.log(' Chat History: Fetched raw history:', data);
         // Ensure data matches DbMessage structure before conversion
         const formattedMessages = convertDbMessagesToVercelFormat(data as DbMessage[]);
-        console.log(' Chat History: Formatted history for useChat:', formattedMessages);
         return formattedMessages;
       } else {
-        console.log(' Chat History: No history found for user.');
         return [];
       }
     } catch (err) {
@@ -171,20 +156,15 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       return [];
     } finally {
       setLoadingHistory(false);
-      console.log(' Chat History: Finished fetching history.');
     }
   }, [supabase]); // Add supabase as dependency
 
   // Effect to load history when user authenticates
   useEffect(() => {
     if (user?.id && !initialHistoryLoaded) {
-      console.log(' Chat History: User authenticated, loading initial history...');
       fetchChatHistory(user.id).then(history => {
         if (history.length > 0) {
-          console.log(' Chat History: Setting initial messages from fetched history:', history);
           setMessages(history); // Update internal messages state with fetched history
-        } else {
-          console.log(' Chat History: No initial history found, starting fresh.');
         }
         setInitialHistoryLoaded(true); // Mark history as loaded
       });

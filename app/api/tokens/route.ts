@@ -78,7 +78,6 @@ export async function GET(request: Request) {
   };
 
   try {
-    console.log(`API Route: Attempting fetch to ${alchemyUrl} for ${ownerAddress}...`);
     const response = await fetch(alchemyUrl, options);
 
     if (!response.ok) {
@@ -123,13 +122,11 @@ export async function GET(request: Request) {
             !balanceRaw ||
             balanceRaw === '0x0000000000000000000000000000000000000000000000000000000000000000'
           ) {
-            // console.log(`Skipping token (missing data/zero balance): ${symbol || name || token.tokenAddress}`);
             return null; // Skip this token
           }
 
           // 2. Skip potential spam tokens
           if (isPotentiallySpam(name, symbol)) {
-            console.log(`Filtering potential spam token: ${symbol || name}`);
             return null;
           }
 
@@ -198,10 +195,7 @@ export async function GET(request: Request) {
       totalUsdValue: totalCalculatedUsdValue // Return the calculated total value
     });
   } catch (error: any) {
-    console.error('Alchemy Data API Fetch Error:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to fetch token balances via Alchemy Data API' },
-      { status: 500 }
-    );
+    console.error('API Route Error:', error);
+    return NextResponse.json({ error: error.message || 'Failed to fetch token balances' }, { status: 500 });
   }
 }

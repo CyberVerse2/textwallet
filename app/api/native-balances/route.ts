@@ -16,7 +16,6 @@ async function getEthPrice(): Promise<number | null> {
     if (typeof ethPrice !== 'number') {
         throw new Error('Invalid price format received from Diadata');
     }
-    console.log(`Successfully fetched ETH price: $${ethPrice}`); // Log success
     return ethPrice;
   } catch (error) {
     console.error('Error fetching ETH price:', error);
@@ -61,9 +60,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Server configuration error: API key missing' }, { status: 500 });
   }
  
-  console.log("Attempting to fetch ETH price..."); // Log before call
   const ethPrice = await getEthPrice();
-  console.log(`Finished fetching ETH price. Result: ${ethPrice}`); // Log after call
  
   // Log if price fetch failed, but proceed
   if (ethPrice === null) {

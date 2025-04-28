@@ -99,8 +99,6 @@ const TokenList: React.FC<TokenListProps> = React.memo(({ tokens = [], isLoading
           key={isNativeBalance(item) ? `${item.networkName}-${item.symbol}` : item.contractAddress || `${item.symbol}-${index}`}
           className="flex items-center justify-between  w-full rounded-xl border-2 border-black hover:bg-neutral-100 transition-colors duration-150 cursor-pointer"
           style={{ boxShadow: "4px 4px 0px 0px #000000" }}
-          // Optional: Add onClick handler, e.g., to show details
-          // onClick={() => console.log('Clicked on:', token)}
         >
           <div className="flex items-center space-x-2  w-full p-3 justify-between"> {/* Removed justify-between from here */}
             <div className="flex items-center space-x-3 overflow-hidden flex-grow min-w-0 "> {/* Ensure flex item can shrink */}

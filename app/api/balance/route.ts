@@ -13,8 +13,6 @@ export async function GET(req: Request) {
       );
     }
     
-    console.log(`🔍 Balance API: Getting balance for ${address} on Base mainnet`);
-    
     // Create a Base mainnet RPC provider
     const response = await fetch('https://mainnet.base.org', {
       method: 'POST',
@@ -34,8 +32,6 @@ export async function GET(req: Request) {
     if (data.error) {
       throw new Error(`RPC error: ${data.error.message}`);
     }
-    
-    console.log(`🔍 Balance API: Balance retrieved: ${data.result}`);
     
     return NextResponse.json({ balance: data.result });
   } catch (error: any) {

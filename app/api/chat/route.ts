@@ -20,15 +20,11 @@ interface RequestBody {
 
 export async function POST(req: Request) {
   try {
-    console.log('🤖 Chat API Route: Started');
-
     const { messages, userId, walletId }: RequestBody = await req.json();
 
     // Default to using server wallet
     if (process.env.NEXT_PUBLIC_PRIVY_APP_ID && process.env.NEXT_PUBLIC_PRIVY_APP_SECRET) {
       try {
-        console.log('🤖 Chat API Route: Loading AgentKit...');
-
         // Check if we have a valid userId and walletId
         if (!userId) {
           throw new Error('Missing userId for wallet operations');
@@ -67,17 +63,7 @@ export async function POST(req: Request) {
           authorizationPrivateKey: authPrivateKey
         };
 
-        console.log('🤖 Wallet config:', {
-          appId: walletConfig.appId.substring(0, 5) + '...',
-          chainId: walletConfig.chainId,
-          walletId: walletConfig.walletId,
-          userId: walletConfig.userId, // Log the userId being used
-          authorizationKeyId: walletConfig.authorizationKeyId,
-          authorizationPrivateKey: walletConfig.authorizationPrivateKey.substring(0, 5) + '...'
-        });
-
         // Configure AgentKit with server wallet
-        console.log('🤖 Chat API Route: Setting up AgentKit with server wallet provider...');
         const walletProvider = await PrivyEvmWalletProvider.configureWithWallet(walletConfig);
 
         const erc721 = erc721ActionProvider();
@@ -99,9 +85,6 @@ export async function POST(req: Request) {
 
         // Get wallet address (from Privy provider)
         const privyManagedWalletAddress = await walletProvider.getAddress();
-        console.log(`🤖 Agent configured with Privy-managed wallet: ${privyManagedWalletAddress}`);
-
-        console.log('🤖 Chat API Route: Generating response with Privy wallet access...');
 
         // Generate a response with server wallet access using Claude with streaming
         const result = await streamText({
@@ -123,7 +106,6 @@ export async function POST(req: Request) {
       } catch (walletError) {
         // If wallet initialization fails, log the error and fall back to regular chat
         console.error('🤖 Chat API Route: Wallet initialization failed:', walletError);
-        console.log('🤖 Chat API Route: Falling back to regular chat...');
       }
     }
   } catch (error) {
