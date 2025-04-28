@@ -89,17 +89,16 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       if (user?.id) {
         console.log(' Chat History: [onFinish] User authenticated with ID:', user.id);
         // Get the last user message and the new bot message
-        const lastUserMessage = convertedMessages[convertedMessages.length - 1];
-        const newBotMessage: Message = { 
-          id: message.id, 
-          text: message.content, 
-          sender: 'txt' 
-        };
+        // The user message should be the second-to-last one when onFinish runs
+        const lastUserMessage = convertedMessages[convertedMessages.length - 2];
+        // The bot message is the one passed to onFinish
+        const newBotMessage = message;
 
         console.log(' Chat History: [onFinish] Identified lastUserMessage:', lastUserMessage);
         console.log(' Chat History: [onFinish] Identified newBotMessage:', newBotMessage);
-
-        if (lastUserMessage && lastUserMessage.sender === 'user' && newBotMessage) {
+        console.log(' Chat History: [onFinish] Current convertedMessages state:', convertedMessages);
+        // Check if the second-to-last message exists and is from the user
+        if (lastUserMessage && lastUserMessage.sender === 'user' && newBotMessage.role === 'assistant') {
           // Prepare data for Supabase insertion
           const messagesToSave = [
             {
@@ -110,9 +109,10 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
             },
             {
               user_id: user.id,
-              message: newBotMessage.text,
-              sender: 'ai', // Use 'ai' for DB
-              id: newBotMessage.id // Store Vercel AI SDK ID for the bot message
+              message: newBotMessage.content, // Use content from the VercelMessage
+              sender: 'txt', // Ensure this matches DB expectation ('txt' or 'bot')
+              message_id: newBotMessage.id, // Store Vercel AI SDK ID for the bot message
+              created_at: new Date().toISOString() // Use bot message arrival time
             }
           ];
 
