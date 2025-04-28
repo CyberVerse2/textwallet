@@ -2,19 +2,19 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { Alchemy, Network, Utils } from "alchemy-sdk";
 
-// Helper function to fetch ETH price from CoinGecko
+// Helper function to fetch ETH price from Diadata
 async function getEthPrice(): Promise<number | null> {
-  const url = 'https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd';
+  const url = 'https://api.diadata.org/v1/assetQuotation/Ethereum/0x0000000000000000000000000000000000000000';
   try {
     // Fetch fresh price, disable caching for server-side route
     const response = await fetch(url, { cache: 'no-store' }); 
     if (!response.ok) {
-      throw new Error(`CoinGecko API error! status: ${response.status}`);
+      throw new Error(`Diadata API error! status: ${response.status}`);
     }
     const data = await response.json();
-    const ethPrice = data?.ethereum?.usd;
+    const ethPrice = data?.Price;
     if (typeof ethPrice !== 'number') {
-        throw new Error('Invalid price format received from CoinGecko');
+        throw new Error('Invalid price format received from Diadata');
     }
     console.log(`Successfully fetched ETH price: $${ethPrice}`); // Log success
     return ethPrice;
