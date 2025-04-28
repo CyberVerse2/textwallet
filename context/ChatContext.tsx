@@ -19,7 +19,7 @@ interface DbMessage {
   message_id: string;
   user_id: string; // Ensure this matches your table column if it exists
   sender: 'user' | 'ai';
-  content: string;
+  message: string; // Renamed from content to match DB schema
   created_at: string; // ISO string format
 }
 
@@ -80,7 +80,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     id: user?.id ? `chat_${user.id}` : undefined, // Unique ID for the chat session
     body: {
       userId: user?.id, // Pass the authenticated user's ID
-      walletId: walletAddress, // Pass the connected wallet address as walletId
+      walletId: user?.wallet?.id, // Pass the connected wallet address as walletId
     },
     onResponse: (response: Response) => { // Add type to response
       if (!response.ok) {
@@ -149,7 +149,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     try {
       const { data, error: dbError } = await supabase
         .from('chat_history')
-        .select('*') // Select all needed fields (message_id, content, sender, created_at)
+        .select('*') // Select all needed fields (message_id, message, sender, created_at)
         .eq('user_id', userId)
         .order('created_at', { ascending: true });
 
@@ -230,7 +230,7 @@ export const useChatContext = () => { // Rename the exported hook
 const convertDbMessagesToVercelFormat = (dbMessages: DbMessage[]): SdkMessage[] => {
   return dbMessages.map((msg): SdkMessage => ({
     id: msg.message_id, // Use message_id from DB as the id for SDK
-    content: msg.content,
+    content: msg.message, // Map DB 'message' field to SDK 'content'
     role: msg.sender === 'user' ? 'user' : 'assistant', // Map 'ai' to 'assistant'
     createdAt: msg.created_at ? new Date(msg.created_at) : undefined,
   }));
@@ -247,7 +247,7 @@ const convertSdkToDbMessage = (msg: SdkMessage, userId: string): DbMessage | nul
     message_id: msg.id,
     user_id: userId,
     sender: msg.role === 'user' ? 'user' : 'ai', // Map 'assistant' role to 'ai'
-    content: msg.content,
+    message: msg.content, // Map SDK 'content' to DB 'message'
     created_at: msg.createdAt?.toISOString() || new Date().toISOString(),
   };
 };
