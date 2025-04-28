@@ -379,12 +379,16 @@ function AssetsSection({
       const tokenBalances: DisplayBalance[] = tokenData.tokens || []; // Access the .tokens property
 
       // Combine and set tokens
-      const combinedTokens = [...nativeBalances, ...tokenBalances];
-      console.log('[AssetsSection Fetch] Combined Native + Token balances (unsorted):', combinedTokens);
+      let combinedTokens = [...nativeBalances, ...tokenBalances];
+      console.log('[AssetsSection Fetch] Combined Native + Token balances (raw):', combinedTokens);
+
+      // Filter out assets with null/undefined usdValue
+      combinedTokens = combinedTokens.filter(token => token.usdValue != null);
+      console.log('[AssetsSection Fetch] Filtered balances (non-null USD value):', combinedTokens);
 
       // Sort by USD value (descending)
       combinedTokens.sort((a, b) => (b.usdValue ?? 0) - (a.usdValue ?? 0));
-      console.log('[AssetsSection Fetch] Sorted balances:', combinedTokens);
+      console.log('[AssetsSection Fetch] Sorted filtered balances:', combinedTokens);
 
       console.log('[AssetsSection Fetch] Setting tokens state.');
       setTokens(combinedTokens); 
