@@ -16,11 +16,12 @@ import { Message as SdkMessage, useChat, UseChatHelpers } from '@ai-sdk/react'; 
 
 // Define the structure matching the chat_history table
 interface DbMessage {
-  message_id: string;
+  message_id: string; // Changed from id to match DB
   user_id: string; // Ensure this matches your table column if it exists
   sender: 'user' | 'ai';
   message: string; // Renamed from content to match DB schema
   created_at: string; // ISO string format
+  parent_message_id?: string | null; // Add this field
 }
 
 interface ChatContextType {
@@ -87,42 +88,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         console.error(' Chat History: [onResponse] Error response:', response.status, response.statusText);
       }
     },
-    onFinish: async (message: SdkMessage) => { // Add type to message
-      setMessageError(null);
-
-      // Find the user message that preceded this assistant response
-      const userMessageFromSdk = messages.findLast(m => m.role === 'user');
-      const botMessageFromSdk = message; // The AI response passed to onFinish
-
-      // Ensure we have both messages and the user is authenticated
-      if (user?.id && userMessageFromSdk && botMessageFromSdk && botMessageFromSdk.role === 'assistant') {
-        // Convert SDK messages to DB format
-        const userMessageForDb = convertSdkToDbMessage(userMessageFromSdk, user.id);
-        const botMessageForDb = convertSdkToDbMessage(botMessageFromSdk, user.id);
-
-        // Prepare data for Supabase insertion
-        const messagesToSave = [
-          userMessageForDb,
-          botMessageForDb
-        ];
-
-        try {
-          const { error: insertError } = await supabase
-            .from('chat_history')
-            .insert(messagesToSave);
-
-          if (insertError) {
-            console.error(' Chat History: [onFinish] Supabase insert error:', insertError);
-            throw insertError;
-          }
-        } catch (error) {
-          console.error(' Chat History: [onFinish] Generic save error caught:', error);
-          // Optional: Set an error state or notify the user
-        }
-      } else {
-        console.warn(' Chat History: [onFinish] Skipping save: Conditions not met (lastUserMessage valid? Bot message valid?)');
-      }
-    },
+    // REMOVED onFinish callback (saving is handled by API route)
     onError: (error: Error) => { // Add type to error parameter
       console.error(' Chat History: [onError] Vercel AI SDK error:', error);
     },
@@ -135,29 +101,70 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   const fetchChatHistory = useCallback(async (userId: string): Promise<SdkMessage[]> => {
     setLoadingHistory(true);
     try {
-      const { data, error: dbError } = await supabase
+      const { data: dbMessages, error: dbError } = await supabase
         .from('chat_history')
-        .select('*') // Select all needed fields (message_id, message, sender, created_at)
+        .select('message_id, user_id, sender, message, created_at, parent_message_id') // Ensure parent_message_id is selected
         .eq('user_id', userId)
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: true }); // Fetch sorted by creation time
 
       if (dbError) throw dbError;
+      if (!dbMessages) return [];
 
-      if (data) {
-        // Ensure data matches DbMessage structure before conversion
-        const formattedMessages = convertDbMessagesToVercelFormat(data as DbMessage[]);
-        return formattedMessages;
-      } else {
-        return [];
+      // Process messages to group user prompts with AI responses
+      const userMessagesMap = new Map<string, DbMessage>();
+      const processedMessages: SdkMessage[] = [];
+
+      // First pass: identify user messages
+      for (const msg of dbMessages) {
+        if (msg.sender === 'user') {
+          userMessagesMap.set(msg.message_id, msg);
+        }
       }
+
+      // Second pass: group and order
+      for (const msg of dbMessages) {
+         if (msg.sender === 'user') {
+           // Check if this user message has already been processed as part of a pair
+           if (userMessagesMap.has(msg.message_id)) {
+             processedMessages.push(convertSingleDbMessageToVercelFormat(msg));
+             userMessagesMap.delete(msg.message_id); // Remove from map once added
+           }
+         } else if (msg.sender === 'ai') {
+           const parentId = msg.parent_message_id;
+           if (parentId && userMessagesMap.has(parentId)) {
+             // Found parent, add user message first if not already added
+             const parentMsg = userMessagesMap.get(parentId)!;
+             processedMessages.push(convertSingleDbMessageToVercelFormat(parentMsg));
+             userMessagesMap.delete(parentId); // Remove parent from map
+
+             // Add AI message
+             processedMessages.push(convertSingleDbMessageToVercelFormat(msg));
+           } else {
+             // AI message without a found parent (orphan or parent already processed)
+             // Add it directly in its chronological spot
+              processedMessages.push(convertSingleDbMessageToVercelFormat(msg));
+           }
+         }
+      }
+
+       // Add any remaining user messages from the map (those without AI replies)
+       // This preserves chronological order because we iterated through dbMessages sorted by created_at
+       userMessagesMap.forEach(userMsg => {
+          processedMessages.push(convertSingleDbMessageToVercelFormat(userMsg));
+       });
+
+      // Re-sort final list just in case (optional, but safe)
+      processedMessages.sort((a, b) => (a.createdAt?.getTime() || 0) - (b.createdAt?.getTime() || 0));
+
+      return processedMessages;
+
     } catch (err) {
-      console.error(' Chat History: Error fetching chat history:', err);
-      // Handle error appropriately, maybe set an error state in context?
-      return [];
+      console.error(' Chat History: Error fetching/processing chat history:', err);
+      return []; // Return empty array on error
     } finally {
       setLoadingHistory(false);
     }
-  }, [supabase]); // Add supabase as dependency
+  }, [supabase]); // Keep dependencies
 
   // Effect to load history when user authenticates
   useEffect(() => {
@@ -206,14 +213,20 @@ export const useChatContext = () => { // Rename the exported hook
   return context;
 };
 
-// Helper function to convert DB messages to Vercel AI SDK format
+// Helper function to convert a single DB message to Vercel AI SDK format
+const convertSingleDbMessageToVercelFormat = (msg: DbMessage): SdkMessage => {
+    return {
+        id: msg.message_id,
+        content: msg.message,
+        role: msg.sender === 'user' ? 'user' : 'assistant',
+        createdAt: msg.created_at ? new Date(msg.created_at) : undefined,
+        // Add other fields if needed by SdkMessage type, but these are primary
+    };
+};
+
+// Helper function to convert DB messages to Vercel AI SDK format (Now less used directly by fetch)
 const convertDbMessagesToVercelFormat = (dbMessages: DbMessage[]): SdkMessage[] => {
-  return dbMessages.map((msg): SdkMessage => ({
-    id: msg.message_id, // Use message_id from DB as the id for SDK
-    content: msg.message, // Map DB 'message' field to SDK 'content'
-    role: msg.sender === 'user' ? 'user' : 'assistant', // Map 'ai' to 'assistant'
-    createdAt: msg.created_at ? new Date(msg.created_at) : undefined,
-  }));
+  return dbMessages.map(convertSingleDbMessageToVercelFormat); // Use the single converter
 };
 
 // Helper function to convert a single Vercel AI SDK message to DB format
