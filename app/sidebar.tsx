@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { usePrivy } from '@privy-io/react-auth'; // Import usePrivy
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import TokenList from './token-list';
@@ -13,8 +14,7 @@ import {
   ChevronDown,
   ChevronUp,
   BarChart2,
-  Power,
-  Image as ImageIcon
+  ImageIcon
 } from 'lucide-react';
 
 import type { NativeBalance } from './api/native-balances/route'; // Import NativeBalance type
@@ -52,8 +52,6 @@ export default function Sidebar() {
 
 function SidebarTabs({}: SidebarTabsProps) {
   const [activeTab, setActiveTab] = useState('assets');
-  const [account, setAccount] = useState<string | null>(null);
-  const [isConnecting, setIsConnecting] = useState(false);
   const [erc20TokenData, setErc20TokenData] = useState<EnrichedTokenBalance[]>([]);
   const [nativeTokenData, setNativeTokenData] = useState<NativeBalance[]>([]);
   const [totalValue, setTotalValue] = useState<number | null>(null);
@@ -61,10 +59,15 @@ function SidebarTabs({}: SidebarTabsProps) {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [showAllTokens, setShowAllTokens] = useState(false);
 
+  // Get user and wallet info from Privy
+  const { user, authenticated } = usePrivy();
+  // Use optional chaining and memoization for stability
+  const walletAddress = useMemo(() => user?.wallet?.address, [user?.wallet?.address]);
+
   useEffect(() => {
     let isMounted = true; // Flag to prevent state updates on unmounted component
-    if (account) {
-      console.log('Fetching tokens for account:', account);
+    if (walletAddress) { // Use walletAddress from Privy
+      console.log('Fetching tokens for wallet:', walletAddress);
       setIsLoadingTokens(true);
       setFetchError(null);
       setErc20TokenData([]); // Clear previous ERC20 data
@@ -73,7 +76,7 @@ function SidebarTabs({}: SidebarTabsProps) {
       // Fetch data when address changes
       const fetchData = async () => {
         // Only fetch if address is defined
-        if (!account) {
+        if (!walletAddress) {
           console.log('Address not available yet, skipping fetch.');
           setErc20TokenData([]); // Clear balances if address becomes undefined
           setNativeTokenData([]); // Clear balances if address becomes undefined
@@ -82,7 +85,7 @@ function SidebarTabs({}: SidebarTabsProps) {
         }
 
         // Fetch ERC20 tokens
-        const fetchErc20 = fetch(`/api/tokens?address=${account}`).then(async (res) => {
+        const fetchErc20 = fetch(`/api/tokens?address=${walletAddress}`).then(async (res) => {
           if (!res.ok) {
             const errorData = await res.json().catch(() => ({})); // Try to parse error JSON
             throw new Error(
@@ -95,7 +98,7 @@ function SidebarTabs({}: SidebarTabsProps) {
         });
 
         // Fetch Native ETH balances
-        const fetchNative = fetch(`/api/native-balances?address=${account}`).then(async (res) => {
+        const fetchNative = fetch(`/api/native-balances?address=${walletAddress}`).then(async (res) => {
           if (!res.ok) {
             const errorData = await res.json().catch(() => ({})); // Try to parse error JSON
             throw new Error(
@@ -156,7 +159,7 @@ function SidebarTabs({}: SidebarTabsProps) {
     return () => {
       isMounted = false; // Cleanup function to set flag on unmount
     };
-  }, [account]);
+  }, [walletAddress]);
 
   // Combine and sort all balances for display
   const allBalances = useMemo(() => {
@@ -194,15 +197,14 @@ function SidebarTabs({}: SidebarTabsProps) {
   const connectWallet = async () => {
     if (window.ethereum) {
       try {
-        setIsConnecting(true);
+        setIsLoadingTokens(true);
         const accounts = await window.ethereum.request({
           method: 'eth_requestAccounts'
         });
-        setAccount(accounts[0]);
-        setIsConnecting(false);
+        setIsLoadingTokens(false);
       } catch (error: any) {
         console.error('User denied account access', error);
-        setIsConnecting(false);
+        setIsLoadingTokens(false);
       }
     } else {
       alert('No Ethereum provider found. Install MetaMask.');
@@ -214,7 +216,6 @@ function SidebarTabs({}: SidebarTabsProps) {
   };
 
   const disconnectWallet = () => {
-    setAccount(null);
     // Optional: Add any other cleanup logic if needed, e.g., clearing local storage
   };
 
@@ -255,7 +256,7 @@ function SidebarTabs({}: SidebarTabsProps) {
       <div className="flex-1">
         <div className="p-6">
           {/* Wallet Connection Section */}
-          {account ? (
+          {walletAddress ? (
             <div
               className="bg-muted rounded-xl p-4 mb-6 border-2 border-black"
               style={{ boxShadow: '4px 4px 0px 0px #000000' }}
@@ -264,7 +265,7 @@ function SidebarTabs({}: SidebarTabsProps) {
                 <span className="text-sm font-semibold">Connected Wallet</span>
                 <div className="h-2 w-2 rounded-full bg-green-500"></div>
               </div>
-              <div className="text-sm text-muted-foreground truncate">{formatAddress(account)}</div>
+              <div className="text-sm text-muted-foreground truncate">{formatAddress(walletAddress)}</div>
             </div>
           ) : (
             <div className="flex flex-col items-center p-4 mb-6 rounded-xl border-2 border-dashed border-muted-foreground text-center">
@@ -274,14 +275,14 @@ function SidebarTabs({}: SidebarTabsProps) {
               </p>
               <Button
                 onClick={connectWallet}
-                disabled={isConnecting}
+                disabled={isLoadingTokens}
                 variant="outline"
                 size="sm"
                 className="gap-2 rounded-lg border-2 border-black bg-yellow text-black hover:bg-yellow-dark active:translate-y-px active:shadow-none transition-all duration-100 font-bold"
                 style={{ boxShadow: '2px 2px 0px 0px #000000' }}
               >
                 <Power className="h-4 w-4" />
-                {isConnecting ? 'Connecting...' : 'Connect Wallet'}
+                {isLoadingTokens ? 'Connecting...' : 'Connect Wallet'}
               </Button>
             </div>
           )}
@@ -382,7 +383,7 @@ function SidebarTabs({}: SidebarTabsProps) {
               <Settings className="mr-2 h-4 w-4" />
               <span>Settings</span>
             </Button>
-            {account && (
+            {walletAddress && (
               <Button
                 variant="outline"
                 onClick={disconnectWallet} // onClick handler remains
