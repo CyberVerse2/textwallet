@@ -2,19 +2,13 @@ import { NextResponse } from 'next/server';
 import { formatUnits } from 'ethers'; // Import ethers utility
 import type { EnrichedTokenBalance } from "../../token-list"; // Import the type
 import { Alchemy, Network, Utils, type TokenBalance } from "alchemy-sdk"; // Import TokenBalance type
-// import { CHAIN_CONFIG } from '../../../lib/chain-config'; // Temporarily commented out - file not found
 
 // Define USDC contract address on Base network
 const USDC_BASE_ADDRESS = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 
 // Simple map for known token metadata (expand as needed)
-const KNOWN_TOKEN_METADATA: { [address: string]: { name: string; symbol: string; decimals: number; logo?: string } } = {
-  [USDC_BASE_ADDRESS.toLowerCase()]: { // Use lowercase address for case-insensitive matching
-    name: 'USD Coin',
-    symbol: 'USDC',
-    decimals: 6,
-    logo: 'https://token.metaswap.codefi.network/assets/tokens/usdc/logo.svg' // Assuming this URL pattern works
-  }
+const KNOWN_TOKEN_LOGOS: { [address: string]: string } = {
+  [USDC_BASE_ADDRESS.toLowerCase()]: 'https://token.metaswap.codefi.network/assets/tokens/usdc/logo.svg'
 };
 
 // Spam keywords (lowercase) - adjust as needed
@@ -53,11 +47,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
   }
 
-  // Configuration for the /assets/tokens/by-address endpoint
   const apiKey = process.env.ALCHEMY_API_KEY;
   const alchemyUrl = `https://api.g.alchemy.com/data/v1/${apiKey}/assets/tokens/by-address`;
 
-  // Define networks to query
   const networks = [
     'eth-mainnet',    // Ethereum (Alchemy ID)
     'opt-mainnet',    // Optimism (Alchemy ID)
@@ -97,64 +89,47 @@ export async function GET(request: Request) {
       throw new Error(`Alchemy Data API request failed with status: ${response.status}`);
     }
 
-    const responseData = await response.json(); // Renamed to avoid conflict with 'data' below
+    const responseData = await response.json();
 
-    // DEBUG: Log the raw response from Alchemy Data API
-    console.log('[API Tokens Route] Raw Alchemy Data API Response:', JSON.stringify(responseData, null, 2));
+    const rawTokens = responseData?.data?.tokens;
 
-    // Check for API-level errors
-    if (!responseData || responseData.error) {
-      console.error('Alchemy Data API Error:', responseData?.error || 'Unknown API error');
-      throw new Error(responseData?.error?.message || 'Alchemy Data API returned an error');
+    if (!rawTokens) {
+      console.error('Alchemy Data API Error: No tokens array in response');
+      return NextResponse.json({ tokens: [], totalUsdValue: 0, error: 'Failed to fetch token balances' }, { status: 500 });
     }
 
-    // --- Data Extraction & Processing based on sample response ---
     let processedTokens: EnrichedTokenBalance[] = [];
     let totalCalculatedUsdValue = 0;
 
-    // Access the tokens array within the 'data' field
-    const rawTokens = responseData?.data?.tokens;
-
     if (rawTokens && Array.isArray(rawTokens)) {
       processedTokens = rawTokens.map((token: TokenBalance) => {
-        // Ensure we only process successful token balance fetches
         if (token.error) {
           console.warn(`API Route: Error fetching balance for token ${token.contractAddress}: ${token.error}`);
           return null;
         }
 
-        // Validate essential data
-        if (!token.contractAddress || typeof token.tokenBalance !== 'string') {
-          console.warn(`API Route: Skipping token due to missing contract address or balance.`);
-          return null;
+        const balanceRaw = token.tokenBalance;
+        const contractAddress = token.contractAddress;
+
+        if (!contractAddress || typeof balanceRaw !== 'string' || balanceRaw === '0x0') {
+          return null; // Skip zero balances or invalid data
         }
 
-        // DEBUG: Log raw token object received from Alchemy
-        console.log('[API Tokens Route] Processing Raw Token:', JSON.stringify(token, null, 2));
+        const contractAddressLower = contractAddress.toLowerCase();
 
-        const balanceRaw = token.tokenBalance;
-        const contractAddressLower = token.contractAddress?.toLowerCase();
-
-        // Get metadata from known map or use placeholders
         let name: string | undefined = 'Unknown Token';
         let symbol: string | undefined = '???';
         let decimals: number = 18; // Default
-        let logo: string | undefined = undefined;
+        let logo: string | undefined = token.logo ?? undefined; // Use API logo if present
 
-        if (contractAddressLower && KNOWN_TOKEN_METADATA[contractAddressLower]) {
-          // DEBUG: Log successful lookup
-          console.log(`[API Tokens Route] Found known metadata for address: ${contractAddressLower}`);
-          const knownMeta = KNOWN_TOKEN_METADATA[contractAddressLower];
-          name = knownMeta.name;
-          symbol = knownMeta.symbol;
-          decimals = knownMeta.decimals;
-          logo = knownMeta.logo;
-        } else if (contractAddressLower) {
-          // DEBUG: Log failed lookup
-          console.log(`[API Tokens Route] No known metadata found for address: ${contractAddressLower}`);
-        } // else: use placeholders defined above
+        if (!logo && KNOWN_TOKEN_LOGOS[contractAddressLower]) {
+          logo = KNOWN_TOKEN_LOGOS[contractAddressLower]; // Use hardcoded logo as fallback
+        }
 
-        // Filter out spam tokens
+        if (token.name) name = token.name;
+        if (token.symbol) symbol = token.symbol;
+        if (typeof token.decimals === 'number') decimals = token.decimals;
+
         const nameLower = name?.toLowerCase() || '';
         const symbolLower = symbol?.toLowerCase() || '';
         if (SPAM_KEYWORDS.some(keyword => nameLower.includes(keyword) || symbolLower.includes(keyword))) {
@@ -162,12 +137,11 @@ export async function GET(request: Request) {
           return null;
         }
 
-        // Format balance using ethers
         const formattedBalance = formatUnits(balanceRaw, decimals);
 
-        // --- Calculate USD value (Placeholder - requires price source) ---
         let usdValue: number | null = null;
         const usdPricePerToken: number | null = null; // TODO: Implement price fetching if needed
+
         if (usdPricePerToken !== null) {
           const balanceNumber = parseFloat(formattedBalance);
           if (!isNaN(balanceNumber)) {
@@ -176,7 +150,6 @@ export async function GET(request: Request) {
           }
         }
 
-        // Create the enriched object
         const enrichedToken = {
           network: 'Unknown', // Placeholder - Network info location TBD from logs
           contractAddress: token.contractAddress,
@@ -190,35 +163,13 @@ export async function GET(request: Request) {
           usdValue: usdValue, // Use calculated USD value
         } as EnrichedTokenBalance; // Assert type here
 
-        // DEBUG: Log the final enriched token object before returning from map
-        console.log('[API Tokens Route] Enriched Token:', JSON.stringify(enrichedToken, null, 2));
-
         return enrichedToken;
       }).filter((token): token is EnrichedTokenBalance => token !== null); // Filter out null values
     }
 
     console.log(`API Route: Fetch successful. Processed ${processedTokens.length} non-spam tokens. Total Value: ${totalCalculatedUsdValue}`);
 
-    // Log details specifically for USDC if found
-    // Find raw USDC by contract address (case-insensitive comparison)
-    const usdcTokenRaw = rawTokens.find((t: TokenBalance) => 
-      !t.error && t.contractAddress?.toLowerCase() === USDC_BASE_ADDRESS.toLowerCase()
-    );
-    if (usdcTokenRaw) {
-      console.log('[API Tokens Route] Raw USDC Data from Alchemy:', JSON.stringify(usdcTokenRaw, null, 2));
-    }
-    const usdcTokenEnriched = processedTokens.find((t: EnrichedTokenBalance) => t.contractAddress?.toLowerCase() === USDC_BASE_ADDRESS.toLowerCase());
-    if (usdcTokenEnriched) {
-      console.log('[API Tokens Route] Enriched USDC Data before sending:', JSON.stringify(usdcTokenEnriched, null, 2));
-    } else if (usdcTokenRaw) {
-      console.log('[API Tokens Route] USDC was found in raw data but not in enriched data (likely filtered as spam).');
-    }
-
-    return NextResponse.json({ 
-      tokens: processedTokens, // Return the processed tokens
-      totalUsdValue: totalCalculatedUsdValue // Return the calculated total value
-    });
-
+    return NextResponse.json({ tokens: processedTokens, totalUsdValue }, { status: 200 });
   } catch (error: any) {
     console.error("Alchemy Data API Fetch Error:", error);
     return NextResponse.json({ error: error.message || 'Failed to fetch token balances via Alchemy Data API' }, { status: 500 });

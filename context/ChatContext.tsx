@@ -19,6 +19,7 @@ interface Message {
   id: string;
   text: string;
   sender: 'user' | 'bot';
+  description?: string;
 }
 
 interface ChatContextType {
