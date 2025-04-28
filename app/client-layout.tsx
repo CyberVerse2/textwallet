@@ -1,13 +1,10 @@
 "use client"
 
 import React, { useEffect, useState, useRef, forwardRef, useImperativeHandle } from "react";
-
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { ChevronDown, Image, BarChart2, Settings, LogOut, Activity, Wallet, Copy, Check, CreditCard, Key, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import TokenList from "./token-list"
 import ActivityList from "./activity-list"
-import WalletBridge from "@/components/wallet-bridge"
 import "./globals.css"
 import { ChatProvider, useChatContext } from '@/context/ChatContext';
 import { shortenAddress } from "@/lib/utils"; // Import shortenAddress at the top
@@ -125,7 +122,7 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
   };
 
   return (
-    <aside className="w-72 bg-white rounded-2xl p-6 flex flex-col justify-between border-2 border-black" style={{ boxShadow: "8px 8px 0px 0px #000000" }}>
+    <aside className="w-72 bg-white rounded-2xl p-4 flex flex-col justify-between border-2 border-black" style={{ boxShadow: "8px 8px 0px 0px #000000" }}>
       <div>
         {/* Profile/Wallet Section */}
         <div className="flex items-center gap-3 mb-8">
@@ -263,7 +260,7 @@ const SidebarTabs = forwardRef<{ refreshBalances: () => void }, {
       {/* Tab Buttons - Updated Styling */}
       <div 
         className="flex mb-6 p-1 border-2 border-black rounded-xl" 
-        style={{ boxShadow: "4px 4px 0px 0px #000000" }}
+
       >
         <button
           className={`flex-1 py-2 px-4 rounded-lg font-bold transition-all duration-150 flex items-center justify-center gap-2 ${ 
