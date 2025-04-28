@@ -380,7 +380,12 @@ function AssetsSection({
 
       // Combine and set tokens
       const combinedTokens = [...nativeBalances, ...tokenBalances];
-      console.log('[AssetsSection Fetch] Combined Native + Token balances:', combinedTokens);
+      console.log('[AssetsSection Fetch] Combined Native + Token balances (unsorted):', combinedTokens);
+
+      // Sort by USD value (descending)
+      combinedTokens.sort((a, b) => (b.usdValue ?? 0) - (a.usdValue ?? 0));
+      console.log('[AssetsSection Fetch] Sorted balances:', combinedTokens);
+
       console.log('[AssetsSection Fetch] Setting tokens state.');
       setTokens(combinedTokens); 
 
