@@ -260,28 +260,37 @@ const SidebarTabs = forwardRef<{ refreshBalances: () => void }, {
 
   return (
     <div>
-      {/* Tab Buttons */}
-      <div className="flex mb-6 p-1 bg-gray-100 rounded-xl">
+      {/* Tab Buttons - Updated Styling */}
+      <div 
+        className="flex mb-6 p-1 border-2 border-black rounded-xl" 
+        style={{ boxShadow: "4px 4px 0px 0px #000000" }}
+      >
         <button
-          onClick={() => setActiveTab('tokens')}
-          className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium ${
-            activeTab === 'tokens' ? 'bg-white border-2 border-black shadow-sm' : 'text-gray-500 hover:text-gray-900'
+          className={`flex-1 py-2 px-4 rounded-lg font-bold transition-all duration-150 flex items-center justify-center gap-2 ${ 
+            activeTab === 'tokens'
+              ? 'bg-yellow text-black border-2 border-black'
+              : 'text-black hover:bg-yellow/50 active:translate-y-px'
           }`}
+          style={activeTab === 'tokens' ? { boxShadow: "2px 2px 0px 0px #000000" } : {}}
+          onClick={() => setActiveTab('tokens')}
         >
-          Tokens
+          <Wallet className="h-4 w-4" /> Tokens
         </button>
         <button
-          onClick={() => setActiveTab('activity')}
-          className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium ${
-            activeTab === 'activity' ? 'bg-white border-2 border-black shadow-sm' : 'text-gray-500 hover:text-gray-900'
+          className={`flex-1 py-2 px-4 rounded-lg font-bold transition-all duration-150 flex items-center justify-center gap-2 ${ 
+            activeTab === 'activity'
+              ? 'bg-yellow text-black border-2 border-black'
+              : 'text-black hover:bg-yellow/50 active:translate-y-px'
           }`}
+          style={activeTab === 'activity' ? { boxShadow: "2px 2px 0px 0px #000000" } : {}}
+          onClick={() => setActiveTab('activity')}
         >
-          Activity
+          <Activity className="h-4 w-4" /> Activity
         </button>
       </div>
 
       {/* Tab Content */}
-      <div className="space-y-4">
+      <div className="space-y-6">
         {activeTab === 'tokens' && (
           <AssetsSection 
             isWalletConnected={isWalletConnected} 
