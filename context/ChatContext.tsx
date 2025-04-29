@@ -109,8 +109,6 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
       if (dbError) throw dbError;
 
-      console.log(" Chat History: Raw data from Supabase:", dbMessages);
-
       if (!dbMessages || dbMessages.length === 0) return [];
 
       const messageMap = new Map<string, SdkMessage>();
@@ -191,9 +189,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (user?.id && !initialHistoryLoaded) {
       fetchChatHistory(user.id).then(history => {
-        console.log(" Chat History: Fetched history array:", history); // Log fetched history
         setMessages(history); // Overwrite initial state from useChat with DB history
-        console.log(" Chat History: Called setMessages with fetched history."); // Log confirmation
         setInitialHistoryLoaded(true); // Mark history as loaded
       });
     }
