@@ -108,55 +108,63 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         .order('created_at', { ascending: true }); // Fetch sorted by creation time
 
       if (dbError) throw dbError;
-      if (!dbMessages) return [];
+      if (!dbMessages || dbMessages.length === 0) return [];
 
-      // Process messages to group user prompts with AI responses
-      const userMessagesMap = new Map<string, DbMessage>();
-      const processedMessages: SdkMessage[] = [];
+      const messageMap = new Map<string, SdkMessage>();
+      const childrenMap = new Map<string, string[]>();
+      const addedMessageIds = new Set<string>();
+      const result: SdkMessage[] = [];
 
-      // First pass: identify user messages
-      for (const msg of dbMessages) {
-        if (msg.sender === 'user') {
-          userMessagesMap.set(msg.message_id, msg);
+      // First pass: Convert all messages and map children
+      for (const dbMsg of dbMessages) {
+        const sdkMsg = convertSingleDbMessageToVercelFormat(dbMsg);
+        messageMap.set(sdkMsg.id, sdkMsg);
+
+        if (dbMsg.parent_message_id) {
+          if (!childrenMap.has(dbMsg.parent_message_id)) {
+            childrenMap.set(dbMsg.parent_message_id, []);
+          }
+          childrenMap.get(dbMsg.parent_message_id)!.push(sdkMsg.id);
         }
       }
 
-      // Second pass: group and order
-      for (const msg of dbMessages) {
-         if (msg.sender === 'user') {
-           // Check if this user message has already been processed as part of a pair
-           if (userMessagesMap.has(msg.message_id)) {
-             processedMessages.push(convertSingleDbMessageToVercelFormat(msg));
-             userMessagesMap.delete(msg.message_id); // Remove from map once added
-           }
-         } else if (msg.sender === 'ai') {
-           const parentId = msg.parent_message_id;
-           if (parentId && userMessagesMap.has(parentId)) {
-             // Found parent, add user message first if not already added
-             const parentMsg = userMessagesMap.get(parentId)!;
-             processedMessages.push(convertSingleDbMessageToVercelFormat(parentMsg));
-             userMessagesMap.delete(parentId); // Remove parent from map
+      // Second pass: Build the result array ensuring pairs are together
+      for (const dbMsg of dbMessages) {
+        const currentMsgId = dbMsg.message_id; // Use DB ID for lookups
 
-             // Add AI message
-             processedMessages.push(convertSingleDbMessageToVercelFormat(msg));
-           } else {
-             // AI message without a found parent (orphan or parent already processed)
-             // Add it directly in its chronological spot
-              processedMessages.push(convertSingleDbMessageToVercelFormat(msg));
-           }
-         }
+        // Skip if already added as part of a pair
+        if (addedMessageIds.has(currentMsgId)) {
+          continue;
+        }
+
+        const sdkMsg = messageMap.get(currentMsgId);
+        if (!sdkMsg) continue; // Should not happen if first pass worked
+
+        if (sdkMsg.role === 'user') {
+          // Add user message
+          result.push(sdkMsg);
+          addedMessageIds.add(currentMsgId);
+
+          // Add its direct children (AI responses)
+          const childIds = childrenMap.get(currentMsgId);
+          if (childIds) {
+            for (const childId of childIds) {
+              const childMsg = messageMap.get(childId);
+              if (childMsg && !addedMessageIds.has(childId)) {
+                result.push(childMsg);
+                addedMessageIds.add(childId);
+              }
+            }
+          }
+        } else if (sdkMsg.role === 'assistant' && !dbMsg.parent_message_id) {
+          // Add orphan AI message (e.g., initial greeting not linked to user)
+          result.push(sdkMsg);
+          addedMessageIds.add(currentMsgId);
+        }
+        // AI messages with parents are handled when their parent user message is processed.
       }
 
-       // Add any remaining user messages from the map (those without AI replies)
-       // This preserves chronological order because we iterated through dbMessages sorted by created_at
-       userMessagesMap.forEach(userMsg => {
-          processedMessages.push(convertSingleDbMessageToVercelFormat(userMsg));
-       });
-
-      // Re-sort final list just in case (optional, but safe)
-      processedMessages.sort((a, b) => (a.createdAt?.getTime() || 0) - (b.createdAt?.getTime() || 0));
-
-      return processedMessages;
+      return result;
 
     } catch (err) {
       console.error(' Chat History: Error fetching/processing chat history:', err);
@@ -166,17 +174,26 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [supabase]); // Keep dependencies
 
+  // Helper function to convert DB message format to Vercel SDK format
+  function convertSingleDbMessageToVercelFormat(dbMsg: DbMessage): SdkMessage {
+    return {
+      id: dbMsg.message_id,
+      role: dbMsg.sender === 'ai' ? 'assistant' : 'user',
+      content: dbMsg.message,
+      createdAt: new Date(dbMsg.created_at),
+    };
+  }
+
   // Effect to load history when user authenticates
   useEffect(() => {
     if (user?.id && !initialHistoryLoaded) {
       fetchChatHistory(user.id).then(history => {
-        if (history.length > 0) {
-          setMessages(history); // Update internal messages state with fetched history
-        }
+        setMessages(history); // Overwrite initial state from useChat with DB history
         setInitialHistoryLoaded(true); // Mark history as loaded
       });
     }
-  }, [user, initialHistoryLoaded, fetchChatHistory, setMessages]); // Add fetchChatHistory and setMessages
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, initialHistoryLoaded, fetchChatHistory]); // Removed setMessages from deps
 
   // Combine Vercel AI state with custom state
   const value = {
@@ -211,36 +228,4 @@ export const useChatContext = () => { // Rename the exported hook
     throw new Error('useChatContext must be used within a ChatProvider');
   }
   return context;
-};
-
-// Helper function to convert a single DB message to Vercel AI SDK format
-const convertSingleDbMessageToVercelFormat = (msg: DbMessage): SdkMessage => {
-    return {
-        id: msg.message_id,
-        content: msg.message,
-        role: msg.sender === 'user' ? 'user' : 'assistant',
-        createdAt: msg.created_at ? new Date(msg.created_at) : undefined,
-        // Add other fields if needed by SdkMessage type, but these are primary
-    };
-};
-
-// Helper function to convert DB messages to Vercel AI SDK format (Now less used directly by fetch)
-const convertDbMessagesToVercelFormat = (dbMessages: DbMessage[]): SdkMessage[] => {
-  return dbMessages.map(convertSingleDbMessageToVercelFormat); // Use the single converter
-};
-
-// Helper function to convert a single Vercel AI SDK message to DB format
-const convertSdkToDbMessage = (msg: SdkMessage, userId: string): DbMessage | null => {
-  // Add a check to ensure the message has an ID, which is needed for the DB schema
-  if (!msg.id) {
-    console.warn(' Chat History: [convertSdkToDbMessage] Skipping message without ID:', msg);
-    return null;
-  }
-  return {
-    message_id: msg.id,
-    user_id: userId,
-    sender: msg.role === 'user' ? 'user' : 'ai', // Map 'assistant' role to 'ai'
-    message: msg.content, // Map SDK 'content' to DB 'message'
-    created_at: msg.createdAt?.toISOString() || new Date().toISOString(),
-  };
 };

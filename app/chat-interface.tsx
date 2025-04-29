@@ -68,6 +68,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
     }
   }, [error]);
   
+  // Log the messages array whenever it changes
+  useEffect(() => {
+    console.log('💬 Chat UI: Messages array updated:', messages);
+  }, [messages]);
+  
   // Determine if the input/button should be disabled
   const isDisabled = isLoading || !isWalletConnected;
   const placeholderText = !isWalletConnected ? "Connect wallet to chat" : "Send a message...";
@@ -107,6 +112,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
             </div>
           )}
           {messages.map((message, index) => {
+            console.log(`💬 Chat UI: Rendering message ${index}:`, message);
+            
             // Determine alignment based on sender ('user' or 'assistant' from SDK)
             const isUser = message.role === 'user';
             const alignClass = isUser ? 'justify-end' : 'justify-start';
