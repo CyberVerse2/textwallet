@@ -1,4 +1,10 @@
-import { ActionProvider, CreateAction, PrivyEvmWalletProvider, Network } from '@coinbase/agentkit';
+import {
+  ActionProvider,
+  CreateAction,
+  Network,
+  WalletProvider,
+  EvmWalletProvider
+} from '@coinbase/agentkit';
 import { z } from 'zod';
 import {
   Address,
@@ -9,24 +15,24 @@ import {
   WalletClient,
   PublicClient
 } from 'viem';
-import { base } from 'viem/chains';
+import { base, mainnet } from 'viem/chains';
 import { createCoin as createZoraCoinSDK, validateMetadataJSON } from '@zoralabs/coins-sdk';
 import { zoraCreateCoinSchema } from './schemas';
 import type { ZoraCreateCoinInput } from './schemas';
 import { uploadJsonToPinata } from '../../ipfs';
-
-interface AgentContext {
-  accountAddress?: Address;
-  walletClient?: WalletClient;
-  publicClient?: PublicClient;
-}
+import { useWallets } from '@privy-io/react-auth';
+import { Hex } from '@privy-io/server-auth';
+import { Interface } from 'ethers';
+import factoryArtifact from '@zoralabs/protocol-deployments';
+const ZoraFactoryABI = factoryArtifact.abi;
 
 /**
  * Action provider specifically for creating Zora coins.
  */
-class ZoraActionProvider extends ActionProvider<PrivyEvmWalletProvider> {
+class ZoraActionProvider extends ActionProvider<EvmWalletProvider> {
   constructor() {
-    super('zora', []);
+    // Define the provider name and an empty actions array (actions defined via @CreateAction)
+    super('zora', []); // Provide empty array as second argument
   }
 
   @CreateAction({
@@ -37,24 +43,22 @@ class ZoraActionProvider extends ActionProvider<PrivyEvmWalletProvider> {
   })
   async createCoin(
     args: ZoraCreateCoinInput,
-    context: AgentContext
+    evmWalletProvider: EvmWalletProvider
   ): Promise<string> {
-    const { accountAddress, walletClient, publicClient } = context;
+    const wallet = evmWalletProvider;
+    const walletClient = createWalletClient({
+      account: wallet.address as Hex,
+      chain: base,
+      transport: custom(provider)
+    });
+    const publicClient = createPublicClient({
+      chain: base,
+      transport: custom(provider)
+    });
+    console.log('🚀 ZoraActionProvider.createCoin: Entered function with args:', args);
 
     try {
       console.log('Attempting to create Zora coin with args:', args);
-
-      if (!accountAddress) {
-        throw new Error(
-          'Could not retrieve address from the AgentContext. Ensure the wallet is configured correctly in the API route.'
-        );
-      }
-      console.log(`Using account address: ${accountAddress}`);
-
-      if (!walletClient || !publicClient) {
-        throw new Error('WalletClient or PublicClient not provided in AgentContext.');
-      }
-      console.log('Using WalletClient and PublicClient from AgentContext.');
 
       const metadataJson = {
         name: args.name,
@@ -73,7 +77,7 @@ class ZoraActionProvider extends ActionProvider<PrivyEvmWalletProvider> {
         name: args.name,
         symbol: args.symbol,
         uri: metadataUri,
-        payoutRecipient: (args.payoutRecipient ?? accountAddress) as Address,
+        payoutRecipient: (args.payoutRecipient ?? wallet.address) as Address,
         platformReferrer: args.platformReferrer as Address | undefined,
         initialPurchaseWei: args.initialPurchaseWei ?? 0n
       };
@@ -82,12 +86,17 @@ class ZoraActionProvider extends ActionProvider<PrivyEvmWalletProvider> {
       const result = await createZoraCoinSDK(coinParams, walletClient, publicClient);
       console.log('Zora SDK createCoin successful:', result);
 
-      return `Successfully created Zora coin '${args.name}'. Transaction hash: ${result.hash}, Coin address: ${result.address}`;
+      console.log('✅ ZoraActionProvider.createCoin: Successfully created coin. Receipt:', result);
+      const resultString = `Successfully created Zora coin '${args.name}'. Transaction hash: ${result.hash}, Coin address: ${result.address}`;
+      console.log('✅ ZoraActionProvider.createCoin: Returning success string:', resultString);
+      return resultString;
     } catch (error: any) {
-      console.error(`Error creating Zora coin:`, error);
+      console.error('💥 ZoraActionProvider.createCoin: Caught error:', error); // Log the full error
       const errorMessage = error.message || 'Unknown error';
       const prefix = errorMessage.startsWith('Shim:') ? '' : 'SDK Error: ';
-      return `Error creating Zora coin: ${prefix}${errorMessage}`;
+      const errorString = `Error creating Zora coin: ${prefix}${errorMessage}`;
+      console.log('💥 ZoraActionProvider.createCoin: Returning error string:', errorString);
+      return errorString;
     }
   }
 
