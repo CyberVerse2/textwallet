@@ -120,9 +120,6 @@ export async function POST(req: Request) {
         // Pass the AgentKit instance to the Vercel AI SDK
         const tools = getVercelAITools(agentKit);
 
-        // Get wallet address (from Privy provider)
-        const privyManagedWalletAddress = await walletProvider.getAddress();
-
         // Generate a response with wallet access using Claude with streaming
         const result = await streamText({
           model: anthropic('claude-3-5-sonnet-20240620'),
