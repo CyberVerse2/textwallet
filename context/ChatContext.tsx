@@ -16,7 +16,7 @@ import { Message as SdkMessage, useChat, UseChatHelpers } from '@ai-sdk/react'; 
 
 // Define the structure matching the chat_history table
 interface DbMessage {
-  message_id: string; // Changed from id to match DB
+  id: string; // Use 'id' to match default Supabase primary key
   user_id: string; // Ensure this matches your table column if it exists
   sender: 'user' | 'ai';
   message: string; // Renamed from content to match DB schema
@@ -103,11 +103,14 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     try {
       const { data: dbMessages, error: dbError } = await supabase
         .from('chat_history')
-        .select('message_id, user_id, sender, message, created_at, parent_message_id') // Ensure parent_message_id is selected
+        .select('id, user_id, sender, message, created_at, parent_message_id') // Select 'id'
         .eq('user_id', userId)
         .order('created_at', { ascending: true }); // Fetch sorted by creation time
 
       if (dbError) throw dbError;
+
+      console.log(" Chat History: Raw data from Supabase:", dbMessages);
+
       if (!dbMessages || dbMessages.length === 0) return [];
 
       const messageMap = new Map<string, SdkMessage>();
@@ -124,13 +127,13 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
           if (!childrenMap.has(dbMsg.parent_message_id)) {
             childrenMap.set(dbMsg.parent_message_id, []);
           }
-          childrenMap.get(dbMsg.parent_message_id)!.push(sdkMsg.id);
+          childrenMap.get(dbMsg.parent_message_id)!.push(sdkMsg.id); // Store sdkMsg.id
         }
       }
 
       // Second pass: Build the result array ensuring pairs are together
       for (const dbMsg of dbMessages) {
-        const currentMsgId = dbMsg.message_id; // Use DB ID for lookups
+        const currentMsgId = dbMsg.id; // Use DB ID for lookups
 
         // Skip if already added as part of a pair
         if (addedMessageIds.has(currentMsgId)) {
@@ -146,20 +149,20 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
           addedMessageIds.add(currentMsgId);
 
           // Add its direct children (AI responses)
-          const childIds = childrenMap.get(currentMsgId);
+          const childIds = childrenMap.get(currentMsgId); // Look up using currentMsgId (DB id)
           if (childIds) {
             for (const childId of childIds) {
               const childMsg = messageMap.get(childId);
-              if (childMsg && !addedMessageIds.has(childId)) {
+              if (childMsg && !addedMessageIds.has(childId)) { // Check addedMessageIds using childId (SdkMessage id)
                 result.push(childMsg);
-                addedMessageIds.add(childId);
+                addedMessageIds.add(childId); // Add childId (SdkMessage id)
               }
             }
           }
         } else if (sdkMsg.role === 'assistant' && !dbMsg.parent_message_id) {
           // Add orphan AI message (e.g., initial greeting not linked to user)
           result.push(sdkMsg);
-          addedMessageIds.add(currentMsgId);
+          addedMessageIds.add(currentMsgId); // Add currentMsgId (DB id)
         }
         // AI messages with parents are handled when their parent user message is processed.
       }
@@ -177,7 +180,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   // Helper function to convert DB message format to Vercel SDK format
   function convertSingleDbMessageToVercelFormat(dbMsg: DbMessage): SdkMessage {
     return {
-      id: dbMsg.message_id,
+      id: dbMsg.id, // Map dbMsg.id to SdkMessage.id
       role: dbMsg.sender === 'ai' ? 'assistant' : 'user',
       content: dbMsg.message,
       createdAt: new Date(dbMsg.created_at),
@@ -188,7 +191,9 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (user?.id && !initialHistoryLoaded) {
       fetchChatHistory(user.id).then(history => {
+        console.log(" Chat History: Fetched history array:", history); // Log fetched history
         setMessages(history); // Overwrite initial state from useChat with DB history
+        console.log(" Chat History: Called setMessages with fetched history."); // Log confirmation
         setInitialHistoryLoaded(true); // Mark history as loaded
       });
     }

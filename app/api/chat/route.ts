@@ -32,7 +32,7 @@ function createPlainTextStream(text: string): ReadableStream<Uint8Array> {
 }
 
 export async function POST(req: Request) {
-  let userMessageId: string | null = null;
+  let parentDbId: string | null = null;
   let finalCompletion = ''; // Hold the final AI text or generic error
   let streamResult: StreamTextResult<any, any> | null = null; // Hold the successful stream result
   let hadStreamError = false;
@@ -49,18 +49,18 @@ export async function POST(req: Request) {
         .insert({
           user_id: userId,
           message: userMessage.content,
-          sender: 'user' // parent_message_id will be null if schema allows
+          sender: 'user',
         })
         .select('id')
         .single();
 
-      if (error) {
-        console.error('🤖 Chat API Route: Error saving user message:', error);
+      if (error || !data?.id) {
+        console.error('🤖 Chat API Route: Error saving user message or retrieving ID:', error);
         // If user message fails to save, stop processing
         return new Response(JSON.stringify({ error: 'Failed to save user message' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
-      } else if (data) {
-        userMessageId = data.id;
-        console.log(`🤖 Saved user message with ID: ${userMessageId}`);
+      } else {
+        parentDbId = data.id;
+        console.log(`🤖 Saved user message with DB ID: ${parentDbId}`);
       }
     } catch (dbError) {
       console.error('🤖 Chat API Route: Exception saving user message:', dbError);
@@ -141,20 +141,20 @@ export async function POST(req: Request) {
 
     // --- Save AI Message (Success or Generic Error) --- Now Outside Nested Try/Catch
     // This now runs after either a successful tool stream, a failed tool stream, OR a config failure
-    if (userId && userMessageId) { // userMessageId is guaranteed non-null if we reached here
+    if (userId && parentDbId) { // userMessageId is guaranteed non-null if we reached here
       try {
         const { error: aiSaveError } = await supabaseAdmin.from('chat_history').insert({
           user_id: userId, // userId is also guaranteed non-null here
           message: finalCompletion, // Saves success, tool error, or config error msg
           sender: 'ai',
-          parent_message_id: userMessageId
+          parent_message_id: parentDbId
         });
 
         if (aiSaveError) {
           console.error('🤖 Chat API Route: Error saving AI message/error:', aiSaveError);
           // Log failure but maybe don't abort the response to user?
         } else {
-          console.log(`🤖 Saved AI message/error, linked to user ID: ${userMessageId}`);
+          console.log(`🤖 Saved AI message/error, linked to user ID: ${parentDbId}`);
         }
       } catch (dbError) {
         console.error('🤖 Chat API Route: Exception saving AI message/error:', dbError);
@@ -179,13 +179,13 @@ export async function POST(req: Request) {
     // Catch errors from initial AgentKit setup IF it happens within the 'if (canUseTools)' block
     console.error('🤖 Chat API Route Top Level Error (AgentKit Setup?):', setupError);
     // Attempt to save generic error linked to user message if possible
-    if (userId && userMessageId) {
+    if (userId && parentDbId) {
       try {
         await supabaseAdmin.from('chat_history').insert({
           user_id: userId,
           message: genericErrorMessage, // Save generic error here too
           sender: 'ai',
-          parent_message_id: userMessageId
+          parent_message_id: parentDbId
         });
       } catch (finalDbError) {
         console.error("🤖 Chat API Route: Failed to save final setup error message:", finalDbError);
