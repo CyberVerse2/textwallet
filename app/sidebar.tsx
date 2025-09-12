@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { usePrivy } from '@privy-io/react-auth'; // Import usePrivy
+import { useAccount, useDisconnect } from 'wagmi';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import TokenList from './token-list';
@@ -67,10 +67,10 @@ function SidebarTabs({}: SidebarTabsProps) {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [showAllTokens, setShowAllTokens] = useState(false);
 
-  // Get user and wallet info from Privy
-  const { user, authenticated, logout } = usePrivy();
+  const { address } = useAccount();
+  const { disconnect } = useDisconnect();
   // Use optional chaining and memoization for stability
-  const walletAddress = useMemo(() => user?.wallet?.address, [user?.wallet?.address]);
+  const walletAddress = useMemo(() => address ?? null, [address]);
 
   useEffect(() => {
     let isMounted = true; // Flag to prevent state updates on unmounted component
@@ -179,8 +179,8 @@ function SidebarTabs({}: SidebarTabsProps) {
         }
       };
       fetchData();
-    } else if (authenticated) {
-      // Clear data if authenticated but no wallet connected via Privy
+    } else if (false) {
+      // Placeholder branch retained for future auth states if needed
       setErc20TokenData([]);
       setNativeTokenData([]);
       setTotalValue(null);
@@ -270,7 +270,7 @@ function SidebarTabs({}: SidebarTabsProps) {
                 {formatDisplayAddress(walletAddress)}
               </div>
             </div>
-          ) : authenticated ? (
+          ) : address ? (
             <div className="flex flex-col items-center p-4 mb-6 rounded-xl border-2 border-dashed border-muted-foreground text-center">
               <WalletIcon className="h-8 w-8 mb-3 text-muted-foreground" />
               <p className="text-sm text-muted-foreground mb-3">
@@ -395,7 +395,7 @@ function SidebarTabs({}: SidebarTabsProps) {
             {walletAddress && (
               <Button
                 variant="outline"
-                onClick={logout}
+                onClick={() => disconnect()}
                 className="w-full justify-start text-red-500 border-2 border-red-500 hover:bg-red-50 active:translate-y-px active:shadow-none transition-all duration-100 rounded-xl font-bold"
                 style={{ boxShadow: '3px 3px 0px 0px #dc2626' }}
               >
