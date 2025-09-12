@@ -20,7 +20,7 @@ import { ChatProvider, useChatContext } from '@/context/ChatContext';
 import { shortenAddress } from '@/lib/utils'; // Import shortenAddress at the top
 import { EnrichedTokenBalance } from './token-list'; // Import the correct type
 import { useAccount, useDisconnect } from 'wagmi';
-import { Wallet as OckWallet, ConnectWallet, ConnectWalletText } from '@coinbase/onchainkit/wallet';
+import { SignInWithBaseButton } from '@base-org/account-ui/react';
 
 // Create a ref to hold the SidebarTabs component
 const sidebarRef = React.createRef<{ refreshBalances: () => void }>();
@@ -141,15 +141,7 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
                 </button>
               </div>
             )}
-            {!isWalletEffectivelyConnected && (
-              <div className="mt-3">
-                <OckWallet>
-                  <ConnectWallet className="w-full" disconnectedLabel="Log In">
-                    <ConnectWalletText>Connect Wallet</ConnectWalletText>
-                  </ConnectWallet>
-                </OckWallet>
-              </div>
-            )}
+            {/* Connect UI handled by pinned Base button at bottom */}
           </div>
         </div>
 
@@ -163,27 +155,35 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
 
       {/* Bottom Actions */}
       <div className="space-y-2">
-        {/* Connection and wallet actions are handled via OnchainKit sidebar button */}
-        <Button
-          variant="outline"
-          className="w-full justify-start border-2 border-black hover:bg-yellow/20 active:translate-y-1 active:shadow-none transition-all duration-100 rounded-xl font-bold"
-          style={{ boxShadow: '4px 4px 0px 0px #000000' }}
-        >
-          <Settings className="mr-2 h-4 w-4" />
-          <span>Settings</span>
-        </Button>
-        <Button
-          variant="ghost"
-          className="w-full justify-start text-red-600 hover:bg-red-100 hover:text-red-700 rounded-xl font-bold"
-          onClick={() => {
-            disconnect();
-            setIsWalletConnected(false);
-            setWalletAddress(null);
-          }}
-        >
-          <LogOut className="mr-2 h-4 w-4" />
-          <span>Log Out</span>
-        </Button>
+        {isWalletEffectivelyConnected ? (
+          <>
+            <Button
+              variant="outline"
+              className="w-full justify-start border-2 border-black hover:bg-yellow/20 active:translate-y-1 active:shadow-none transition-all duration-100 rounded-xl font-bold"
+              style={{ boxShadow: '4px 4px 0px 0px #000000' }}
+            >
+              <Settings className="mr-2 h-4 w-4" />
+              <span>Settings</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full justify-start text-red-500 border-2 border-red-500 hover:bg-red-50 active:translate-y-1 active:shadow-none transition-all duration-100 rounded-xl font-bold"
+              style={{ boxShadow: '3px 3px 0px 0px #dc2626' }}
+              onClick={() => {
+                disconnect();
+                setIsWalletConnected(false);
+                setWalletAddress(null);
+              }}
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>Log Out</span>
+            </Button>
+          </>
+        ) : (
+          <div className="w-full">
+            <SignInWithBaseButton colorScheme="light" onClick={() => {}} />
+          </div>
+        )}
       </div>
     </aside>
   );

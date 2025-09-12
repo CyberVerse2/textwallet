@@ -28,10 +28,12 @@ interface SidebarTabsProps {
 }
 
 export default function Sidebar() {
+  const { isConnected } = useAccount();
+  const { disconnect } = useDisconnect();
   return (
     <div className="w-80 flex flex-col">
       <div
-        className="bg-white rounded-2xl overflow-hidden flex flex-col h-full"
+        className="bg-white rounded-2xl flex flex-col h-full"
         style={{ boxShadow: '8px 8px 0px 0px #000000' }}
       >
         <div className="p-6 border-b">
@@ -49,6 +51,34 @@ export default function Sidebar() {
         <div className="flex-1 overflow-auto">
           <SidebarTabs />
         </div>
+
+        <div className="p-6 border-t-2 border-black">
+          {isConnected ? (
+            <>
+              <Button
+                variant="outline"
+                className="w-full justify-start mb-2 border-2 border-black hover:bg-yellow/20 active:translate-y-px active:shadow-none transition-all duration-100 rounded-xl font-bold"
+                style={{ boxShadow: '3px 3px 0px 0px #000000' }}
+              >
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Settings</span>
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => disconnect()}
+                className="w-full justify-start text-red-500 border-2 border-red-500 hover:bg-red-50 active:translate-y-px active:shadow-none transition-all duration-100 rounded-xl font-bold"
+                style={{ boxShadow: '3px 3px 0px 0px #dc2626' }}
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Log Out</span>
+              </Button>
+            </>
+          ) : (
+            <div className="w-full">
+              <SignInWithBaseButton colorScheme="light" onClick={() => {}} />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -63,7 +93,7 @@ function SidebarTabs({}: SidebarTabsProps) {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [showAllTokens, setShowAllTokens] = useState(false);
 
-  const { address } = useAccount();
+  const { address, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
   const { connectors, connect, isPending } = useConnect();
   // Use optional chaining and memoization for stability
@@ -254,7 +284,7 @@ function SidebarTabs({}: SidebarTabsProps) {
       <div className="flex-1">
         <div className="p-6">
           {/* Wallet Connection Section */}
-          {walletAddress ? (
+          {isConnected ? (
             <div
               className="bg-muted rounded-xl p-4 mb-6 border-2 border-black"
               style={{ boxShadow: '4px 4px 0px 0px #000000' }}
@@ -264,15 +294,8 @@ function SidebarTabs({}: SidebarTabsProps) {
                 <div className="h-2 w-2 rounded-full bg-green-500"></div>
               </div>
               <div className="text-sm text-muted-foreground truncate">
-                {formatDisplayAddress(walletAddress)}
+                {formatDisplayAddress(walletAddress || '')}
               </div>
-            </div>
-          ) : address ? (
-            <div className="flex flex-col items-center p-4 mb-6 rounded-xl border-2 border-dashed border-muted-foreground text-center">
-              <WalletIcon className="h-8 w-8 mb-3 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground mb-3">
-                Connect your wallet via the main login/connect button to view assets.
-              </p>
             </div>
           ) : (
             <div className="flex flex-col items-center p-4 mb-6 rounded-xl border-2 border-dashed border-muted-foreground text-center">
@@ -381,7 +404,7 @@ function SidebarTabs({}: SidebarTabsProps) {
 
           {/* Settings & Disconnect */}
           <div className="pt-6 border-t-2 border-black mt-6">
-            {walletAddress ? (
+            {isConnected ? (
               <>
                 <Button
                   variant="outline"
