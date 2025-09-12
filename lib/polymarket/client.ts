@@ -32,7 +32,6 @@ export class PolymarketClient {
       cache: 'no-store'
     });
     if (!res.ok) {
-      // Graceful fallback for 422 (parameter mismatch) → relax filters, then try /markets
       if (res.status === 422) {
         try {
           const detail = await res.text();
@@ -48,20 +47,6 @@ export class PolymarketClient {
           headers: this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : undefined,
           cache: 'no-store'
         });
-        if (!res.ok && res.status === 422) {
-          // Final fallback: /markets with basic pagination
-          const marketsUrl = new URL(`${this.baseUrl}/markets`);
-          const limit = url.searchParams.get('limit') ?? '100';
-          const offset = url.searchParams.get('offset') ?? '0';
-          marketsUrl.searchParams.set('limit', limit);
-          marketsUrl.searchParams.set('offset', offset);
-          const closed = url.searchParams.get('closed');
-          if (closed !== null) marketsUrl.searchParams.set('closed', closed);
-          res = await fetch(marketsUrl, {
-            headers: this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : undefined,
-            cache: 'no-store'
-          });
-        }
       }
       if (!res.ok) {
         throw new Error(`Polymarket API error: ${res.status}`);
@@ -72,7 +57,7 @@ export class PolymarketClient {
     for (const ev of events) {
       const title: string = ev?.title ?? ev?.name ?? 'Untitled';
       const url: string | null = ev?.slug ? `https://polymarket.com/event/${ev.slug}` : null;
-      const volume24h = Number(ev?.volume24hr ?? ev?.volume24h ?? 0) || 0;
+      // event-level volume is not consistent; prefer market-level volumes below
       const endsAt: string | null = ev?.endDate ?? null;
       const markets: any[] = Array.isArray(ev?.markets) ? ev.markets : [];
       for (const m of markets) {
@@ -81,6 +66,8 @@ export class PolymarketClient {
         const lastPrice = this.num(m?.lastTradePrice);
         const liquidityNum = this.num(m?.liquidityNum);
         const liquidity = liquidityNum ?? this.num(m?.liquidity) ?? 0;
+        const marketVol =
+          this.num((m as any)?.volume24hr) ?? this.num(m?.volumeNum) ?? this.num(m?.volume) ?? 0;
         const normalizedMarket: NormalizedMarket = {
           id: String(m?.id ?? ev?.id),
           title: m?.question ?? title,
@@ -89,7 +76,7 @@ export class PolymarketClient {
           bestAsk,
           lastPrice,
           liquidity,
-          volume24h,
+          volume24h: marketVol,
           endsAt,
           score: 0
         };
