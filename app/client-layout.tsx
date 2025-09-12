@@ -64,6 +64,8 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
   const [isCopied, setIsCopied] = useState(false);
   // State for funding
   const [isFunding, setIsFunding] = useState(false);
+  // USDC balance state
+  const [usdcBalance, setUsdcBalance] = useState<string | null>(null);
   // Create a ref to the SidebarTabs component to access the refresh function
   const tabsRef = useRef<{ refreshBalances: () => void } | null>(null);
 
@@ -85,6 +87,38 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
     setIsWalletConnected(isConnected);
     setWalletAddress(isConnected ? address ?? null : null);
   }, [address, isConnected, setIsWalletConnected, setWalletAddress]);
+
+  // Fetch Base USDC balance when address changes
+  useEffect(() => {
+    let abort = false;
+    const fetchUsdc = async () => {
+      try {
+        if (!displayAddress) {
+          setUsdcBalance(null);
+          return;
+        }
+        const res = await fetch(`/api/usdc-balance?address=${displayAddress}`, {
+          cache: 'no-store'
+        });
+        if (!res.ok) throw new Error('usdc_balance_failed');
+        const json = await res.json();
+        if (abort) return;
+        const raw = BigInt(json.balance);
+        const decimals = Number(json.decimals ?? 6);
+        const formatted = (Number(raw) / 10 ** decimals).toLocaleString(undefined, {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        });
+        setUsdcBalance(`${formatted} USDC`);
+      } catch {
+        if (!abort) setUsdcBalance(null);
+      }
+    };
+    fetchUsdc();
+    return () => {
+      abort = true;
+    };
+  }, [displayAddress]);
 
   // Funding/export actions removed with Privy
   const handleFundWallet = async () => {};
@@ -143,6 +177,9 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
                   )}
                 </button>
               </div>
+            )}
+            {isWalletEffectivelyConnected && usdcBalance && (
+              <div className="text-xs text-black mt-1">Base USDC: {usdcBalance}</div>
             )}
             {/* Connect UI handled by pinned Base button at bottom */}
           </div>
