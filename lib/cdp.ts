@@ -1,4 +1,4 @@
-'use server';
+// CDP utilities used from API routes (server only)
 
 import { CdpClient } from '@coinbase/cdp-sdk';
 import { Address, createPublicClient, erc20Abi, http, parseUnits } from 'viem';
@@ -28,7 +28,7 @@ export async function getServerWalletAddress(): Promise<Address> {
     return process.env.CDP_SERVER_EVM_ADDRESS as Address;
   }
   const cdp = getCdpClient();
-  // Create a generic EVM account (address works across EVM chains)
+  // Create one EVM account if none set in env
   const account = await cdp.evm.createAccount();
   return account.address as Address;
 }
