@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAccount, useDisconnect, useConnect } from 'wagmi';
 import { SignInWithBaseButton } from '@base-org/account-ui/react';
+import { signInWithBase } from '@/lib/baseAuth';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import TokenList from './token-list';
@@ -64,7 +65,12 @@ export default function Sidebar() {
             </Button>
           ) : (
             <div className="w-full mb-2">
-              <SignInWithBaseButton colorScheme="light" />
+              <SignInWithBaseButton
+                colorScheme="light"
+                onClick={async () => {
+                  await signInWithBase();
+                }}
+              />
             </div>
           )}
           <Button

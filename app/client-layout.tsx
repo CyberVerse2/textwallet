@@ -21,6 +21,7 @@ import { shortenAddress } from '@/lib/utils'; // Import shortenAddress at the to
 import { EnrichedTokenBalance } from './token-list'; // Import the correct type
 import { useAccount, useDisconnect } from 'wagmi';
 import { SignInWithBaseButton } from '@base-org/account-ui/react';
+import { signInWithBase } from '@/lib/baseAuth';
 
 // Create a ref to hold the SidebarTabs component
 const sidebarRef = React.createRef<{ refreshBalances: () => void }>();
@@ -168,7 +169,15 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
           </>
         ) : (
           <div className="w-full">
-            <SignInWithBaseButton colorScheme="light" />
+            <SignInWithBaseButton
+              colorScheme="light"
+              onClick={async () => {
+                const result = await signInWithBase();
+                if (result) {
+                  // trigger state update if needed; Wagmi will reflect connection
+                }
+              }}
+            />
           </div>
         )}
         <Button
