@@ -849,7 +849,7 @@ export async function POST(req: Request) {
           description:
             'Ask the client to show a spend-permission confirmation UI with a weekly budget. Returns UI metadata for the client to render.',
           parameters: z.object({
-            budgetUSD: z.coerce.number().positive().default(100),
+            budgetUSD: z.coerce.number().positive(),
             periodDays: z.coerce.number().int().positive().default(7)
           }),
           execute: async ({ budgetUSD, periodDays }: { budgetUSD: number; periodDays: number }) => {
@@ -923,7 +923,7 @@ export async function POST(req: Request) {
             '- Market picking: Use get_top_markets heuristics. If results are too few, the tool may relax constraints once (evaluator retry).\n' +
             '- Research and thesis: Web search is currently disabled; focus on on-chain signals and market stats only.\n' +
             '- When a user asks for details about a market, summarize key stats and thesis without external citations.\n' +
-            '- Spend permissions & budget UX: If place_order or charge_budget returns permission_expired or insufficient_budget, do NOT proceed. Ask for confirmation to set a weekly budget and grant spend permissions. Use this exact prompt format so the client can render buttons: \n' +
+            '- Spend permissions & budget UX: If place_order or charge_budget returns permission_expired or insufficient_budget, do NOT proceed. First ask: “What weekly budget should I set?” After the user replies with a dollar amount, call request_spend_permission_prompt(budgetUSD) so the client can render Confirm/Reject.\n' +
             '[ACTION:REQUEST_SPEND_PERMISSION budgetUSD=<number> periodDays=7 token=BaseUSDC] Confirm | Reject' +
             '\n' +
             '- If the user replies Confirm with a dollar amount (e.g., $500), first call set_budget (amountCents), then instruct the client to request spend permission by emitting the exact line: \n' +
