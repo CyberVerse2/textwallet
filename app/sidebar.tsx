@@ -45,7 +45,7 @@ export default function Sidebar() {
           </div>
           <div className="mt-4">
             <OckWallet>
-              <ConnectWallet className="w-full">
+              <ConnectWallet className="w-full" disconnectedLabel="Log In">
                 <ConnectWalletText>Connect Wallet</ConnectWalletText>
               </ConnectWallet>
             </OckWallet>

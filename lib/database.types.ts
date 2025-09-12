@@ -14,6 +14,7 @@ export interface Database {
           id: string
           created_at: string
           privy_user_id: string
+          wallet_address: string | null
           email: string | null
           last_login: string | null
         }
@@ -21,6 +22,7 @@ export interface Database {
           id?: string
           created_at?: string
           privy_user_id: string
+          wallet_address?: string | null
           email?: string | null
           last_login?: string | null
         }
@@ -28,6 +30,7 @@ export interface Database {
           id?: string
           created_at?: string
           privy_user_id?: string
+          wallet_address?: string | null
           email?: string | null
           last_login?: string | null
         }
