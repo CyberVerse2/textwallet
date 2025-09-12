@@ -30,27 +30,22 @@ export async function getPolymarketClient() {
   const signer = new Wallet(privateKey);
   let creds: ApiKeyCreds;
   try {
+    // Prefer derive or createOrDerive as per Polymarket guidance
     creds = await new ClobClient(host, chainId, signer).createOrDeriveApiKey();
   } catch (e: any) {
     const msg = e?.message || String(e);
     console.error('🧩 Polymarket API key error', { signer: signer.address, message: msg });
     throw new Error('polymarket_api_key_failed');
   }
-  const signatureType = 0; // 0: EOA
-  if (
-    process.env.POLYMARKET_FUNDER_ADDRESS &&
-    process.env.POLYMARKET_FUNDER_ADDRESS !== signer.address
-  ) {
-    console.warn(
-      '⚠️ Ignoring POLYMARKET_FUNDER_ADDRESS; using signer as maker to avoid signature mismatch',
-      {
-        signer: signer.address,
-        envFunder: process.env.POLYMARKET_FUNDER_ADDRESS
-      }
-    );
-  }
-  const funder = signer.address; // ensure maker == signer to avoid mismatches
-  const client = new ClobClient(host, chainId, signer, creds, signatureType, funder);
+  // Signature type: 0 = EOA (browser wallets), 1 = Magic/email login
+  const signatureType = (() => {
+    const raw = process.env.POLYMARKET_SIGNATURE_TYPE;
+    const parsed = raw != null ? Number(raw) : 0;
+    return parsed === 1 ? 1 : 0;
+  })();
+  // Use configured funder if provided; otherwise default to signer
+  const funder = process.env.POLYMARKET_FUNDER_ADDRESS || signer.address;
+  const client = new ClobClient(host, chainId, signer, await creds, signatureType, funder);
   return { client, signerAddress: signer.address };
 }
 
