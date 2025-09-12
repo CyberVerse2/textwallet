@@ -895,14 +895,21 @@ export async function POST(req: Request) {
                 price,
                 size: amountUSD,
                 polymarket_order_id: String(
-                  (res.order as any)?.id || (res.order as any)?.orderId || ''
+                  (res.order as any)?.orderId ||
+                    (res.order as any)?.id ||
+                    (res.order as any)?.postResponse?.id ||
+                    ''
                 ),
                 status: 'posted'
               });
               try {
                 console.log('✅ postMarketOrder SUCCESS', {
                   userId: normalizedUserId,
-                  orderId: (res.order as any)?.id || (res.order as any)?.orderId || ''
+                  orderId:
+                    (res.order as any)?.orderId ||
+                    (res.order as any)?.id ||
+                    (res.order as any)?.postResponse?.id ||
+                    ''
                 });
               } catch {}
               return { ok: true, order: res.order };

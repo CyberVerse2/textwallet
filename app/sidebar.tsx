@@ -89,7 +89,7 @@ export default function Sidebar() {
 }
 
 function SidebarTabs({}: SidebarTabsProps) {
-  const [activeTab, setActiveTab] = useState('assets');
+  const [activeTab, setActiveTab] = useState('positions');
   const [erc20TokenData, setErc20TokenData] = useState<EnrichedTokenBalance[]>([]);
   const [nativeTokenData, setNativeTokenData] = useState<NativeBalance[]>([]);
   const [totalValue, setTotalValue] = useState<number | null>(null);
@@ -261,17 +261,17 @@ function SidebarTabs({}: SidebarTabsProps) {
         className="bg-muted rounded-xl p-1 mb-6 border-2 border-black flex space-x-1"
         style={{ boxShadow: '4px 4px 0px 0px #000000' }}
       >
-        {/* Assets Button */}
+        {/* Positions Button */}
         <button
           className={`flex-1 py-2 px-3 rounded-lg font-bold text-center transition-all duration-150 flex items-center justify-center gap-2 ${
-            activeTab === 'assets'
+            activeTab === 'positions'
               ? 'bg-blue text-black shadow-inner-sm' // Active state
               : 'text-muted-foreground hover:bg-black/5 active:bg-black/10' // Inactive state
           }`}
-          onClick={() => setActiveTab('assets')}
+          onClick={() => setActiveTab('positions')}
         >
-          <WalletIcon className="h-5 w-5" />
-          <span>Assets</span>
+          <BarChart2 className="h-5 w-5" />
+          <span>Positions</span>
         </button>
 
         {/* Activity Button */}
@@ -314,88 +314,13 @@ function SidebarTabs({}: SidebarTabsProps) {
           )}
 
           {/* Tab Content */}
-          {activeTab === 'assets' ? (
+          {activeTab === 'positions' ? (
             <div className="flex flex-col h-full">
-              {/* Assets Section Header */}
+              {/* Positions Section Header */}
               <div className="mb-6">
-                <h3 className="font-bold text-2xl mb-4">Assets</h3>
-
-                {/* ETH Token Card */}
-                {nativeTokenData.length > 0 ? (
-                  <div className="mb-4">
-                    <div
-                      className="flex items-center justify-between p-4 rounded-xl border-2 border-black mb-3"
-                      style={{ boxShadow: '4px 4px 0px 0px #000000' }}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center">
-                          <div className="h-6 w-6 rounded-full bg-white flex items-center justify-center">
-                            <div className="w-4 h-1 bg-blue-500"></div>
-                          </div>
-                        </div>
-                        <div>
-                          <div className="font-bold">
-                            ETH <span className="text-gray-500 font-normal">(Base)</span>
-                          </div>
-                          <div className="text-gray-500 text-sm">Native Balance</div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-bold">
-                          {parseFloat(nativeTokenData[0]?.formattedBalance || '0').toFixed(3)}
-                        </div>
-                        <div className="text-gray-500 text-sm">
-                          ${parseFloat(nativeTokenData[0]?.usdValue?.toFixed(2) || '0')}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : isLoadingTokens ? (
-                  <div className="mb-4">
-                    <div
-                      className="flex items-center justify-between p-4 rounded-xl border-2 border-black mb-3 animate-pulse"
-                      style={{ boxShadow: '4px 4px 0px 0px #000000' }}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-gray-200"></div>
-                        <div>
-                          <div className="h-4 w-24 bg-gray-200 rounded mb-2"></div>
-                          <div className="h-3 w-20 bg-gray-200 rounded"></div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="h-4 w-16 bg-gray-200 rounded mb-2"></div>
-                        <div className="h-3 w-12 bg-gray-200 rounded"></div>
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-
-                {/* Show Small Balances Button */}
-                <button
-                  onClick={() => setShowAllTokens(!showAllTokens)}
-                  className="w-full flex items-center justify-between p-3 rounded-xl border-2 border-black bg-yellow text-black font-bold"
-                  style={{ boxShadow: '4px 4px 0px 0px #000000' }}
-                >
-                  <span>Show Small Balances</span>
-                  <ChevronDown className="h-5 w-5" />
-                </button>
+                <h3 className="font-bold text-2xl mb-4">Positions</h3>
+                <NvidiaPositionCard />
               </div>
-
-              {/* Separator Line */}
-              <div className="border-b-2 border-black mb-6"></div>
-
-              {/* NFTs Section */}
-              <button
-                className="w-full flex items-center justify-between p-3 rounded-xl border-2 border-black text-black font-bold"
-                style={{ boxShadow: '4px 4px 0px 0px #000000' }}
-              >
-                <div className="flex items-center gap-2">
-                  <ImageIcon className="h-5 w-5" />
-                  <span>NFTs</span>
-                </div>
-                <ChevronDown className="h-5 w-5" />
-              </button>
             </div>
           ) : (
             <div>
@@ -445,5 +370,94 @@ function SidebarTabs({}: SidebarTabsProps) {
         </div>
       </div>
     </>
+  );
+}
+
+function NvidiaPositionCard() {
+  const { address } = useAccount();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pos, setPos] = useState<{
+    title: string;
+    url?: string;
+    yesSize: number;
+    noSize: number;
+  } | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const run = async () => {
+      if (!address) return;
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(`/api/positions?userId=${address}`);
+        const json = await res.json();
+        if (!isMounted) return;
+        const p = Array.isArray(json?.positions) ? json.positions[0] : null;
+        setPos(
+          p ? { title: p.title, url: p.url, yesSize: p.yesSize || 0, noSize: p.noSize || 0 } : null
+        );
+      } catch (e: any) {
+        if (!isMounted) return;
+        setError(e?.message || 'failed');
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+    run();
+    return () => {
+      isMounted = false;
+    };
+  }, [address]);
+
+  if (!address) return null;
+  if (loading)
+    return (
+      <div
+        className="p-4 rounded-xl border-2 border-black animate-pulse"
+        style={{ boxShadow: '4px 4px 0px 0px #000000' }}
+      >
+        Loading position…
+      </div>
+    );
+  if (error)
+    return (
+      <div
+        className="p-4 rounded-xl border-2 border-black bg-red-50"
+        style={{ boxShadow: '4px 4px 0px 0px #000000' }}
+      >
+        Failed to load position
+      </div>
+    );
+  if (!pos)
+    return (
+      <div
+        className="p-4 rounded-xl border-2 border-black"
+        style={{ boxShadow: '4px 4px 0px 0px #000000' }}
+      >
+        No NVIDIA position yet.
+      </div>
+    );
+
+  return (
+    <div
+      className="p-4 rounded-xl border-2 border-black"
+      style={{ boxShadow: '4px 4px 0px 0px #000000' }}
+    >
+      <div className="flex items-center justify-between mb-2">
+        <a href={pos.url} target="_blank" rel="noreferrer" className="font-bold underline">
+          {pos.title}
+        </a>
+      </div>
+      <div className="flex items-center justify-between">
+        <div className="text-sm">YES size</div>
+        <div className="font-bold">${pos.yesSize.toFixed(2)}</div>
+      </div>
+      <div className="flex items-center justify-between mt-1">
+        <div className="text-sm">NO size</div>
+        <div className="font-bold">${pos.noSize.toFixed(2)}</div>
+      </div>
+    </div>
   );
 }

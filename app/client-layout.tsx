@@ -212,7 +212,7 @@ const SidebarTabs = forwardRef<
     walletAddress: string | null;
   }
 >(function SidebarTabs({ isWalletConnected, walletAddress }, ref) {
-  const [activeTab, setActiveTab] = useState<'tokens' | 'activity'>('tokens');
+  const [activeTab, setActiveTab] = useState<'positions' | 'activity'>('positions');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Function to refresh balances
@@ -231,20 +231,20 @@ const SidebarTabs = forwardRef<
       <div className="flex mb-6 p-1 border-2 border-black rounded-xl">
         <button
           className={`flex-1 py-2 px-4 rounded-lg font-bold transition-all duration-150 flex items-center justify-center gap-2 ${
-            activeTab === 'tokens'
-              ? 'bg-yellow text-black border-2 border-black'
-              : 'text-black hover:bg-yellow/50 active:translate-y-px'
+            activeTab === 'positions'
+              ? 'bg-blue text-black border-2 border-black'
+              : 'text-black hover:bg-blue/50 active:translate-y-px'
           }`}
-          style={activeTab === 'tokens' ? { boxShadow: '2px 2px 0px 0px #000000' } : {}}
-          onClick={() => setActiveTab('tokens')}
+          style={activeTab === 'positions' ? { boxShadow: '2px 2px 0px 0px #000000' } : {}}
+          onClick={() => setActiveTab('positions')}
         >
-          <Wallet className="h-4 w-4" /> Tokens
+          <BarChart2 className="h-4 w-4" /> Positions
         </button>
         <button
           className={`flex-1 py-2 px-4 rounded-lg font-bold transition-all duration-150 flex items-center justify-center gap-2 ${
             activeTab === 'activity'
-              ? 'bg-yellow text-black border-2 border-black'
-              : 'text-black hover:bg-yellow/50 active:translate-y-px'
+              ? 'bg-blue text-black border-2 border-black'
+              : 'text-black hover:bg-blue/50 active:translate-y-px'
           }`}
           style={activeTab === 'activity' ? { boxShadow: '2px 2px 0px 0px #000000' } : {}}
           onClick={() => setActiveTab('activity')}
@@ -255,8 +255,8 @@ const SidebarTabs = forwardRef<
 
       {/* Tab Content */}
       <div className="space-y-6">
-        {activeTab === 'tokens' && (
-          <AssetsSection isWalletConnected={isWalletConnected} walletAddress={walletAddress} />
+        {activeTab === 'positions' && (
+          <PositionsSection isWalletConnected={isWalletConnected} walletAddress={walletAddress} />
         )}
         {activeTab === 'activity' && (
           <ActivityList walletAddress={walletAddress} refreshTrigger={refreshTrigger} />
@@ -267,7 +267,7 @@ const SidebarTabs = forwardRef<
 });
 
 // --- AssetsSection ---
-function AssetsSection({
+function PositionsSection({
   isWalletConnected,
   walletAddress
 }: {
@@ -359,50 +359,9 @@ function AssetsSection({
     <div className="space-y-6">
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-bold text-lg">Assets</h3>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 w-8 p-0 hover:bg-yellow/20 active:translate-y-1 active:shadow-none transition-all duration-100 border-2 border-black rounded-lg"
-            style={{ boxShadow: '2px 2px 0px 0px #000000' }}
-          >
-            <BarChart2 className="h-4 w-4" />
-          </Button>
+          <h3 className="font-bold text-lg">Positions</h3>
         </div>
-        {/* Pass the state down to TokenList */}
-        <TokenList tokens={tokens} isLoading={isLoading} showSmallBalances={showSmallBalances} />
-        {/* Display error message if fetch fails */}
-        {error && <p className="text-sm text-red-600 text-center mt-2">Error: {error}</p>}
-        {isWalletConnected &&
-          !isLoading &&
-          tokens.length > 0 &&
-          hasSmallBalances && ( // Show button only if there are small balances
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full justify-start mt-4 border-2 border-black hover:bg-yellow/20 active:translate-y-1 active:shadow-none transition-all duration-100 rounded-xl font-bold"
-              style={{ boxShadow: '4px 4px 0px 0px #000000' }}
-              onClick={() => setShowSmallBalances(!showSmallBalances)}
-            >
-              <span>{showSmallBalances ? 'Hide Small Balances' : 'Show Small Balances'}</span>
-              <ChevronDown
-                className={`ml-auto h-4 w-4 transition-transform ${
-                  showSmallBalances ? 'rotate-180' : ''
-                }`}
-              />
-            </Button>
-          )}
-      </div>
-      <div className="pt-4 border-t-2 border-black">
-        <Button
-          variant="outline"
-          className="w-full justify-start border-2 border-black hover:bg-yellow/20 active:translate-y-1 active:shadow-none transition-all duration-100 rounded-xl font-bold"
-          style={{ boxShadow: '4px 4px 0px 0px #000000' }}
-        >
-          <Image className="mr-2 h-4 w-4" />
-          <span>NFTs</span>
-          <ChevronDown className="ml-auto h-4 w-4" />
-        </Button>
+        <PositionsCard walletAddress={walletAddress} />
       </div>
     </div>
   );

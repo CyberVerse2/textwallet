@@ -92,7 +92,16 @@ export async function postMarketOrder(params: PostMarketOrderParams): Promise<Po
     });
     try {
       const resp = await client.postOrder(order, OrderType.FOK);
-      return { ok: true, order: resp };
+      const extractedId =
+        (resp as any)?.orderId ||
+        (resp as any)?.id ||
+        (resp as any)?.data?.orderId ||
+        (resp as any)?.data?.id ||
+        (order as any)?.orderId ||
+        (order as any)?.id ||
+        '';
+      const normalized = { ...order, postResponse: resp, id: extractedId, orderId: extractedId };
+      return { ok: true, order: normalized };
     } catch (e: any) {
       console.error('🧩 Polymarket postOrder error', { message: e?.message });
       return { ok: false, error: e?.message || String(e) };
