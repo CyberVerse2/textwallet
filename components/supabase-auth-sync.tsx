@@ -37,7 +37,7 @@ export const SupabaseAuthSyncProvider = ({ children }: { children: ReactNode }) 
 
       try {
         // 1. Sign a static message
-        const message = 'Sign this message to verify your address for Text Wallet.';
+        const message = 'Sign this message to verify your address for PolyAgent.';
         const signature = await signMessageAsync({ message });
         if (!signature) {
           throw new Error('Signature was not obtained.');

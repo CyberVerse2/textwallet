@@ -5,7 +5,7 @@ import './globals.css';
 import '@coinbase/onchainkit/styles.css';
 
 export const metadata = {
-  title: 'Text Wallet',
+  title: 'PolyAgent',
   description: 'Your conversational DeFi assistant',
   generator: 'v0.dev'
 };

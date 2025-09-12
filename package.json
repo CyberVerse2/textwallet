@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@ethersproject/wallet": "^5.7.0",
     "@ai-sdk/anthropic": "^1.2.10",
     "@anthropic-ai/sdk": "^0.39.0",
     "@base-org/account": "^2.2.0",

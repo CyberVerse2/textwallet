@@ -105,7 +105,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
       // 3) Request spend permission via Base Account SDK (client only)
       const { createBaseAccountSDK } = await import('@base-org/account');
       const { requestSpendPermission } = await import('@base-org/account/spend-permission');
-      const sdk = createBaseAccountSDK({ appName: 'Text Wallet' });
+      const sdk = createBaseAccountSDK({ appName: 'PolyAgent' });
       const allowance = BigInt(Math.round(budgetUSD * 1_000_000));
       const permission: any = await requestSpendPermission({
         account: walletAddress,

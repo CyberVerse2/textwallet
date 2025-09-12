@@ -13,7 +13,7 @@ export interface SpendPermissionInput {
 }
 
 export async function requestAndStoreSpendPermission(userId: string, input: SpendPermissionInput) {
-  const sdk = createBaseAccountSDK({ appName: 'Text Wallet', appChainIds: [base.id] });
+  const sdk = createBaseAccountSDK({ appName: 'PolyAgent', appChainIds: [base.id] });
   const { requestSpendPermission } = await import('@base-org/account/spend-permission');
   const permission = await requestSpendPermission({
     account: input.account,

@@ -5,7 +5,7 @@ import { createBaseAccountSDK } from '@base-org/account';
 export async function signInWithBase(): Promise<{ address: string } | null> {
   try {
     // Provide required app metadata to the SDK (prevents undefined appName error)
-    const provider = createBaseAccountSDK({ appName: 'Text Wallet' }).getProvider();
+    const provider = createBaseAccountSDK({ appName: 'PolyAgent' }).getProvider();
     const nonce = (
       globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2)
     ).replace(/-/g, '');

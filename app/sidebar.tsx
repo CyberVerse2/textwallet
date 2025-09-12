@@ -45,7 +45,7 @@ export default function Sidebar() {
             >
               *
             </div>
-            <span className="font-bold text-xl">Text Wallet</span>
+            <span className="font-bold text-xl">PolyAgent</span>
           </div>
         </div>
 
