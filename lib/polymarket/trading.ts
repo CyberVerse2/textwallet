@@ -28,10 +28,29 @@ export async function getPolymarketClient() {
   const privateKey = process.env.POLYMARKET_TRADER_PRIVATE_KEY;
   if (!privateKey) throw new Error('Missing POLYMARKET_TRADER_PRIVATE_KEY');
   const signer = new Wallet(privateKey);
-  const creds: Promise<ApiKeyCreds> = new ClobClient(host, chainId, signer).createOrDeriveApiKey();
+  let creds: ApiKeyCreds;
+  try {
+    creds = await new ClobClient(host, chainId, signer).createOrDeriveApiKey();
+  } catch (e: any) {
+    const msg = e?.message || String(e);
+    console.error('🧩 Polymarket API key error', { signer: signer.address, message: msg });
+    throw new Error('polymarket_api_key_failed');
+  }
   const signatureType = 0; // 0: EOA
-  const funder = process.env.POLYMARKET_FUNDER_ADDRESS || signer.address;
-  const client = new ClobClient(host, chainId, signer, await creds, signatureType, funder);
+  if (
+    process.env.POLYMARKET_FUNDER_ADDRESS &&
+    process.env.POLYMARKET_FUNDER_ADDRESS !== signer.address
+  ) {
+    console.warn(
+      '⚠️ Ignoring POLYMARKET_FUNDER_ADDRESS; using signer as maker to avoid signature mismatch',
+      {
+        signer: signer.address,
+        envFunder: process.env.POLYMARKET_FUNDER_ADDRESS
+      }
+    );
+  }
+  const funder = signer.address; // ensure maker == signer to avoid mismatches
+  const client = new ClobClient(host, chainId, signer, creds, signatureType, funder);
   return { client, signerAddress: signer.address };
 }
 
@@ -51,6 +70,39 @@ export async function postOrder(params: PostOrderParams): Promise<PostOrderResul
       (params.timeInForce as any) ?? OrderType.GTC
     );
     return { ok: true, order };
+  } catch (e: any) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+}
+
+export interface PostMarketOrderParams {
+  tokenID: string;
+  side: 'buy' | 'sell' | 'YES' | 'NO' | 'yes' | 'no';
+  amountUSD: number; // dollar notionals
+  feeRateBps?: number;
+  price?: number; // optional hint
+  nonce?: number;
+}
+
+export async function postMarketOrder(params: PostMarketOrderParams): Promise<PostOrderResult> {
+  try {
+    const { client } = await getPolymarketClient();
+    const side = normalizeSide(params.side);
+    const order = await client.createMarketOrder({
+      side,
+      tokenID: params.tokenID,
+      amount: params.amountUSD,
+      feeRateBps: params.feeRateBps ?? 0,
+      nonce: params.nonce ?? 0,
+      price: params.price ?? 0.5
+    });
+    try {
+      const resp = await client.postOrder(order, OrderType.FOK);
+      return { ok: true, order: resp };
+    } catch (e: any) {
+      console.error('🧩 Polymarket postOrder error', { message: e?.message });
+      return { ok: false, error: e?.message || String(e) };
+    }
   } catch (e: any) {
     return { ok: false, error: e?.message || String(e) };
   }

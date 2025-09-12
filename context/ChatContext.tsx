@@ -11,7 +11,7 @@ import React, {
 } from 'react';
 import { useAccount } from 'wagmi';
 import { supabase } from '@/lib/supabaseClient'; // Corrected import path
-import { Message as SdkMessage, useChat, UseChatHelpers } from '@ai-sdk/react'; // Renamed import
+import { Message as SdkMessage, useChat, UseChatHelpers } from 'ai/react';
 
 // Define the structure matching the chat_history table
 interface DbMessage {

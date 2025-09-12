@@ -13,6 +13,7 @@ import { getPolymarketClient } from '@/lib/polymarket/client';
 // Zora custom actions removed
 import supabaseAdmin from '@/lib/supabaseAdmin';
 import { getServerWalletAddress, getUsdcAddress } from '@/lib/cdp';
+import { spendFromPermission } from '@/lib/base/spend';
 // import { zora } from 'viem/chains';
 
 // ---------- Local scoring helpers (adapted from events strategy) ----------
@@ -557,6 +558,16 @@ export async function POST(req: Request) {
                         return [];
                       }
                     };
+                    const outcomes = parseStrs(m.outcomes);
+                    const clobTokenIds = parseStrs(m.clobTokenIds);
+                    // Map outcome token IDs for convenience
+                    let yesToken: string | undefined;
+                    let noToken: string | undefined;
+                    for (let i = 0; i < outcomes.length; i++) {
+                      const label = String(outcomes[i] || '').toLowerCase();
+                      if (label === 'yes') yesToken = clobTokenIds[i];
+                      if (label === 'no') noToken = clobTokenIds[i];
+                    }
                     details = {
                       event: {
                         id: ev?.id,
@@ -576,8 +587,10 @@ export async function POST(req: Request) {
                         liquidity: m.liquidity ?? null,
                         volumeNum: m.volumeNum ?? null,
                         volume24hr: m.volume24hr ?? null,
-                        outcomes: parseStrs(m.outcomes),
+                        outcomes,
                         outcomePrices: parseNums(m.outcomePrices),
+                        clobTokenIds,
+                        tokenIds: { yes: yesToken, no: noToken },
                         endDate: m.endDate,
                         startDate: m.startDate,
                         marketMakerAddress: m.marketMakerAddress ?? null,
@@ -736,7 +749,8 @@ export async function POST(req: Request) {
           }),
           execute: async ({ tokenID, side, price, size, tickSize, negRisk, feeRateBps }: any) => {
             if (!normalizedUserId) return { error: 'missing_user' };
-            const costCents = Math.round(size * price * 100);
+            const amountUSD = size * price;
+            const costCents = Math.round(amountUSD * 100);
             try {
               console.log('🛒 place_order START', {
                 userId: normalizedUserId,
@@ -747,6 +761,7 @@ export async function POST(req: Request) {
                 tickSize,
                 negRisk,
                 feeRateBps,
+                amountUSD,
                 costCents
               });
             } catch {}
@@ -803,16 +818,15 @@ export async function POST(req: Request) {
               });
             } catch {}
 
-            // Pull Base USDC via spend permission
+            // Pull Base USDC via spend permission (amount is dollar notional)
             try {
-              const usdcUnits = BigInt(Math.round(size * price * 1_000_000));
+              const usdcUnits = BigInt(Math.round(amountUSD * 1_000_000));
               try {
                 console.log('🔐 spendFromPermission ATTEMPT', {
                   userId: normalizedUserId,
                   usdc_units: usdcUnits.toString()
                 });
               } catch {}
-              const { spendFromPermission } = await import('@/lib/base/spend');
               const spend = await spendFromPermission(normalizedUserId, usdcUnits);
               if (!spend.ok) throw new Error(spend.error || 'spend_failed');
               try {
@@ -836,28 +850,24 @@ export async function POST(req: Request) {
               return { error: e?.message || 'spend_failed' };
             }
 
-            // Post the Polymarket order
+            // Post a Polymarket MARKET order (FOK) using the dollar amount
             try {
               try {
-                console.log('📤 postOrder ATTEMPT', {
+                console.log('📤 postMarketOrder ATTEMPT', {
                   tokenID,
                   side,
-                  price,
-                  size,
-                  tickSize,
-                  negRisk,
-                  feeRateBps
+                  amountUSD,
+                  feeRateBps,
+                  priceHint: price
                 });
               } catch {}
-              const { postOrder } = await import('@/lib/polymarket/trading');
-              const res = await postOrder({
+              const { postMarketOrder } = await import('@/lib/polymarket/trading');
+              const res = await postMarketOrder({
                 tokenID,
-                price,
                 side,
-                size,
+                amountUSD,
                 feeRateBps,
-                tickSize,
-                negRisk
+                price: price
               });
               if (!res.ok) throw new Error(res.error || 'order_failed');
               await supabaseAdmin.from('orders').insert({
@@ -865,27 +875,135 @@ export async function POST(req: Request) {
                 market_id: tokenID,
                 side,
                 price,
-                size,
+                size: amountUSD,
                 polymarket_order_id: String(
-                  (res.order as any)?.orderId || (res.order as any)?.id || ''
+                  (res.order as any)?.id || (res.order as any)?.orderId || ''
                 ),
                 status: 'posted'
               });
               try {
-                console.log('✅ postOrder SUCCESS', {
+                console.log('✅ postMarketOrder SUCCESS', {
                   userId: normalizedUserId,
-                  orderId: (res.order as any)?.orderId || (res.order as any)?.id || ''
+                  orderId: (res.order as any)?.id || (res.order as any)?.orderId || ''
                 });
               } catch {}
               return { ok: true, order: res.order };
             } catch (e: any) {
               try {
-                console.error('❌ postOrder ERROR', {
+                console.error('❌ postMarketOrder ERROR', {
                   userId: normalizedUserId,
                   message: e?.message,
                   stack: e?.stack
                 });
               } catch {}
+              return { error: e?.message || 'order_failed' };
+            }
+          }
+        }),
+        place_market_order: tool({
+          description:
+            'Place a Polymarket market order (FOK) with JIT escrow: charge budget in USD, pull Base USDC, then post market order using amountUSD.',
+          parameters: z.object({
+            tokenID: z.string(),
+            side: z.enum(['yes', 'no']),
+            amountUSD: z.coerce.number().positive(),
+            feeRateBps: z.coerce.number().int().min(0).max(1000).default(0),
+            priceHint: z.coerce.number().min(0).max(1).optional()
+          }),
+          execute: async ({ tokenID, side, amountUSD, feeRateBps, priceHint }: any) => {
+            if (!normalizedUserId) return { error: 'missing_user' };
+            const amountCents = Math.round(amountUSD * 100);
+            try {
+              console.log('🛒 place_market_order START', {
+                userId: normalizedUserId,
+                tokenID,
+                side,
+                amountUSD,
+                feeRateBps,
+                priceHint
+              });
+            } catch {}
+            // Check permission and budget
+            const { data: b, error: bErr } = await supabaseAdmin
+              .from('budgets')
+              .select('remaining_cents, permission_expires_at')
+              .eq('user_id', normalizedUserId)
+              .maybeSingle();
+            if (bErr) return { error: bErr.message };
+            const remaining = b?.remaining_cents ?? 0;
+            const exp = b?.permission_expires_at ? Date.parse(b.permission_expires_at) : null;
+            if (!exp || Date.now() > exp) return { error: 'permission_expired' };
+            if (remaining < amountCents) return { error: 'insufficient_budget' };
+            // Deduct budget
+            const nowIso = new Date().toISOString();
+            const { error: updErr } = await supabaseAdmin
+              .from('budgets')
+              .update({ remaining_cents: remaining - amountCents, updated_at: nowIso })
+              .eq('user_id', normalizedUserId);
+            if (updErr) return { error: updErr.message };
+            try {
+              console.log('✅ budget_deducted_market', {
+                userId: normalizedUserId,
+                before_cents: remaining,
+                after_cents: remaining - amountCents
+              });
+            } catch {}
+
+            // Pull Base USDC via spend permission
+            try {
+              const usdcUnits = BigInt(Math.round(amountUSD * 1_000_000));
+              try {
+                console.log('🔐 spendFromPermission ATTEMPT (market)', {
+                  userId: normalizedUserId,
+                  usdc_units: usdcUnits.toString()
+                });
+              } catch {}
+              const { spendFromPermission } = await import('@/lib/base/spend');
+              const spend = await spendFromPermission(normalizedUserId, usdcUnits);
+              if (!spend.ok) throw new Error(spend.error || 'spend_failed');
+              try {
+                console.log('🔐 spendFromPermission SUCCESS (market)', {
+                  userId: normalizedUserId,
+                  result: { ok: spend.ok }
+                });
+              } catch {}
+            } catch (e: any) {
+              try {
+                console.error('❌ spendFromPermission ERROR (market)', {
+                  userId: normalizedUserId,
+                  message: e?.message,
+                  stack: e?.stack
+                });
+              } catch {}
+              await supabaseAdmin
+                .from('budgets')
+                .update({ remaining_cents: remaining, updated_at: nowIso })
+                .eq('user_id', normalizedUserId);
+              return { error: e?.message || 'spend_failed' };
+            }
+
+            // Post the market order FOK
+            try {
+              const { postMarketOrder } = await import('@/lib/polymarket/trading');
+              const res = await postMarketOrder({
+                tokenID,
+                side,
+                amountUSD,
+                feeRateBps,
+                price: priceHint
+              });
+              if (!res.ok) throw new Error(res.error || 'order_failed');
+              await supabaseAdmin.from('orders').insert({
+                user_id: normalizedUserId,
+                market_id: tokenID,
+                side,
+                price: priceHint ?? null,
+                size: amountUSD,
+                polymarket_order_id: String((res.order as any)?.id || ''),
+                status: 'posted'
+              });
+              return { ok: true, order: res.order };
+            } catch (e: any) {
               return { error: e?.message || 'order_failed' };
             }
           }
@@ -974,6 +1092,7 @@ export async function POST(req: Request) {
             '- If the user replies Confirm with a dollar amount (e.g., $500), first call set_budget (amountCents), then instruct the client to request spend permission by emitting the exact line: \n' +
             '[ACTION:TRIGGER_SPEND_PERMISSION]' +
             '\n' +
+            '- Token IDs: When preparing a trade, derive tokenID from the event market’s clobTokenIds. Use tokenIds.yes for side=yes, tokenIds.no for side=no. If missing, fetch the single event by slug and parse outcomes/clobTokenIds.\n' +
             '- After the client completes spend permission (they will re-try or say done), retry the pending order once.\n' +
             '- Safety: Do not claim to place trades. If asked to trade, ask for budget/limits and, if needed, call propose_trade_intent to structure the plan.\n' +
             '- Style: Be concise, numbers first, then brief rationale.',
