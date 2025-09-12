@@ -9,6 +9,9 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@coinbase/cdp-sdk": "^0.3.3",
+    "@polymarket/clob-client": "^1.17.0",
+    "ethers": "^5.7.2",
     "@ai-sdk/anthropic": "^1.2.10",
     "@anthropic-ai/sdk": "^0.39.0",
     "@base-org/account": "^2.2.0",
