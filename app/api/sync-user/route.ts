@@ -10,27 +10,46 @@ export async function POST(req: NextRequest) {
 
     const normalized = address.toLowerCase();
 
-    // Upsert user by wallet_address; if column not present yet, this will fail
-    const { data, error } = await supabaseAdmin
+    // Ensure user exists first to satisfy FK constraints
+    const { data: existing, error: fetchError } = await supabaseAdmin
       .from('users')
-      .upsert(
-        {
-          // Keep privy_user_id null when migrating; schema currently requires NOT NULL, so we only update last_login if record exists
-          // Once migration adds wallet_address, we will set it here and remove privy dependency
-          last_login: new Date().toISOString(),
-          // @ts-ignore - will rely on DB migration to add wallet_address
-          wallet_address: normalized
-        },
-        { onConflict: 'wallet_address' as any }
-      )
-      .select('*')
-      .single();
+      .select('wallet_address')
+      .eq('wallet_address', normalized)
+      .maybeSingle();
 
-    if (error) {
-      return NextResponse.json({ message: 'Upsert failed', error: error.message }, { status: 500 });
+    if (fetchError) {
+      return NextResponse.json(
+        { message: 'Lookup failed', error: fetchError.message },
+        { status: 500 }
+      );
     }
 
-    return NextResponse.json({ message: 'User synced', user: data }, { status: 200 });
+    if (!existing) {
+      const { error: insertError } = await supabaseAdmin.from('users').insert({
+        wallet_address: normalized,
+        email: null,
+        last_login: new Date().toISOString()
+      });
+      if (insertError) {
+        return NextResponse.json(
+          { message: 'Insert failed', error: insertError.message },
+          { status: 500 }
+        );
+      }
+    } else {
+      const { error: updateError } = await supabaseAdmin
+        .from('users')
+        .update({ last_login: new Date().toISOString() })
+        .eq('wallet_address', normalized);
+      if (updateError) {
+        return NextResponse.json(
+          { message: 'Update failed', error: updateError.message },
+          { status: 500 }
+        );
+      }
+    }
+
+    return NextResponse.json({ message: 'User synced', address: normalized }, { status: 200 });
   } catch (error) {
     return NextResponse.json({ message: 'Sync failed' }, { status: 500 });
   }

@@ -54,7 +54,8 @@ interface SidebarProps {
 // Create a forwardRef component for Sidebar to properly handle refs
 const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar(props, ref) {
   // Use Chat context setters and Wagmi account
-  const { setIsWalletConnected, setWalletAddress } = useChatContext();
+  const { isWalletConnected, walletAddress, setIsWalletConnected, setWalletAddress } =
+    useChatContext();
   const { address, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
 
@@ -75,8 +76,8 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
   }));
 
   // Derived state for UI
-  const isWalletEffectivelyConnected = isConnected;
-  const displayAddress = isConnected ? address ?? null : null;
+  const isWalletEffectivelyConnected = isConnected || isWalletConnected;
+  const displayAddress = isConnected ? address ?? null : walletAddress;
 
   // Update context based on Wagmi state
   useEffect(() => {
@@ -174,25 +175,28 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
               onClick={async () => {
                 const result = await signInWithBase();
                 if (result) {
-                  // trigger state update if needed; Wagmi will reflect connection
+                  setIsWalletConnected(true);
+                  setWalletAddress(result.address);
                 }
               }}
             />
           </div>
         )}
-        <Button
-          variant="outline"
-          className="w-full justify-start text-red-500 border-2 border-red-500 hover:bg-red-50 active:translate-y-1 active:shadow-none transition-all duration-100 rounded-xl font-bold"
-          style={{ boxShadow: '3px 3px 0px 0px #dc2626' }}
-          onClick={() => {
-            disconnect();
-            setIsWalletConnected(false);
-            setWalletAddress(null);
-          }}
-        >
-          <LogOut className="mr-2 h-4 w-4" />
-          <span>Log Out</span>
-        </Button>
+        {isWalletEffectivelyConnected && (
+          <Button
+            variant="outline"
+            className="w-full justify-start text-red-500 border-2 border-red-500 hover:bg-red-50 active:translate-y-1 active:shadow-none transition-all duration-100 rounded-xl font-bold"
+            style={{ boxShadow: '3px 3px 0px 0px #dc2626' }}
+            onClick={() => {
+              disconnect();
+              setIsWalletConnected(false);
+              setWalletAddress(null);
+            }}
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            <span>Log Out</span>
+          </Button>
+        )}
       </div>
     </aside>
   );

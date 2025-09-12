@@ -59,6 +59,8 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   }, [address]);
 
   // Initialize Vercel AI Chat with proper naming
+  const effectiveUserId = address || walletAddress || undefined;
+
   const {
     messages,
     input,
@@ -73,10 +75,10 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     append
   } = useChat({
     api: '/api/chat', // Your backend endpoint
-    id: address ? `chat_${address}` : undefined, // Unique ID for the chat session
+    id: effectiveUserId ? `chat_${effectiveUserId.toLowerCase()}` : undefined, // Unique ID for the chat session
     body: {
-      userId: address, // Use connected wallet address
-      walletId: address
+      userId: effectiveUserId ? effectiveUserId.toLowerCase() : undefined, // Normalize
+      walletId: effectiveUserId ? effectiveUserId.toLowerCase() : undefined
     },
     onResponse: (response: Response) => {
       // Add type to response
@@ -191,14 +193,14 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
   // Effect to load history when wallet connects
   useEffect(() => {
-    if (address && !initialHistoryLoaded) {
-      fetchChatHistory(address.toLowerCase()).then((history) => {
+    if (effectiveUserId && !initialHistoryLoaded) {
+      fetchChatHistory(effectiveUserId.toLowerCase()).then((history) => {
         setMessages(history); // Overwrite initial state from useChat with DB history
         setInitialHistoryLoaded(true); // Mark history as loaded
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [address, initialHistoryLoaded, fetchChatHistory]); // Removed setMessages from deps
+  }, [effectiveUserId, initialHistoryLoaded, fetchChatHistory]); // Removed setMessages from deps
 
   // Combine Vercel AI state with custom state
   const value = {

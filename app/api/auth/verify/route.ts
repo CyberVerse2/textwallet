@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'Signature invalid' }, { status: 401 });
     }
 
-    return NextResponse.json({ address: address.toLowerCase(), verified: true }, { status: 200 });
+    return NextResponse.json({ address: address.toLowerCase(), ok: true }, { status: 200 });
   } catch (error) {
     return NextResponse.json({ message: 'Verification failed' }, { status: 500 });
   }

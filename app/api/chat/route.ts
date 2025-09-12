@@ -1,20 +1,9 @@
-import {
-  AgentKit,
-  AgentKitOptions,
-  alchemyTokenPricesActionProvider,
-  erc721ActionProvider,
-  FlaunchActionProvider,
-  PrivyEvmWalletConfig,
-  PrivyEvmWalletProvider,
-  pythActionProvider,
-  walletActionProvider
-} from '@coinbase/agentkit';
-import { getVercelAITools } from '@coinbase/agentkit-vercel-ai-sdk';
+// AgentKit removed: using AI SDK only
 import { streamText, Message as VercelMessage, StreamTextResult } from 'ai';
 import { anthropic, AnthropicProviderOptions } from '@ai-sdk/anthropic';
-import { zoraActionProvider } from '@/lib/customActions/zora/zoraActionProvider';
+// Zora custom actions removed
 import supabaseAdmin from '@/lib/supabaseAdmin';
-import { zora } from 'viem/chains';
+// import { zora } from 'viem/chains';
 
 // Define the types for our API request body
 interface RequestBody {
@@ -40,15 +29,58 @@ export async function POST(req: Request) {
     'Sorry, I encountered an issue processing that request. Please try again.'; // Default error
 
   const { messages, userId, walletId }: RequestBody = await req.json();
+  const normalizedUserId = userId ? userId.toLowerCase() : undefined;
+
+  // Ensure the user exists to satisfy FK constraints, in case client-side sync hasn't completed
+  if (normalizedUserId) {
+    try {
+      const { data: existing, error: fetchError } = await supabaseAdmin
+        .from('users')
+        .select('wallet_address')
+        .eq('wallet_address', normalizedUserId)
+        .maybeSingle();
+
+      if (fetchError) {
+        console.error('🤖 Chat API Route: Error looking up user before insert:', fetchError);
+        return new Response(JSON.stringify({ error: 'User lookup failed' }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+
+      if (!existing) {
+        const { error: insertUserError } = await supabaseAdmin.from('users').insert({
+          wallet_address: normalizedUserId,
+          last_login: new Date().toISOString()
+        });
+        if (insertUserError) {
+          console.error(
+            '🤖 Chat API Route: Error creating user before chat insert:',
+            insertUserError
+          );
+          return new Response(JSON.stringify({ error: 'User creation failed' }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+      }
+    } catch (ensureErr) {
+      console.error('🤖 Chat API Route: Exception ensuring user exists:', ensureErr);
+      return new Response(JSON.stringify({ error: 'Failed to ensure user exists' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+  }
 
   // --- Save User Message --- Check for Non-Nullability
   const userMessage = messages[messages.length - 1];
-  if (userMessage && userMessage.role === 'user' && userId) {
+  if (userMessage && userMessage.role === 'user' && normalizedUserId) {
     try {
       const { data, error } = await supabaseAdmin
         .from('chat_history')
         .insert({
-          user_id: userId,
+          user_id: normalizedUserId,
           message: userMessage.content,
           sender: 'user'
         })
@@ -88,153 +120,84 @@ export async function POST(req: Request) {
   try {
     // --- Attempt AI Interaction with Tools --- Moved AgentKit setup inside this block
     // Check if ALL required conditions for tool usage are met
-    const allConditionsMet = userId && parentDbId && process.env.NEXT_PUBLIC_PRIVY_APP_ID && process.env.NEXT_PUBLIC_PRIVY_APP_SECRET && process.env.PRIVY_AUTHORIZATION_KEY_ID && process.env.PRIVY_AUTHORIZATION_PRIVATE_KEY;
+    const allConditionsMet = false; // AgentKit removed; always use fallback path
 
     if (allConditionsMet) {
-      // Setup AgentKit and tools ONLY if conditions met
-      const walletConfig: PrivyEvmWalletConfig = {
-        appId: process.env.NEXT_PUBLIC_PRIVY_APP_ID!,
-        appSecret: process.env.NEXT_PUBLIC_PRIVY_APP_SECRET!,
-        walletId,
-        chainId: process.env.PRIVY_CHAIN_ID || '8453',
-        authorizationKeyId: process.env.PRIVY_AUTHORIZATION_KEY_ID!,
-        authorizationPrivateKey: process.env.PRIVY_AUTHORIZATION_PRIVATE_KEY!
-      }; // Added type annotation
-      const walletProvider = await PrivyEvmWalletProvider.configureWithWallet(walletConfig);
-      const erc721 = erc721ActionProvider();
-      const pyth = pythActionProvider();
-      const walletAct = walletActionProvider();
-      const flaunch = new FlaunchActionProvider({
-        pinataJwt: process.env.PINATA_JWT// Required for IPFS uploads
-      });// Renamed wallet variable
-      // const zora = zoraActionProvider();
-      const alchemy = alchemyTokenPricesActionProvider({
-        apiKey: process.env.ALCHEMY_API_KEY
+      // Unused: AgentKit path removed
+      return new Response(JSON.stringify({ error: 'Tools disabled' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
       });
-
-      const agentKitConfig: AgentKitOptions = {
-        walletProvider,
-        actionProviders: [erc721, pyth, walletAct, alchemy, flaunch]
-        // Add CDP keys if needed
-      };
-      const agentKit = await AgentKit.from(agentKitConfig);
-      const tools = getVercelAITools(agentKit);
-
+    } else {
+      // Fallback: stream conversational response without AgentKit tools
       try {
-        // --- Execute streamText with Tools and return response directly ---
         const result = streamText({
           model: anthropic('claude-3-7-sonnet-20250219'),
           system:
-            'You are an onchain AI assistant with access to a server wallet. You can perform blockchain operations through the provided tools. Always explain what you are doing and why.',
-          toolCallStreaming: true,
+            'You are an onchain AI assistant. If tools are unavailable, answer conversationally and avoid claiming onchain execution.',
           messages,
-          tools,
-          maxSteps: 10,
           providerOptions: {
             anthropic: {
               thinking: { type: 'enabled', budgetTokens: 12000 }
             } satisfies AnthropicProviderOptions
           },
-          onFinish: async (event) => { 
-
-
-            // Check if event.text exists and is a non-empty string before accessing it
+          onFinish: async (event) => {
             if (typeof event.text === 'string' && event.text.length > 0) {
-              console.log(`🤖 Chat API Route: Stream finished. Final text property found. Length: ${event.text.length}`);
-              // Proceed with saving only if text exists
-              if (userId && parentDbId) {
+              if (normalizedUserId && parentDbId) {
                 try {
                   const { error: saveError } = await supabaseAdmin.from('chat_history').insert({
-                    user_id: userId,
-                    message: event.text, // Save the final text from the event object
+                    user_id: normalizedUserId,
+                    message: event.text,
                     sender: 'ai',
                     parent_message_id: parentDbId
                   });
                   if (saveError) throw saveError;
-                  console.log(`🤖 Chat API Route: Saved successful AI message to DB for user ${userId}, parent ${parentDbId}`);
                 } catch (dbError: any) {
-                   console.error("💥 Chat API Route: DB error saving AI message in onFinish:", dbError.message);
+                  console.error(
+                    '💥 Chat API Route: DB error saving AI message (fallback):',
+                    dbError.message
+                  );
                 }
               } else {
-                console.error("💥 Chat API Route: Cannot save AI message in onFinish - userId or parentDbId missing.");
+                console.error(
+                  '💥 Chat API Route: Cannot save AI message (fallback) - userId or parentDbId missing.'
+                );
               }
             } else {
-               // Log if event.text wasn't found or was empty
-               console.warn("🤖 Chat API Route: Stream finished, but event.text was empty or not found in the event object. Skipping save based on .text.");
+              console.warn('🤖 Chat API Route: Fallback stream finished but text empty.');
             }
           }
         });
-
-        // Immediately return the Vercel AI SDK response object
-        // This handles streaming text, tool calls, and tool results to the client
         return result.toDataStreamResponse();
-      } catch (streamOrToolError: any) {
-        // Errors from streamText setup or initial call
-        console.error(
-          '🤖 Chat API Route: Error during streamText setup/initiation:',
-          streamOrToolError
-        );
-        // Directly save the initiation error message here
-        if (userId && parentDbId) {
-            try {
-                const { error: initiationSaveError } = await supabaseAdmin.from('chat_history').insert({
-                  user_id: userId,
-                  message: genericErrorMessage, // Save the generic error message
-                  sender: 'ai',
-                  parent_message_id: parentDbId
-                });
-                if (initiationSaveError) throw initiationSaveError;
-                console.log(`🤖 Chat API Route: Saved AI initiation error message to DB for user ${userId}, parent ${parentDbId}`);
-            } catch (dbError: any) {
-                console.error("💥 Chat API Route: DB error saving AI initiation error message:", dbError.message);
-            }
-        } else {
-             console.error("💥 Chat API Route: Cannot save AI initiation error message - userId or parentDbId missing.");
+      } catch (fallbackErr: any) {
+        console.error('🤖 Chat API Route: Fallback streaming error:', fallbackErr);
+        // Save generic error
+        if (normalizedUserId && parentDbId) {
+          try {
+            await supabaseAdmin.from('chat_history').insert({
+              user_id: normalizedUserId,
+              message: genericErrorMessage,
+              sender: 'ai',
+              parent_message_id: parentDbId
+            });
+          } catch (dbErr) {
+            console.error('🤖 Chat API Route: Failed to save fallback error message:', dbErr);
+          }
         }
-        // Return an error response to the client
         return new Response(JSON.stringify({ error: genericErrorMessage }), {
           status: 500,
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json' }
         });
       }
-    } else {
-      // Conditions for tool usage NOT met - Treat as an error, DO NOT call streamText
-      console.error(
-        '🤖 Chat API Route: Configuration incomplete for tool usage. Required IDs or ENV VARS missing.'
-      );
-      genericErrorMessage =
-        'Sorry, I cannot perform actions requiring wallet access due to configuration issues.'; // More specific error
-      // Directly save the config error message here
-      if (userId && parentDbId) {
-          try {
-              const { error: configSaveError } = await supabaseAdmin.from('chat_history').insert({
-                user_id: userId,
-                message: genericErrorMessage, // Save the config error message
-                sender: 'ai',
-                parent_message_id: parentDbId
-              });
-              if (configSaveError) throw configSaveError;
-               console.log(`🤖 Chat API Route: Saved AI config error message to DB for user ${userId}, parent ${parentDbId}`);
-          } catch (dbError: any) {
-              console.error("💥 Chat API Route: DB error saving AI config error message:", dbError.message);
-          }
-      } else {
-           console.error("💥 Chat API Route: Cannot save AI config error message - userId or parentDbId missing.");
-      }
-      // Return an error response to the client
-      return new Response(JSON.stringify({ error: genericErrorMessage }), {
-        status: 500, 
-        headers: { 'Content-Type': 'application/json' },
-      });
     }
   } catch (setupError: any) {
     // Catch errors from initial AgentKit setup IF it happens within the 'if (canUseTools)' block
     console.error('🤖 Chat API Route Top Level Error (AgentKit Setup?):', setupError);
     // Attempt to save generic error linked to user message if possible
-    if (userId && parentDbId) {
+    if (normalizedUserId && parentDbId) {
       try {
         await supabaseAdmin.from('chat_history').insert({
-          user_id: userId,
+          user_id: normalizedUserId,
           message: genericErrorMessage, // Save generic error here too
           sender: 'ai',
           parent_message_id: parentDbId
@@ -248,7 +211,7 @@ export async function POST(req: Request) {
       JSON.stringify({ error: 'Failed to process chat request due to a setup error.' }),
       {
         status: 500,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' }
       }
     );
   }

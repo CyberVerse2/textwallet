@@ -135,3 +135,163 @@ Primary goals:
 - Include helpful debug logs and toasts when verifying signatures and syncing users.
 - Read files before editing; remove Privy in stages behind feature flag for safe rollback.
 - Run `npm audit` after dependency changes; avoid `--force` unless approved.
+
+---
+
+# Polymarket Trading Feature Plan (Planner)
+
+## Background and Motivation
+
+We want TextWallet to discover high-upside prediction markets on Polymarket and optionally trade them automatically for the user. Funds flow: user’s wallet (on Base) → escrow (CDP wallet) → Polygon USDC for Polymarket trading. Initially, the agent will (1) recommend top markets and (2) execute trades upon user confirmation. Strategy/portfolio logic will come later. Remove AgentKit; use the AI SDK only.
+
+Key constraints:
+
+- Polymarket settles/trades in USDC on Polygon. User funds originate on Base.
+- An escrow “CDP wallet” will custody trading funds. You’ll share CDP specifics (provisioning/API) later.
+- Minimum viable: market discovery + trade execution. Bridging orchestration can be simple (single-route, synchronous or queued).
+
+## Key Challenges and Analysis
+
+1. Custody and Escrow
+
+- Define the “CDP wallet”: per-user wallet or shared vault with per-user accounting? API/SDK for creating addresses and signing on Polygon.
+- Secure storage of keys or delegated signing via CDP provider.
+
+2. Base → Polygon USDC Flow
+
+- Options: Circle CCTP, 3rd-party bridge, or centralized swap flow. Consider time-to-finality, fees, and reliability.
+- USDC variants: ensure native USDC on Polygon (not USDC.e) for Polymarket.
+
+3. Polymarket Integration
+
+- Public market discovery API (markets/orderbooks/tickers) and private trading endpoints (auth, order placement, fills, positions).
+- Rate limits, pagination, and filtering to identify “most upside” markets.
+
+4. Trading UX and Safety
+
+- Explicit user confirmation for trade size/market. Slippage tolerance, max exposure per user, circuit breakers.
+- Position tracking and PnL reporting.
+
+5. AI Orchestration (No AgentKit)
+
+- Use Vercel AI SDK for NLU. Map intents to backend endpoints (no tool-based wallet ops).
+- Deterministic server endpoints for discovery/trading. AI suggests, UI executes.
+
+6. Data Model and Auditing
+
+- Track deposits, bridges, trades, and positions per user (keyed by `wallet_address`).
+- Idempotency keys for trade placement; robust error logs.
+
+## Success Criteria (Phase 1)
+
+- User can request “top markets” and see curated list with rationale, odds, liquidity, and est. upside.
+- User can “fund trading account” (escrow) by sending Base USDC to a provided deposit address; app detects deposit and records available trading balance.
+- App can bridge sufficient USDC to Polygon and place a market order on Polymarket (buy outcome) upon user confirmation.
+- Positions visible in UI with current value; basic activity log entries are saved.
+
+## Architecture Overview
+
+Flow (happy path):
+
+1. Discovery: `/api/polymarket/markets` fetches and scores markets → UI renders Top Opportunities.
+2. Funding: `/api/escrow/deposit-intent` returns a per-user Base USDC deposit address (CDP-managed or derived). App watches for deposit and updates `escrow_deposits` and available balance.
+3. Bridge: `/api/bridge/base-to-polygon` moves USDC to Polygon (CCTP or configured bridge). On success, credit trading balance (Polygon).
+4. Trade: `/api/polymarket/trade` places orders via Polymarket API using the CDP wallet on Polygon; record in `trades` and `positions`.
+5. Reporting: `/api/polymarket/positions` aggregates open positions with mark-to-market and PnL.
+
+Data tables to add:
+
+- `escrow_deposits` (id, user_id, chain, token, amount, tx_hash, status)
+- `bridges` (id, user_id, from_chain, to_chain, amount, tx_hashes, status)
+- `polymarket_trades` (id, user_id, market_id, side, size, price, tx_hash, status)
+- `polymarket_positions` (id, user_id, market_id, quantity, avg_price, value, status)
+
+## High-level Task Breakdown (with success criteria)
+
+1. Remove AgentKit and clean chat API
+
+- Delete AgentKit imports/logic and feature-flag paths. Keep AI SDK streaming only.
+- Success: Chat works without any AgentKit/Privy wallet provider paths.
+
+2. Polymarket client and types
+
+- Add lightweight client for Polymarket public endpoints (markets/orderbooks). Define types and scoring heuristic for “upside.”
+- Success: `/api/polymarket/markets` returns a ranked list with fields needed for UI.
+
+3. Markets discovery API + UI
+
+- Implement `/app/api/polymarket/markets/route.ts` and a `Markets` view/tab listing top opportunities with odds, liquidity, and scores.
+- Success: UI shows paginated/top N markets and updates on refresh.
+
+4. Escrow deposit intents (Base USDC)
+
+- Implement `/app/api/escrow/deposit-intent` to return a deposit address for the user (CDP-managed). Add webhook/polling to detect incoming Base USDC and credit `escrow_deposits`.
+- Success: User sees a deposit address; after sending USDC, app marks deposit “confirmed” and shows available balance.
+
+5. Bridge Base→Polygon USDC
+
+- Implement `/app/api/bridge/base-to-polygon` (stub provider interface). Support CCTP or configured bridge. Persist `bridges` rows and update status.
+- Success: After funding, user can trigger bridge; status transitions to “completed” with target chain receipt.
+
+6. Polymarket trade placement
+
+- Implement `/app/api/polymarket/trade` to place orders using the Polygon CDP wallet. Handle auth, slippage, and idempotency.
+- Success: Confirmed order placement returns order/tx id; saved in `polymarket_trades`.
+
+7. Positions and activity
+
+- Implement `/app/api/polymarket/positions` and augment activity feed. Compute simple PnL/mark-to-market.
+- Success: Positions visible with live-ish values; entries appear in activity list.
+
+8. Chat intents (AI SDK only)
+
+- Add intent parsing for: “show top markets,” “buy X USDC of [market/outcome],” “bridge funds,” “show positions.” Calls corresponding APIs; require explicit confirmation before trading.
+- Success: Chat flows drive the same endpoints and record history.
+
+9. DB migrations
+
+- Add the four tables. Wire FK to `users(wallet_address)`. Disable RLS (service role) like others.
+- Success: Migration runs clean on fresh DB and existing DB with additive changes.
+
+10. Config, secrets, and guardrails
+
+- Add envs: POLYMARKET_API_KEY (if required), BRIDGE_PROVIDER config, CDP wallet config. Limit max trade size/exposure; add slippage defaults.
+- Success: Safe defaults; missing config returns actionable errors.
+
+11. Tests (TDD where feasible)
+
+- Unit tests for market scoring; API contract tests for discovery/trade routes; mock bridge/polymarket client.
+- Success: CI passes core tests; manual E2E happy path verified locally.
+
+## Project Status Board
+
+- [ ] Remove AgentKit and clean chat API
+- [ ] Add Polymarket client and types
+- [ ] Markets discovery API + UI
+- [ ] Escrow deposit intents (Base USDC)
+- [ ] Bridge Base→Polygon USDC
+- [ ] Polymarket trade placement (Polygon)
+- [ ] Positions and activity wiring
+- [ ] Chat intents (AI SDK only)
+- [ ] DB migrations for polymarket tables
+- [ ] Config + guardrails + docs
+- [ ] Tests (scoring, APIs, mocks)
+
+## Current Status / Progress Tracking
+
+- Planning drafted. Awaiting CDP details and Polymarket API credentials to pick concrete bridge and signing approach.
+
+## Executor's Feedback or Assistance Requests
+
+Please confirm:
+
+- CDP wallet provider and how we provision per-user deposit addresses on Base and sign on Polygon (SDK/API, custody, limits).
+- Bridge provider preference (Circle CCTP vs specific bridge). Any constraints on speed/cost?
+- Minimum/maximum trade size and default slippage tolerance.
+- Whether we should support “paper trading” toggle for early testing.
+- Polymarket API usage: API key and rate limits, and whether we place via API or onchain router.
+
+## Lessons
+
+- Keep explicit user confirmation for any trade. Log every step (deposit detect, bridge, order place) for auditability.
+- Build provider interfaces (BridgeClient, PolymarketClient) to stub in tests and swap implementations safely.

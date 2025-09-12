@@ -15,21 +15,21 @@ export const SupabaseAuthSyncProvider = ({ children }: { children: ReactNode }) 
   const { address } = useAccount();
   const { signMessageAsync } = useSignMessage();
   const [isInitialized, setIsInitialized] = useState(false);
-  const [isLoading, setIsLoading] = useState(true); // Start loading until ready/auth state is known
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    // If no connected wallet, consider initialized for now
+    // If no connected wallet, ensure sync is not marked initialized
     if (!address) {
       setIsLoading(false);
-      setIsInitialized(true);
+      setIsInitialized(false);
       return;
     }
 
     // Define the async function to sync and setup user
     const syncAndSetupUser = async () => {
-      // Prevent starting sync if already loading or initialized
-      if (isLoading || isInitialized) return;
+      // Prevent starting sync if already loading
+      if (isLoading) return;
 
       setIsLoading(true);
       console.log('[AuthSync] Wallet connected:', address);
@@ -50,7 +50,7 @@ export const SupabaseAuthSyncProvider = ({ children }: { children: ReactNode }) 
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ address, signature })
+          body: JSON.stringify({ address, message, signature })
         });
         const verifyJson = await verifyRes.json();
         if (!verifyRes.ok) {
@@ -89,7 +89,7 @@ export const SupabaseAuthSyncProvider = ({ children }: { children: ReactNode }) 
       }
     };
 
-    // Trigger the sync only if authenticated and not already initialized/loading
+    // Trigger the sync when address is available
     syncAndSetupUser();
 
     // Dependencies: Run when auth state changes or essential functions become available
