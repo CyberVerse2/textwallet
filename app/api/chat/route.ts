@@ -200,6 +200,27 @@ export async function POST(req: Request) {
       // Fallback: stream conversational response with AI SDK tools
       let stepIndexCounter = 0;
       const tools: Record<string, any> = {
+        get_orders: tool({
+          description:
+            'Fetch recent orders for the current user. Returns list sorted by newest first.',
+          parameters: z.object({
+            limit: z.coerce.number().int().min(1).max(100).default(20),
+            status: z.enum(['created', 'posted', 'filled', 'cancelled']).optional()
+          }),
+          execute: async ({ limit, status }: { limit?: number; status?: string }) => {
+            if (!normalizedUserId) return { error: 'missing_user' };
+            const q = supabaseAdmin
+              .from('orders')
+              .select('id, market_id, side, price, size, status, created_at, polymarket_order_id')
+              .eq('user_id', normalizedUserId)
+              .order('created_at', { ascending: false })
+              .limit(limit ?? 20);
+            if (status) q.eq('status', status);
+            const { data, error } = await q;
+            if (error) return { error: error.message };
+            return { orders: data ?? [] };
+          }
+        }),
         get_top_markets: tool({
           description:
             'Fetch current Polymarket events ranked by liquidity-weighted upside. Uses /events filters; defaults to current (closed=false, end_date_min=now).',
@@ -1108,6 +1129,7 @@ export async function POST(req: Request) {
             '- Route intent:\n' +
             '  • If the user asks to find markets, call get_top_markets.\n' +
             '  • If the user asks “why” or for details on a pick, call get_market_details.\n' +
+            '  • If the user asks about their order history or recent trades, call get_orders.\n' +
             '- Market picking: Use get_top_markets heuristics. If results are too few, the tool may relax constraints once (evaluator retry).\n' +
             '- Research and thesis: Web search is currently disabled; focus on on-chain signals and market stats only.\n' +
             '- When a user asks for details about a market, summarize key stats and thesis without external citations.\n' +
