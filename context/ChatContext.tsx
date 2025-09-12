@@ -34,6 +34,7 @@ interface ChatContextType {
   setInput: UseChatHelpers['setInput'];
   error: UseChatHelpers['error'];
   append: UseChatHelpers['append'];
+  setMessages: UseChatHelpers['setMessages'];
   loadingHistory: boolean;
   isWalletConnected: boolean;
   setIsWalletConnected: (connected: boolean) => void;
@@ -251,6 +252,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     setInput,
     error,
     append,
+    setMessages,
     loadingHistory,
     isWalletConnected,
     setIsWalletConnected,

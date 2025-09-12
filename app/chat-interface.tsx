@@ -35,6 +35,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
     reload,
     stop,
     append,
+    setMessages,
     // Custom context values
     isWalletConnected,
     walletAddress,
@@ -124,22 +125,41 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
           periodSeconds: periodDays * 86400
         })
       });
-      try {
-        await append({
-          role: 'assistant',
-          content: pendingTrade
-            ? `✅ Budget set to $${budgetUSD} and spend permission enabled for ${periodDays} days. Proceeding with your trade…`
-            : `✅ Budget set to $${budgetUSD} and spend permission enabled for ${periodDays} days.`
-        });
-      } catch {}
+      // Merge success line into previous assistant message instead of creating a new one
+      const successLine = pendingTrade
+        ? `✅ Budget set to $${budgetUSD} and spend permission enabled for ${periodDays} days. Proceeding with your trade…`
+        : `✅ Budget set to $${budgetUSD} and spend permission enabled for ${periodDays} days.`;
+      setMessages((prev: any) => {
+        const updated = [...prev];
+        for (let i = updated.length - 1; i >= 0; i--) {
+          if ((updated[i] as any).role === 'assistant') {
+            const existing = (updated[i] as any).content || '';
+            updated[i] = {
+              ...(updated[i] as any),
+              content: existing ? `${existing}\n\n${successLine}` : successLine
+            };
+            return updated;
+          }
+        }
+        return [...prev, { role: 'assistant', content: successLine, id: `sys-${Date.now()}` }];
+      });
     } catch (e) {
       console.error('Spend permission flow failed:', e);
-      try {
-        await append({
-          role: 'assistant',
-          content: '❌ Spend permission setup failed or was rejected.'
-        });
-      } catch {}
+      const failLine = '❌ Spend permission setup failed or was rejected.';
+      setMessages((prev: any) => {
+        const updated = [...prev];
+        for (let i = updated.length - 1; i >= 0; i--) {
+          if ((updated[i] as any).role === 'assistant') {
+            const existing = (updated[i] as any).content || '';
+            updated[i] = {
+              ...(updated[i] as any),
+              content: existing ? `${existing}\n\n${failLine}` : failLine
+            };
+            return updated;
+          }
+        }
+        return [...prev, { role: 'assistant', content: failLine, id: `sys-${Date.now()}` }];
+      });
     } finally {
       setIsActing(false);
     }
@@ -361,14 +381,26 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
                                 variant="outline"
                                 className="border-2 border-black"
                                 disabled={isActing}
-                                onClick={async () => {
-                                  try {
-                                    await append({
-                                      role: 'assistant',
-                                      content: '👍 Spend permission request cancelled.'
-                                    });
-                                  } catch {}
-                                }}
+                                onClick={() =>
+                                  setMessages((prev: any) => {
+                                    const msg = '👍 Spend permission request cancelled.';
+                                    const updated = [...prev];
+                                    for (let i = updated.length - 1; i >= 0; i--) {
+                                      if ((updated[i] as any).role === 'assistant') {
+                                        const existing = (updated[i] as any).content || '';
+                                        updated[i] = {
+                                          ...(updated[i] as any),
+                                          content: existing ? `${existing}\n\n${msg}` : msg
+                                        };
+                                        return updated;
+                                      }
+                                    }
+                                    return [
+                                      ...prev,
+                                      { role: 'assistant', content: msg, id: `sys-${Date.now()}` }
+                                    ];
+                                  })
+                                }
                               >
                                 Reject
                               </Button>
