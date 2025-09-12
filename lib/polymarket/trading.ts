@@ -63,6 +63,7 @@ export async function postOrder(params: PostOrderParams): Promise<PostOrderResul
       { tickSize: params.tickSize as any, negRisk: params.negRisk },
       (params.timeInForce as any) ?? OrderType.GTC
     );
+    console.log('🧩 Polymarket postOrder success', { order });
     return { ok: true, order };
   } catch (e: any) {
     return { ok: false, error: e?.message || String(e) };
@@ -101,6 +102,7 @@ export async function postMarketOrder(params: PostMarketOrderParams): Promise<Po
         (order as any)?.id ||
         '';
       const normalized = { ...order, postResponse: resp, id: extractedId, orderId: extractedId };
+      console.log('🧩 Polymarket postOrder success', { order: normalized });
       return { ok: true, order: normalized };
     } catch (e: any) {
       console.error('🧩 Polymarket postOrder error', { message: e?.message });
