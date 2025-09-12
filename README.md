@@ -5,13 +5,11 @@ TextWallet is a modular network of interoperable DeFi agents designed to bring t
 
 ## Features
 
-- **Text-Based Wallet Operations:** Perform standard EVM wallet actions (send, receive) via text.
-- **DeFi Interaction:**
-  - Stake tokens.
-  - Add liquidity to protocols.
-- **Portfolio Management:** Get an overview and insights into your wallet's portfolio.
-- **Token Research:** Conduct research on specific tokens.
-- **Modular & Interoperable:** Built as a network of agents for extensibility.
+- **Base Account (client)**: SIWE auth and Spend Permissions (grant/revoke) with budgets.
+- **CDP Server Wallet (server)**: Trusted spender that executes on users’ behalf.
+- **Spend Permissions (JIT escrow)**: Pull Base USDC from user to CDP wallet at order time.
+- **Polymarket trading**: Market orders via CLOB; tokenIds derived from `clobTokenIds`.
+- **Supabase-backed state**: users, chat, budgets, spend_permissions, orders.
 
 ## Tech Stack
 

@@ -76,7 +76,7 @@ export default function Sidebar() {
           <Button
             variant="outline"
             onClick={() => disconnect()}
-            className="w-full justify-start text-red-500 border-2 border-red-500 hover:bg-red-50 active:translate-y-px active:shadow-none transition-all duration-100 rounded-xl font-bold"
+            className="w-full justify-start text-red-500 border-0 hover:bg-red-50 active:translate-y-px active:shadow-none transition-all duration-100 rounded-xl font-bold"
             style={{ boxShadow: '3px 3px 0px 0px #dc2626' }}
           >
             <LogOut className="mr-2 h-4 w-4" />
