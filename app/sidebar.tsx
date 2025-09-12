@@ -43,13 +43,6 @@ export default function Sidebar() {
             </div>
             <span className="font-bold text-xl">Text Wallet</span>
           </div>
-          <div className="mt-4">
-            <OckWallet>
-              <ConnectWallet className="w-full" disconnectedLabel="Log In">
-                <ConnectWalletText>Connect Wallet</ConnectWalletText>
-              </ConnectWallet>
-            </OckWallet>
-          </div>
         </div>
 
         <SidebarTabs />
@@ -384,24 +377,37 @@ function SidebarTabs({}: SidebarTabsProps) {
 
           {/* Settings & Disconnect */}
           <div className="pt-6 border-t-2 border-black mt-6">
-            <Button
-              variant="outline"
-              className="w-full justify-start mb-2 border-2 border-black hover:bg-yellow/20 active:translate-y-px active:shadow-none transition-all duration-100 rounded-xl font-bold"
-              style={{ boxShadow: '3px 3px 0px 0px #000000' }}
-            >
-              <Settings className="mr-2 h-4 w-4" />
-              <span>Settings</span>
-            </Button>
-            {walletAddress && (
-              <Button
-                variant="outline"
-                onClick={() => disconnect()}
-                className="w-full justify-start text-red-500 border-2 border-red-500 hover:bg-red-50 active:translate-y-px active:shadow-none transition-all duration-100 rounded-xl font-bold"
-                style={{ boxShadow: '3px 3px 0px 0px #dc2626' }}
-              >
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Disconnect</span>
-              </Button>
+            {walletAddress ? (
+              <>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start mb-2 border-2 border-black hover:bg-yellow/20 active:translate-y-px active:shadow-none transition-all duration-100 rounded-xl font-bold"
+                  style={{ boxShadow: '3px 3px 0px 0px #000000' }}
+                >
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Settings</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => disconnect()}
+                  className="w-full justify-start text-red-500 border-2 border-red-500 hover:bg-red-50 active:translate-y-px active:shadow-none transition-all duration-100 rounded-xl font-bold"
+                  style={{ boxShadow: '3px 3px 0px 0px #dc2626' }}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Disconnect</span>
+                </Button>
+              </>
+            ) : (
+              <div className="w-full">
+                <OckWallet>
+                  <ConnectWallet
+                    className="w-full justify-start border-2 border-black hover:bg-yellow/20 active:translate-y-px active:shadow-none transition-all duration-100 rounded-xl font-bold"
+                    disconnectedLabel="Log In"
+                  >
+                    <ConnectWalletText>Connect Wallet</ConnectWalletText>
+                  </ConnectWallet>
+                </OckWallet>
+              </div>
             )}
           </div>
         </div>

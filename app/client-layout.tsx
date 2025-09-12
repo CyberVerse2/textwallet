@@ -20,6 +20,7 @@ import { ChatProvider, useChatContext } from '@/context/ChatContext';
 import { shortenAddress } from '@/lib/utils'; // Import shortenAddress at the top
 import { EnrichedTokenBalance } from './token-list'; // Import the correct type
 import { useAccount, useDisconnect } from 'wagmi';
+import { Wallet as OckWallet, ConnectWallet, ConnectWalletText } from '@coinbase/onchainkit/wallet';
 
 // Create a ref to hold the SidebarTabs component
 const sidebarRef = React.createRef<{ refreshBalances: () => void }>();
@@ -138,6 +139,15 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
                     <Copy className="w-3.5 h-3.5 text-gray-500" />
                   )}
                 </button>
+              </div>
+            )}
+            {!isWalletEffectivelyConnected && (
+              <div className="mt-3">
+                <OckWallet>
+                  <ConnectWallet className="w-full" disconnectedLabel="Log In">
+                    <ConnectWalletText>Connect Wallet</ConnectWalletText>
+                  </ConnectWallet>
+                </OckWallet>
               </div>
             )}
           </div>
