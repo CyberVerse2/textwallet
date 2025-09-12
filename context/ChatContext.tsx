@@ -90,7 +90,11 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         );
       }
     },
-    // REMOVED onFinish callback (saving is handled by API route)
+    onFinish: (message) => {
+      try {
+        console.log('💬 Chat UI: Assistant final message:', message);
+      } catch {}
+    },
     onError: (error: Error) => {
       // Add type to error parameter
       console.error(' Chat History: [onError] Vercel AI SDK error:', error);

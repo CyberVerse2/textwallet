@@ -1,4 +1,9 @@
-import type { PolymarketClientConfig, PolymarketRawMarket, NormalizedMarket } from './types';
+import type {
+  PolymarketClientConfig,
+  PolymarketRawMarket,
+  NormalizedMarket,
+  PolymarketEventFilters
+} from './types';
 
 export class PolymarketClient {
   private readonly baseUrl: string;
@@ -9,8 +14,19 @@ export class PolymarketClient {
     this.apiKey = config.apiKey;
   }
 
-  async fetchMarkets(): Promise<NormalizedMarket[]> {
-    const url = `${this.baseUrl}/events`;
+  async fetchMarkets(filters?: PolymarketEventFilters): Promise<NormalizedMarket[]> {
+    const url = new URL(`${this.baseUrl}/events`);
+    if (filters) {
+      const params = url.searchParams;
+      for (const [key, value] of Object.entries(filters)) {
+        if (value === undefined || value === null) continue;
+        if (Array.isArray(value)) {
+          for (const v of value) params.append(key, String(v));
+        } else {
+          params.set(key, String(value));
+        }
+      }
+    }
     const res = await fetch(url, {
       headers: this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : undefined,
       cache: 'no-store'
@@ -31,7 +47,7 @@ export class PolymarketClient {
         const bestAsk = this.num(m?.bestAsk);
         const lastPrice = this.num(m?.lastTradePrice);
         const liquidityNum = this.num(m?.liquidityNum);
-        const liquidity = liquidityNum || this.num(m?.liquidity);
+        const liquidity = liquidityNum ?? this.num(m?.liquidity) ?? 0;
         const normalizedMarket: NormalizedMarket = {
           id: String(m?.id ?? ev?.id),
           title: m?.question ?? title,
