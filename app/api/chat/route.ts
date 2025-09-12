@@ -246,7 +246,8 @@ export async function POST(req: Request) {
             // Apply sensible server-side defaults for current events
             const filters = {
               closed: false,
-              end_date_min: nowIso,
+              // some /events deployments don't accept end_date_min → omit by default
+              // end_date_min: nowIso,
               order: fetchFilters.order ?? 'liquidity_num',
               ascending: fetchFilters.ascending ?? false,
               ...fetchFilters

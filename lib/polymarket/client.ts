@@ -27,12 +27,45 @@ export class PolymarketClient {
         }
       }
     }
-    const res = await fetch(url, {
+    let res = await fetch(url, {
       headers: this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : undefined,
       cache: 'no-store'
     });
     if (!res.ok) {
-      throw new Error(`Polymarket API error: ${res.status}`);
+      // Graceful fallback for 422 (parameter mismatch) → relax filters, then try /markets
+      if (res.status === 422) {
+        try {
+          const detail = await res.text();
+          console.error('Polymarket /events 422:', { url: url.toString(), detail });
+        } catch {}
+        // Retry: remove strict params that often cause 422
+        const retryUrl = new URL(`${this.baseUrl}/events`);
+        for (const [k, v] of url.searchParams.entries()) {
+          if (k === 'end_date_min' || k === 'order' || k === 'ascending') continue;
+          retryUrl.searchParams.append(k, v);
+        }
+        res = await fetch(retryUrl, {
+          headers: this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : undefined,
+          cache: 'no-store'
+        });
+        if (!res.ok && res.status === 422) {
+          // Final fallback: /markets with basic pagination
+          const marketsUrl = new URL(`${this.baseUrl}/markets`);
+          const limit = url.searchParams.get('limit') ?? '100';
+          const offset = url.searchParams.get('offset') ?? '0';
+          marketsUrl.searchParams.set('limit', limit);
+          marketsUrl.searchParams.set('offset', offset);
+          const closed = url.searchParams.get('closed');
+          if (closed !== null) marketsUrl.searchParams.set('closed', closed);
+          res = await fetch(marketsUrl, {
+            headers: this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : undefined,
+            cache: 'no-store'
+          });
+        }
+      }
+      if (!res.ok) {
+        throw new Error(`Polymarket API error: ${res.status}`);
+      }
     }
     const events = (await res.json()) as any[];
     const normalized: NormalizedMarket[] = [];
