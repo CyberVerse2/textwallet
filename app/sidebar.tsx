@@ -54,30 +54,28 @@ export default function Sidebar() {
 
         <div className="p-6 border-t-2 border-black">
           {isConnected ? (
-            <>
-              <Button
-                variant="outline"
-                className="w-full justify-start mb-2 border-2 border-black hover:bg-yellow/20 active:translate-y-px active:shadow-none transition-all duration-100 rounded-xl font-bold"
-                style={{ boxShadow: '3px 3px 0px 0px #000000' }}
-              >
-                <Settings className="mr-2 h-4 w-4" />
-                <span>Settings</span>
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => disconnect()}
-                className="w-full justify-start text-red-500 border-2 border-red-500 hover:bg-red-50 active:translate-y-px active:shadow-none transition-all duration-100 rounded-xl font-bold"
-                style={{ boxShadow: '3px 3px 0px 0px #dc2626' }}
-              >
-                <LogOut className="mr-2 h-4 w-4" />
-                <span>Log Out</span>
-              </Button>
-            </>
+            <Button
+              variant="outline"
+              className="w-full justify-start mb-2 border-2 border-black hover:bg-yellow/20 active:translate-y-px active:shadow-none transition-all duration-100 rounded-xl font-bold"
+              style={{ boxShadow: '3px 3px 0px 0px #000000' }}
+            >
+              <Settings className="mr-2 h-4 w-4" />
+              <span>Settings</span>
+            </Button>
           ) : (
-            <div className="w-full">
-              <SignInWithBaseButton colorScheme="light" onClick={() => {}} />
+            <div className="w-full mb-2">
+              <SignInWithBaseButton colorScheme="light" />
             </div>
           )}
+          <Button
+            variant="outline"
+            onClick={() => disconnect()}
+            className="w-full justify-start text-red-500 border-2 border-red-500 hover:bg-red-50 active:translate-y-px active:shadow-none transition-all duration-100 rounded-xl font-bold"
+            style={{ boxShadow: '3px 3px 0px 0px #dc2626' }}
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            <span>Log Out</span>
+          </Button>
         </div>
       </div>
     </div>
