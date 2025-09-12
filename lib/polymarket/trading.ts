@@ -31,7 +31,7 @@ export async function getPolymarketClient() {
   let creds: ApiKeyCreds;
   try {
     // Prefer derive or createOrDerive as per Polymarket guidance
-    creds = await new ClobClient(host, chainId, signer).deriveApiKey();
+    creds = await new ClobClient(host, chainId, signer).createOrDeriveApiKey();
   } catch (e: any) {
     const msg = e?.message || String(e);
     console.error('🧩 Polymarket API key error', { signer: signer.address, message: msg });
