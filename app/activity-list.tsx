@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { cn } from '@/lib/utils';
+import { cn, shortenAddress } from '@/lib/utils';
 import { ArrowRightLeft, Wallet, BarChart2, Clock } from 'lucide-react';
+import { formatDistanceToNowStrict, parseISO, isValid as isValidDate } from 'date-fns';
 
 interface Activity {
   type: 'trade' | 'permission' | 'other';
@@ -81,14 +82,37 @@ export default function ActivityList({ walletAddress, refreshTrigger }: Activity
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between">
-                <div className="text-sm font-bold">{activity.description}</div>
+                <div className="text-sm font-bold">
+                  {summarizeAddresses(activity.description)}
+                </div>
                 <div className={cn('h-2 w-2 rounded-full', getStatusColor(activity.status))}></div>
               </div>
-              <div className="text-sm text-muted-foreground">{activity.timestamp}</div>
+              <div className="text-sm text-muted-foreground">{humanizeTimestamp(activity.timestamp)}</div>
             </div>
           </div>
         </div>
       ))}
     </div>
   );
+}
+
+// Replace long hex addresses within any text with a shortened form
+function summarizeAddresses(text: string): string {
+  if (!text) return text;
+  try {
+    return text.replace(/0x[a-fA-F0-9]{40}/g, (addr) => shortenAddress(addr, 4));
+  } catch {
+    return text;
+  }
+}
+
+function humanizeTimestamp(ts: string): string {
+  if (!ts) return '';
+  try {
+    const date = parseISO(ts);
+    if (!isValidDate(date)) return ts;
+    return formatDistanceToNowStrict(date, { addSuffix: true });
+  } catch {
+    return ts;
+  }
 }

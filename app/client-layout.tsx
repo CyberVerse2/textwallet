@@ -188,7 +188,10 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
             variant="outline"
             className="w-full justify-start text-red-500 border-2 border-red-500 hover:bg-red-50 active:translate-y-1 active:shadow-none transition-all duration-100 rounded-xl font-bold"
             style={{ boxShadow: '3px 3px 0px 0px #dc2626' }}
-            onClick={() => {
+            onClick={async () => {
+              try {
+                await fetch('/api/auth/logout', { method: 'POST' });
+              } catch {}
               disconnect();
               setIsWalletConnected(false);
               setWalletAddress(null);

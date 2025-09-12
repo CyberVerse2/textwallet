@@ -6,9 +6,17 @@ export async function signInWithBase(): Promise<{ address: string } | null> {
   try {
     // Provide required app metadata to the SDK (prevents undefined appName error)
     const provider = createBaseAccountSDK({ appName: 'PolyAgent' }).getProvider();
-    const nonce = (
-      globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2)
-    ).replace(/-/g, '');
+    // Prefetch a nonce from the server to avoid popup blockers and allow server-side replay protection
+    let nonce: string;
+    try {
+      const nonceRes = await fetch('/api/auth/nonce', { cache: 'no-store' });
+      nonce = (await nonceRes.text()).trim();
+    } catch {
+      // Fallback: generate locally if server prefetch fails
+      nonce = (globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2))
+        .replace(/-/g, '')
+        .slice(0, 32);
+    }
 
     // 0 — request accounts first per provider requirements
     await provider.request({ method: 'eth_requestAccounts' });
@@ -39,9 +47,12 @@ export async function signInWithBase(): Promise<{ address: string } | null> {
     const res = await fetch('/api/auth/verify', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ address, message, signature })
+      body: JSON.stringify({ address, message, signature, nonce })
     });
-    if (!res.ok) throw new Error('Signature verification failed');
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Signature verification failed: ${text}`);
+    }
     return { address };
   } catch (err) {
     console.error('SignInWithBase error:', err);
