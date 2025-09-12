@@ -186,8 +186,8 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
         {isWalletEffectivelyConnected && (
           <Button
             variant="outline"
-            className="w-full justify-start text-red-500 border-2 border-red-500 hover:bg-red-50 active:translate-y-1 active:shadow-none transition-all duration-100 rounded-xl font-bold"
-            style={{ boxShadow: '3px 3px 0px 0px #dc2626' }}
+            className="w-full justify-start border-2 border-black hover:bg-yellow/20 active:translate-y-1 active:shadow-none transition-all duration-100 rounded-xl font-bold"
+            style={{ boxShadow: '4px 4px 0px 0px #000000' }}
             onClick={async () => {
               try {
                 await fetch('/api/auth/logout', { method: 'POST' });
