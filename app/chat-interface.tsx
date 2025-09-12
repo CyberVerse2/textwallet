@@ -56,6 +56,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
     return { budgetUSD, periodDays, token, cleaned };
   }
 
+  function normalizeMarkdown(s: string) {
+    if (!s) return s;
+    // Ensure headings start on a new line
+    let out = s.replace(/([^\n])(#\s)/g, '$1\n$2');
+    // Ensure a blank line before top-level headings for better rendering
+    out = out.replace(/\n(#\s)/g, '\n\n$1');
+    return out;
+  }
+
   function parseTriggerTag(content: string) {
     const re =
       /\[ACTION:TRIGGER_SPEND_PERMISSION(?:\s+budgetUSD=(\d+(?:\.\d+)?))?(?:\s+periodDays=(\d+))?\]/;
@@ -260,6 +269,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
                     (() => {
                       const parsed = parseSpendPermissionTag(message.content || '');
                       const display = parsed?.cleaned ?? message.content;
+                      const normalizedDisplay = normalizeMarkdown(display || '');
                       return (
                         <div className="markdown-content text-sm prose prose-sm max-w-none">
                           <ReactMarkdown
@@ -329,7 +339,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
                               )
                             }}
                           >
-                            {display}
+                            {normalizedDisplay}
                           </ReactMarkdown>
                           {parsed && (
                             <div className="mt-3 flex gap-2">

@@ -59,7 +59,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
     try {
       if (!effective) {
         const cached = localStorage.getItem('tw_address');
-        if (cached) effective = cached;
+        if (cached) effective = cached as any;
       }
     } catch {}
     setIsWalletConnected(Boolean(effective));
@@ -98,10 +98,15 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         );
       }
     },
-    onFinish: (message) => {
+    onFinish: async () => {
       try {
-        console.log('💬 Chat UI: Assistant final message:', message);
-      } catch {}
+        if (effectiveUserId) {
+          const history = await fetchChatHistory(effectiveUserId.toLowerCase());
+          setMessages(history);
+        }
+      } catch (e) {
+        console.error('Chat UI: failed to refresh grouped history after finish', e);
+      }
     },
     onError: (error: Error) => {
       // Add type to error parameter
@@ -119,7 +124,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
       try {
         const { data: dbMessages, error: dbError } = await supabase
           .from('chat_history')
-          .select('id, user_id, sender, message, created_at, parent_message_id') // Select 'id'
+          .select('id, user_id, sender, message, created_at, parent_message_id, step_index')
           .eq('user_id', userId)
           .order('created_at', { ascending: true }); // Fetch sorted by creation time
 
@@ -129,6 +134,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
         const messageMap = new Map<string, SdkMessage>();
         const childrenMap = new Map<string, string[]>();
+        const stepIndexMap = new Map<string, number>();
         const addedMessageIds = new Set<string>();
         const result: SdkMessage[] = [];
 
@@ -136,6 +142,10 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         for (const dbMsg of dbMessages) {
           const sdkMsg = convertSingleDbMessageToVercelFormat(dbMsg);
           messageMap.set(sdkMsg.id, sdkMsg);
+          // Track step index for assistant messages
+          if (dbMsg.sender === 'ai' && typeof (dbMsg as any).step_index === 'number') {
+            stepIndexMap.set(sdkMsg.id, (dbMsg as any).step_index);
+          }
 
           if (dbMsg.parent_message_id) {
             if (!childrenMap.has(dbMsg.parent_message_id)) {
@@ -163,15 +173,20 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
             addedMessageIds.add(currentMsgId);
 
             // Add its direct children (AI responses)
-            const childIds = childrenMap.get(currentMsgId); // Look up using currentMsgId (DB id)
-            if (childIds) {
-              for (const childId of childIds) {
-                const childMsg = messageMap.get(childId);
-                if (childMsg && !addedMessageIds.has(childId)) {
-                  // Check addedMessageIds using childId (SdkMessage id)
-                  result.push(childMsg);
-                  addedMessageIds.add(childId); // Add childId (SdkMessage id)
-                }
+            const childIds = childrenMap.get(currentMsgId) || [];
+            const sortedChildIds = [...childIds].sort((a, b) => {
+              const ai = stepIndexMap.get(a) ?? 9999;
+              const bi = stepIndexMap.get(b) ?? 9999;
+              if (ai !== bi) return ai - bi;
+              const am = messageMap.get(a);
+              const bm = messageMap.get(b);
+              return (am?.createdAt?.getTime?.() || 0) - (bm?.createdAt?.getTime?.() || 0);
+            });
+            for (const childId of sortedChildIds) {
+              const childMsg = messageMap.get(childId);
+              if (childMsg && !addedMessageIds.has(childId)) {
+                result.push(childMsg);
+                addedMessageIds.add(childId);
               }
             }
           } else if (sdkMsg.role === 'assistant' && !dbMsg.parent_message_id) {
@@ -180,6 +195,16 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
             addedMessageIds.add(currentMsgId); // Add currentMsgId (DB id)
           }
           // AI messages with parents are handled when their parent user message is processed.
+        }
+
+        // Include any remaining assistant messages that didn't get attached (safety net)
+        for (const dbMsg of dbMessages) {
+          const sdkMsg = messageMap.get(dbMsg.id);
+          if (!sdkMsg) continue;
+          if (sdkMsg.role === 'assistant' && !addedMessageIds.has(dbMsg.id)) {
+            result.push(sdkMsg);
+            addedMessageIds.add(dbMsg.id);
+          }
         }
 
         return result;
