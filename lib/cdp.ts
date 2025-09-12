@@ -7,8 +7,8 @@ import { base, polygon } from 'viem/chains';
 export type SupportedEvmNetwork = 'base' | 'polygon';
 
 const DEFAULT_USDC_ADDRESSES: Record<SupportedEvmNetwork, Address> = {
-  base: '0x833589FCD6EDB6E08f4c7c32D4f41f0558AC3f8b',
-  polygon: '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174'
+  base: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+  polygon: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359'
 };
 
 export function getUsdcAddress(network: SupportedEvmNetwork): Address {
