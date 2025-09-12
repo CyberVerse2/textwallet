@@ -1,6 +1,8 @@
 // AgentKit removed: using AI SDK only
 import { streamText, Message as VercelMessage, StreamTextResult } from 'ai';
 import { anthropic, AnthropicProviderOptions } from '@ai-sdk/anthropic';
+import { z } from 'zod';
+import { getPolymarketClient } from '@/lib/polymarket/client';
 // Zora custom actions removed
 import supabaseAdmin from '@/lib/supabaseAdmin';
 // import { zora } from 'viem/chains';
@@ -129,13 +131,36 @@ export async function POST(req: Request) {
         headers: { 'Content-Type': 'application/json' }
       });
     } else {
-      // Fallback: stream conversational response without AgentKit tools
+      // Fallback: stream conversational response with AI SDK tools
+      const tools = {
+        get_top_markets: {
+          description:
+            'Fetch top Polymarket markets ranked by liquidity-weighted upside. Optional filters: limit, minLiquidity.',
+          parameters: z
+            .object({
+              limit: z.number().int().min(1).max(50).optional(),
+              minLiquidity: z.number().min(0).optional()
+            })
+            .optional(),
+          execute: async (args: { limit?: number; minLiquidity?: number } = {}) => {
+            const client = getPolymarketClient();
+            const markets = await client.fetchMarkets();
+            const filtered =
+              typeof args.minLiquidity === 'number'
+                ? markets.filter((m) => (m.liquidity ?? 0) >= args.minLiquidity!)
+                : markets;
+            const limit = args.limit ?? 10;
+            return filtered.slice(0, limit);
+          }
+        }
+      } as const;
       try {
         const result = streamText({
           model: anthropic('claude-3-7-sonnet-20250219'),
           system:
-            'You are an onchain AI assistant. If tools are unavailable, answer conversationally and avoid claiming onchain execution.',
+            'You are an onchain AI assistant. Use provided tools for market discovery. Avoid claiming onchain execution.',
           messages,
+          tools,
           providerOptions: {
             anthropic: {
               thinking: { type: 'enabled', budgetTokens: 12000 }

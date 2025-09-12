@@ -295,3 +295,114 @@ Please confirm:
 
 - Keep explicit user confirmation for any trade. Log every step (deposit detect, bridge, order place) for auditability.
 - Build provider interfaces (BridgeClient, PolymarketClient) to stub in tests and swap implementations safely.
+
+## Polymarket Chat UX (JIT Escrow) — Copy-ready
+
+0. first-run
+
+Bot: hi, i’m polyagent. i place buy orders on polymarket inside your weekly budget. revoke anytime.
+Quick replies: grant budget, paper mode, help
+
+1. grant spend permission (one-time)
+
+User: `grant $200/week until Oct 12`
+Bot (confirm card):
+
+- You’re granting: USDC (Base) · $200/week · ends Oct 12
+  Buttons: Confirm, Edit, Cancel
+  — on confirm —
+  Bot: ✅ budget granted.
+  Chips: deposit later? not needed — i’ll pull at order time | watch markets
+
+2. place order (happy path, JIT escrow)
+
+User: `buy YES 10 @ 0.44 on <market URL>`
+Bot (step 1 — charge):
+
+- pulling $4.40 (+ buffer $0.01) from your Base wallet to your escrow…
+- onchain confirm: ✅ charged $4.41 (tx)
+  Bot (step 2 — trade): placing order on polymarket…
+  — after fill —
+  Bot (step 3 — settle): ✅ filled 10 @ $0.439
+- used: $4.39 · refund: $0.02 → sent back to your Base wallet (tx)
+  Chips: Order ID, Polymarket tx, Explain
+
+3. receipts & explainability
+
+User: `explain last order`
+Bot: because price ≤ 0.45, spread ≤ $0.01, size = 10, cooldown ok. tickSize 0.001 (snapped).
+
+4. status & limits
+
+User: `status`
+Bot:
+
+- Allowance left (this week): $195.59
+- Escrow (JIT): $0.00 (we refund diffs by default)
+- Autopilot: OFF
+- Open orders: 0
+  Chips: increase cap, autopilot on, revoke
+
+5. autopilot (optional)
+
+User: `autopilot on (value-dip: buy ≤ 0.45, size $5, cooldown 15m)`
+Bot (confirm): up to 10 orders/day, max $5 each; weekly ≤ $200.
+Buttons: Turn On, Edit, Cancel
+— on —
+Bot (pin): Autopilot: ON · Panic · Revoke
+
+6. panic & revoke (always visible)
+
+User: `panic`
+Bot: 🛑 paused. no new orders will be placed. (button: resume)
+User: `revoke`
+Bot (confirm): revoke spend permission now? Yes, revoke / Cancel
+— on revoke —
+Bot: ✅ revoked. i no longer have spend access. (manage link)
+
+7. withdraw (only if you keep residuals)
+
+User: `withdraw $20`
+Bot (confirm): send $20 from escrow to your Base wallet? Confirm / Cancel
+— on confirm —
+Bot: ✅ withdrew $20. (tx)
+
+8. errors & edge paths (chat lines)
+
+- Insufficient cap
+  Bot: weekly cap left: $6.17. try `size 5` or `increase cap to $300/week`.
+
+- Spend permission missing/expired
+  Bot: i need spend access. try `grant $200/week`.
+
+- Charge failed
+  Bot: charge failed (network). nothing pulled. retry? Retry / Cancel
+
+- Order not filled in TTL (e.g., 15s)
+  Bot: no fill yet. keep posted (GTC) or cancel & refund? Keep posted / Cancel & refund
+
+- Tick size mismatch
+  Bot: market tick is 0.001. snap to 0.441 and retry? Snap & retry / Cancel
+
+- Spread too wide / rule not met
+  Bot: spread is $0.015 (> $0.01). i can queue until it narrows or place anyway. Queue / Place anyway
+
+- Revoked mid-trade
+  Bot: spend access revoked. if a charge occurred, i’ll refund immediately. ✅ refunded (tx)
+
+9. quick commands (slash + natural)
+
+- grant $X/week [until DATE]
+- buy YES|NO <size> @ <price> on <market>
+- status · panic · revoke
+- autopilot on|off [rule…]
+- increase cap to $X/week
+- explain last order · open orders
+
+10. message components to implement
+
+- Confirm cards (grant, trade, withdraw, revoke), the cards would be in chat
+- Progress ticks (Charging → Confirmed → Traded → Settled)
+- Receipts (spend tx, order id, fill price, refund tx)
+- Pinned controls (Autopilot ON/OFF · Panic · Revoke)
+- Allowance meter (updates after each charge)
