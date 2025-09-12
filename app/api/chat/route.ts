@@ -204,7 +204,7 @@ export async function POST(req: Request) {
           description:
             'Fetch current Polymarket events ranked by liquidity-weighted upside. Uses /events filters; defaults to current (closed=false, end_date_min=now).',
           parameters: z.object({
-            limit: z.coerce.number().int().min(1).max(50).default(10),
+            limit: z.coerce.number().int().min(1).max(100).default(40),
             offset: z.coerce.number().int().min(0).default(0),
             order: z.string().optional(),
             ascending: z.coerce.boolean().optional(),
@@ -224,7 +224,7 @@ export async function POST(req: Request) {
             end_date_max: z.string().optional(),
             closed: z.coerce.boolean().optional(),
             // Local heuristic knobs
-            limitPicks: z.coerce.number().int().min(1).max(25).default(8),
+            limitPicks: z.coerce.number().int().min(1).max(25).default(5),
             maxDaysToEnd: z.coerce.number().int().min(1).max(365).default(180),
             minConsensus: z.coerce.number().min(0.5).max(0.99).default(0.7),
             minLiquidityLocal: z.coerce.number().min(0).default(1500),
@@ -339,7 +339,13 @@ export async function POST(req: Request) {
                 });
               }
 
-              picks.sort((a, b) => b.score - a.score);
+              picks.sort((a, b) => {
+                const liq = (b.liquidity ?? 0) - (a.liquidity ?? 0);
+                if (liq !== 0) return liq;
+                const vol = (b.volume24h ?? 0) - (a.volume24h ?? 0);
+                if (vol !== 0) return vol;
+                return (b.score ?? 0) - (a.score ?? 0);
+              });
               let resultPicks = picks.slice(0, limitPicks ?? 8);
 
               // Evaluator step: if too few picks, relax constraints once
@@ -427,7 +433,13 @@ export async function POST(req: Request) {
                     });
                   }
 
-                  relaxedPicks.sort((a, b) => b.score - a.score);
+                  relaxedPicks.sort((a, b) => {
+                    const liq = (b.liquidity ?? 0) - (a.liquidity ?? 0);
+                    if (liq !== 0) return liq;
+                    const vol = (b.volume24h ?? 0) - (a.volume24h ?? 0);
+                    if (vol !== 0) return vol;
+                    return (b.score ?? 0) - (a.score ?? 0);
+                  });
                   const seen = new Set(resultPicks.map((p: any) => String(p.id)));
                   for (const rp of relaxedPicks) {
                     if (resultPicks.length >= desired) break;
