@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useAccount, useDisconnect } from 'wagmi';
+import { useAccount, useDisconnect, useConnect } from 'wagmi';
+import { SignInWithBaseButton } from '@base-org/account-ui/react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import TokenList from './token-list';
@@ -16,7 +17,7 @@ import {
   BarChart2,
   ImageIcon
 } from 'lucide-react';
-import { Wallet as OckWallet, ConnectWallet, ConnectWalletText } from '@coinbase/onchainkit/wallet';
+// Using Wagmi connect to implement a custom-styled connect button
 
 import type { NativeBalance } from './api/native-balances/route'; // Import NativeBalance type
 import type { DisplayBalance, EnrichedTokenBalance } from './token-list';
@@ -45,7 +46,9 @@ export default function Sidebar() {
           </div>
         </div>
 
-        <SidebarTabs />
+        <div className="flex-1 overflow-auto">
+          <SidebarTabs />
+        </div>
       </div>
     </div>
   );
@@ -62,6 +65,7 @@ function SidebarTabs({}: SidebarTabsProps) {
 
   const { address } = useAccount();
   const { disconnect } = useDisconnect();
+  const { connectors, connect, isPending } = useConnect();
   // Use optional chaining and memoization for stability
   const walletAddress = useMemo(() => address ?? null, [address]);
 
@@ -394,19 +398,17 @@ function SidebarTabs({}: SidebarTabsProps) {
                   style={{ boxShadow: '3px 3px 0px 0px #dc2626' }}
                 >
                   <LogOut className="mr-2 h-4 w-4" />
-                  <span>Disconnect</span>
+                  <span>Log Out</span>
                 </Button>
               </>
             ) : (
               <div className="w-full">
-                <OckWallet>
-                  <ConnectWallet
-                    className="w-full justify-start border-2 border-black hover:bg-yellow/20 active:translate-y-px active:shadow-none transition-all duration-100 rounded-xl font-bold"
-                    disconnectedLabel="Log In"
-                  >
-                    <ConnectWalletText>Connect Wallet</ConnectWalletText>
-                  </ConnectWallet>
-                </OckWallet>
+                <SignInWithBaseButton
+                  colorScheme="light"
+                  onClick={() => {
+                    /* base handles modal */
+                  }}
+                />
               </div>
             )}
           </div>
