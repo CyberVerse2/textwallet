@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createPublicClient, http } from 'viem';
+import { createPublicClient, http, recoverMessageAddress } from 'viem';
 import { base } from 'viem/chains';
 
 export async function POST(req: NextRequest) {
@@ -12,8 +12,18 @@ export async function POST(req: NextRequest) {
     }
 
     const client = createPublicClient({ chain: base, transport: http() });
-    const valid = await client.verifyMessage({ address, message, signature });
+    let valid = false;
+    try {
+      valid = await client.verifyMessage({ address, message, signature });
+    } catch {}
     if (!valid) {
+      // Fallback: recover actual signer (EOA) in case the provided address is a smart account
+      try {
+        const recovered = await recoverMessageAddress({ message, signature });
+        if (recovered) {
+          return NextResponse.json({ address: recovered.toLowerCase(), ok: true }, { status: 200 });
+        }
+      } catch {}
       return NextResponse.json({ message: 'Signature invalid' }, { status: 401 });
     }
 

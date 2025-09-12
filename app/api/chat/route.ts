@@ -614,51 +614,51 @@ export async function POST(req: Request) {
             return { market: summary, details, researchQueries };
           }
         }),
-        propose_trade_intent: tool({
-          description:
-            'Structure a proposed trade intent for a Polymarket order. This does not execute any trade; it only returns a validated plan.',
-          parameters: z.object({
-            marketId: z.string().describe('Polymarket market id from last picks'),
-            side: z.enum(['yes', 'no']).describe('Order side: yes/no'),
-            budgetUSDC: z.coerce
-              .number()
-              .positive()
-              .max(1000000)
-              .describe('Max USDC to allocate for this intent'),
-            limitPrice: z.coerce
-              .number()
-              .min(0)
-              .max(1)
-              .describe('Max buy price or min sell price (0-1)'),
-            maxSlippage: z.coerce
-              .number()
-              .min(0)
-              .max(0.2)
-              .default(0.02)
-              .describe('Allowed slippage (0-0.2)'),
-            autopilot: z.coerce.boolean().default(false),
-            notes: z.string().optional()
-          }),
-          execute: async (args: any) => {
-            const createdAt = new Date().toISOString();
-            const normalized = {
-              marketId: String(args.marketId),
-              side: args.side === 'no' ? 'no' : 'yes',
-              budgetUSDC: Number.isFinite(+args.budgetUSDC) ? +(+args.budgetUSDC).toFixed(2) : 0,
-              limitPrice: Number.isFinite(+args.limitPrice) ? +(+args.limitPrice).toFixed(4) : 0,
-              maxSlippage: Number.isFinite(+args.maxSlippage)
-                ? +(+args.maxSlippage).toFixed(4)
-                : 0.02,
-              autopilot: Boolean(args.autopilot),
-              notes: typeof args.notes === 'string' ? args.notes : undefined
-            };
-            return {
-              intent: { ...normalized, createdAt },
-              disclaimer:
-                'No onchain execution performed. This is a structured plan for review and future execution.'
-            };
-          }
-        }),
+        // propose_trade_intent: tool({
+        //   description:
+        //     'Structure a proposed trade intent for a Polymarket order. This does not execute any trade; it only returns a validated plan.',
+        //   parameters: z.object({
+        //     marketId: z.string().describe('Polymarket market id from last picks'),
+        //     side: z.enum(['yes', 'no']).describe('Order side: yes/no'),
+        //     budgetUSDC: z.coerce
+        //       .number()
+        //       .positive()
+        //       .max(1000000)
+        //       .describe('Max USDC to allocate for this intent'),
+        //     limitPrice: z.coerce
+        //       .number()
+        //       .min(0)
+        //       .max(1)
+        //       .describe('Max buy price or min sell price (0-1)'),
+        //     maxSlippage: z.coerce
+        //       .number()
+        //       .min(0)
+        //       .max(0.2)
+        //       .default(0.02)
+        //       .describe('Allowed slippage (0-0.2)'),
+        //     autopilot: z.coerce.boolean().default(false),
+        //     notes: z.string().optional()
+        //   }),
+        //   execute: async (args: any) => {
+        //     const createdAt = new Date().toISOString();
+        //     const normalized = {
+        //       marketId: String(args.marketId),
+        //       side: args.side === 'no' ? 'no' : 'yes',
+        //       budgetUSDC: Number.isFinite(+args.budgetUSDC) ? +(+args.budgetUSDC).toFixed(2) : 0,
+        //       limitPrice: Number.isFinite(+args.limitPrice) ? +(+args.limitPrice).toFixed(4) : 0,
+        //       maxSlippage: Number.isFinite(+args.maxSlippage)
+        //         ? +(+args.maxSlippage).toFixed(4)
+        //         : 0.02,
+        //       autopilot: Boolean(args.autopilot),
+        //       notes: typeof args.notes === 'string' ? args.notes : undefined
+        //     };
+        //     return {
+        //       intent: { ...normalized, createdAt },
+        //       disclaimer:
+        //         'No onchain execution performed. This is a structured plan for review and future execution.'
+        //     };
+        //   }
+        // }),
         set_budget: tool({
           description:
             'Set or update weekly budget (cents) and reset remaining for the current period.',
