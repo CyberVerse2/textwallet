@@ -21,6 +21,7 @@ export interface NormalizedMarket {
   volume24h: number;
   endsAt: string | null;
   score: number; // computed upside score
+  featured?: boolean;
 }
 
 export interface PolymarketClientConfig {

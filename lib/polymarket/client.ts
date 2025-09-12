@@ -60,6 +60,7 @@ export class PolymarketClient {
       // event-level volume is not consistent; prefer market-level volumes below
       const endsAt: string | null = ev?.endDate ?? null;
       const markets: any[] = Array.isArray(ev?.markets) ? ev.markets : [];
+      const isFeatured = Boolean(ev?.featured);
       for (const m of markets) {
         const bestBid = this.num(m?.bestBid);
         const bestAsk = this.num(m?.bestAsk);
@@ -78,7 +79,8 @@ export class PolymarketClient {
           liquidity,
           volume24h: marketVol,
           endsAt,
-          score: 0
+          score: 0,
+          featured: isFeatured
         };
         normalized.push({
           ...normalizedMarket,

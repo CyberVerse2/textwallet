@@ -340,6 +340,10 @@ export async function POST(req: Request) {
               }
 
               picks.sort((a, b) => {
+                // Featured first
+                const feat = (b.featured ? 1 : 0) - (a.featured ? 1 : 0);
+                if (feat !== 0) return feat;
+                // Then liquidity, then 24h volume, then score
                 const liq = (b.liquidity ?? 0) - (a.liquidity ?? 0);
                 if (liq !== 0) return liq;
                 const vol = (b.volume24h ?? 0) - (a.volume24h ?? 0);
@@ -434,6 +438,8 @@ export async function POST(req: Request) {
                   }
 
                   relaxedPicks.sort((a, b) => {
+                    const feat = (b.featured ? 1 : 0) - (a.featured ? 1 : 0);
+                    if (feat !== 0) return feat;
                     const liq = (b.liquidity ?? 0) - (a.liquidity ?? 0);
                     if (liq !== 0) return liq;
                     const vol = (b.volume24h ?? 0) - (a.volume24h ?? 0);
