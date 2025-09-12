@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import supabaseAdmin from '@/lib/supabaseAdmin';
+import crypto from 'crypto';
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,11 +14,14 @@ export async function POST(req: NextRequest) {
       startUnix,
       endUnix
     } = await req.json();
-    if (!userId || !permissionHash || !permission || !token || !allowance || !periodSeconds) {
+    if (!userId || !permission || !token || allowance == null || !periodSeconds) {
       return NextResponse.json({ error: 'missing_params' }, { status: 400 });
     }
+    const computedHash =
+      permissionHash ||
+      '0x' + crypto.createHash('sha256').update(JSON.stringify(permission)).digest('hex');
     const { error } = await supabaseAdmin.from('spend_permissions').upsert({
-      permission_hash: String(permissionHash),
+      permission_hash: String(computedHash),
       user_id: String(userId).toLowerCase(),
       token_address: String(token),
       allowance: Number(allowance),

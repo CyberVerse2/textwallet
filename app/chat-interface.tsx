@@ -34,6 +34,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
     error,
     reload,
     stop,
+    append,
     // Custom context values
     isWalletConnected,
     walletAddress,
@@ -41,6 +42,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
   } = useChatContext();
 
   const [isActing, setIsActing] = useState(false);
+  const triggeredIdsRef = useRef<Set<string>>(new Set());
 
   function parseSpendPermissionTag(content: string) {
     const re =
@@ -54,7 +56,21 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
     return { budgetUSD, periodDays, token, cleaned };
   }
 
-  async function onConfirmSpendPermission(budgetUSD: number, periodDays: number) {
+  function parseTriggerTag(content: string) {
+    const re =
+      /\[ACTION:TRIGGER_SPEND_PERMISSION(?:\s+budgetUSD=(\d+(?:\.\d+)?))?(?:\s+periodDays=(\d+))?\]/;
+    const m = content.match(re);
+    if (!m) return null;
+    const budgetUSD = m[1] ? parseFloat(m[1]) : undefined;
+    const periodDays = m[2] ? parseInt(m[2], 10) : undefined;
+    return { budgetUSD, periodDays };
+  }
+
+  async function onConfirmSpendPermission(
+    budgetUSD: number,
+    periodDays: number,
+    pendingTrade: boolean
+  ) {
     if (!walletAddress) return;
     try {
       setIsActing(true);
@@ -64,11 +80,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: walletAddress, amountCents: Math.round(budgetUSD * 100) })
       });
+      try {
+        localStorage.setItem('tw_budget_usd', String(budgetUSD));
+      } catch {}
       // 2) Fetch spender (CDP server wallet address)
       const addrRes = await fetch('/api/cdp/account');
       const addrJson = await addrRes.json();
       const spender = addrJson.address as string;
-      const tokenAddress = '	0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'; // Base USDC
+      const tokenAddress = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'; // Base USDC
       // 3) Request spend permission via Base Account SDK (client only)
       const { createBaseAccountSDK } = await import('@base-org/account');
       const { requestSpendPermission } = await import('@base-org/account/spend-permission');
@@ -96,12 +115,48 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
           periodSeconds: periodDays * 86400
         })
       });
+      try {
+        await append({
+          role: 'assistant',
+          content: pendingTrade
+            ? `✅ Budget set to $${budgetUSD} and spend permission enabled for ${periodDays} days. Proceeding with your trade…`
+            : `✅ Budget set to $${budgetUSD} and spend permission enabled for ${periodDays} days.`
+        });
+      } catch {}
     } catch (e) {
       console.error('Spend permission flow failed:', e);
+      try {
+        await append({
+          role: 'assistant',
+          content: '❌ Spend permission setup failed or was rejected.'
+        });
+      } catch {}
     } finally {
       setIsActing(false);
     }
   }
+
+  // Auto-trigger spend permission when assistant outputs [ACTION:TRIGGER_SPEND_PERMISSION]
+  useEffect(() => {
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== 'assistant') return;
+    if (triggeredIdsRef.current.has(last.id || String(messages.length))) return;
+    const parsed = parseTriggerTag(last.content || '');
+    if (!parsed) return;
+    let budget = parsed.budgetUSD;
+    if (budget == null) {
+      try {
+        const cached = localStorage.getItem('tw_budget_usd');
+        if (cached) budget = parseFloat(cached);
+      } catch {}
+    }
+    const period = parsed.periodDays ?? 7;
+    const likelyPending = /order|trade|proceed/i.test(last.content || '');
+    if (budget && !isActing) {
+      triggeredIdsRef.current.add(last.id || String(messages.length));
+      onConfirmSpendPermission(budget, period, likelyPending);
+    }
+  }, [messages, isActing]);
 
   // Log state changes to see what's happening
   useEffect(() => {
@@ -283,7 +338,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
                                 className="border-2 border-black"
                                 disabled={isActing}
                                 onClick={() =>
-                                  onConfirmSpendPermission(parsed.budgetUSD, parsed.periodDays)
+                                  onConfirmSpendPermission(
+                                    parsed.budgetUSD,
+                                    parsed.periodDays,
+                                    /order|trade|proceed/i.test(display || '')
+                                  )
                                 }
                               >
                                 Confirm
@@ -292,6 +351,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
                                 variant="outline"
                                 className="border-2 border-black"
                                 disabled={isActing}
+                                onClick={async () => {
+                                  try {
+                                    await append({
+                                      role: 'assistant',
+                                      content: '👍 Spend permission request cancelled.'
+                                    });
+                                  } catch {}
+                                }}
                               >
                                 Reject
                               </Button>

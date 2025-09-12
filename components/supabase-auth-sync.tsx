@@ -57,6 +57,9 @@ export const SupabaseAuthSyncProvider = ({ children }: { children: ReactNode }) 
           console.error('❌ Signature verification failed:', verifyJson);
           throw new Error(verifyJson.message || 'Signature verification failed.');
         }
+        try {
+          localStorage.setItem('tw_address', address.toLowerCase());
+        } catch {}
         console.log('[AuthSync] Signature verified. Syncing user...');
 
         // 3. Call the backend API route to sync the user by wallet address

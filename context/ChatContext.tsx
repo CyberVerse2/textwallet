@@ -54,8 +54,16 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
 
   // Derive wallet connection state from Wagmi account
   useEffect(() => {
-    setIsWalletConnected(Boolean(address));
-    setWalletAddress(address ?? null);
+    // Bootstrap from localStorage if wagmi address missing
+    let effective = address ?? null;
+    try {
+      if (!effective) {
+        const cached = localStorage.getItem('tw_address');
+        if (cached) effective = cached;
+      }
+    } catch {}
+    setIsWalletConnected(Boolean(effective));
+    setWalletAddress(effective);
   }, [address]);
 
   // Initialize Vercel AI Chat with proper naming
