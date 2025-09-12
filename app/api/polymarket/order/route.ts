@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import supabaseAdmin from '@/lib/supabaseAdmin';
 import { postOrder } from '@/lib/polymarket/trading';
+import { spendFromPermission } from '@/lib/base/spend';
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,6 +28,18 @@ export async function POST(req: NextRequest) {
       .update({ remaining_cents: remaining - costCents })
       .eq('user_id', userId.toLowerCase());
     if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
+
+    // Pull USDC from user's Base account to server wallet via spend permission (no bridge)
+    const usdcUnits = BigInt(Math.round(size * price * 1_000_000));
+    const spend = await spendFromPermission(userId, usdcUnits);
+    if (!spend.ok) {
+      // Refund on failure
+      await supabaseAdmin
+        .from('budgets')
+        .update({ remaining_cents: remaining })
+        .eq('user_id', userId.toLowerCase());
+      return NextResponse.json({ error: spend.error || 'spend_failed' }, { status: 500 });
+    }
 
     // Place the Polymarket order
     const result = await postOrder({ tokenID, price, side, size, tickSize, negRisk, feeRateBps });
