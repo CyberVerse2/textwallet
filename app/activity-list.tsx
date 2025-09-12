@@ -1,14 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { ArrowRightLeft, Wallet, BarChart2, Clock } from 'lucide-react';
 
 interface Activity {
-  type: 'swap' | 'balance' | 'liquidity' | 'other';
+  type: 'trade' | 'permission' | 'other';
   description: string;
   timestamp: string;
-  status: 'completed' | 'pending' | 'failed';
+  status: 'completed' | 'pending' | 'failed' | 'posted';
 }
 
 interface ActivityListProps {
@@ -17,47 +17,35 @@ interface ActivityListProps {
 }
 
 export default function ActivityList({ walletAddress, refreshTrigger }: ActivityListProps) {
-  const [activities] = useState<Activity[]>([
-    {
-      type: 'swap',
-      description: 'Swapped 1 BNB for 100 BASE',
-      timestamp: '10:45 AM',
-      status: 'completed'
-    },
-    {
-      type: 'balance',
-      description: 'Checked wallet balance',
-      timestamp: '10:30 AM',
-      status: 'completed'
-    },
-    {
-      type: 'liquidity',
-      description: 'Viewed top liquidity pools',
-      timestamp: 'Yesterday',
-      status: 'completed'
-    },
-    {
-      type: 'swap',
-      description: 'Swapped 0.5 ETH for 800 USDT',
-      timestamp: 'Yesterday',
-      status: 'completed'
-    },
-    {
-      type: 'other',
-      description: 'Connected wallet',
-      timestamp: 'Yesterday',
-      status: 'completed'
-    }
-  ]);
+  const [activities, setActivities] = useState<Activity[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const run = async () => {
+      try {
+        const url = walletAddress ? `/api/activity?userId=${walletAddress}` : '/api/activity';
+        const res = await fetch(url);
+        const json = await res.json();
+        if (!isMounted) return;
+        const list: Activity[] = Array.isArray(json?.activities) ? json.activities : [];
+        setActivities(list);
+      } catch {
+        if (!isMounted) return;
+        setActivities([]);
+      }
+    };
+    run();
+    return () => {
+      isMounted = false;
+    };
+  }, [walletAddress, refreshTrigger]);
 
   const getActivityIcon = (type: Activity['type']) => {
     switch (type) {
-      case 'swap':
+      case 'trade':
         return <ArrowRightLeft className="h-3 w-3" />;
-      case 'balance':
+      case 'permission':
         return <Wallet className="h-3 w-3" />;
-      case 'liquidity':
-        return <BarChart2 className="h-3 w-3" />;
       default:
         return <Clock className="h-3 w-3" />;
     }
@@ -68,7 +56,7 @@ export default function ActivityList({ walletAddress, refreshTrigger }: Activity
       case 'completed':
         return 'bg-green-500';
       case 'pending':
-        return 'bg-yellow';
+        return 'bg-blue';
       case 'failed':
         return 'bg-red-500';
       default:
