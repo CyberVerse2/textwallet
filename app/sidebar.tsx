@@ -7,7 +7,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import TokenList from './token-list';
 import ActivityList from './activity-list';
 import {
-  Wallet,
+  Wallet as WalletIcon,
   Activity,
   Settings,
   LogOut,
@@ -16,6 +16,7 @@ import {
   BarChart2,
   ImageIcon
 } from 'lucide-react';
+import { Wallet as OckWallet, ConnectWallet, ConnectWalletText } from '@coinbase/onchainkit/wallet';
 
 import type { NativeBalance } from './api/native-balances/route'; // Import NativeBalance type
 import type { DisplayBalance, EnrichedTokenBalance } from './token-list';
@@ -42,6 +43,13 @@ export default function Sidebar() {
             </div>
             <span className="font-bold text-xl">Text Wallet</span>
           </div>
+          <div className="mt-4">
+            <OckWallet>
+              <ConnectWallet className="w-full">
+                <ConnectWalletText>Connect Wallet</ConnectWalletText>
+              </ConnectWallet>
+            </OckWallet>
+          </div>
         </div>
 
         <SidebarTabs />
@@ -67,7 +75,8 @@ function SidebarTabs({}: SidebarTabsProps) {
   useEffect(() => {
     let isMounted = true; // Flag to prevent state updates on unmounted component
 
-    if (walletAddress) { // Use walletAddress from Privy
+    if (walletAddress) {
+      // Use walletAddress from Privy
       setIsLoadingTokens(true);
       setFetchError(null);
       setErc20TokenData([]); // Clear previous ERC20 data
@@ -93,7 +102,9 @@ function SidebarTabs({}: SidebarTabsProps) {
           if (!res.ok) {
             const errorData = await res.json().catch(() => ({})); // Try to parse error JSON
             throw new Error(
-              `ERC20 API Error ${res.status}: ${res.statusText} - ${errorData?.message || 'Unknown error'}`
+              `ERC20 API Error ${res.status}: ${res.statusText} - ${
+                errorData?.message || 'Unknown error'
+              }`
             );
           }
           const data = await res.json();
@@ -105,7 +116,9 @@ function SidebarTabs({}: SidebarTabsProps) {
           if (!res.ok) {
             const errorData = await res.json().catch(() => ({})); // Try to parse error JSON
             throw new Error(
-              `Native Balances API Error ${res.status}: ${res.statusText} - ${errorData?.message || 'Unknown error'}`
+              `Native Balances API Error ${res.status}: ${res.statusText} - ${
+                errorData?.message || 'Unknown error'
+              }`
             );
           }
           const data = await res.json();
@@ -146,7 +159,9 @@ function SidebarTabs({}: SidebarTabsProps) {
             setNativeTokenData([]); // Clear data on error
             // Append to existing error or set if no previous error
             currentError = currentError
-              ? `${currentError}; ${nativeResult.reason?.message || 'Failed to fetch native balances'}`
+              ? `${currentError}; ${
+                  nativeResult.reason?.message || 'Failed to fetch native balances'
+                }`
               : nativeResult.reason?.message || 'Failed to fetch native balances';
           }
 
@@ -156,7 +171,7 @@ function SidebarTabs({}: SidebarTabsProps) {
           setFetchError(error.message || 'An unexpected error occurred while fetching data');
           setErc20TokenData([]); // Clear data on error
           setNativeTokenData([]); // Clear data on error
-          setTotalValue(null);    // Clear total value on error
+          setTotalValue(null); // Clear total value on error
         } finally {
           if (isMounted) {
             setIsLoadingTokens(false);
@@ -221,7 +236,7 @@ function SidebarTabs({}: SidebarTabsProps) {
           }`}
           onClick={() => setActiveTab('assets')}
         >
-          <Wallet className="h-5 w-5" />
+          <WalletIcon className="h-5 w-5" />
           <span>Assets</span>
         </button>
 
@@ -251,22 +266,24 @@ function SidebarTabs({}: SidebarTabsProps) {
                 <span className="text-sm font-semibold">Connected Wallet</span>
                 <div className="h-2 w-2 rounded-full bg-green-500"></div>
               </div>
-              <div className="text-sm text-muted-foreground truncate">{formatDisplayAddress(walletAddress)}</div>
+              <div className="text-sm text-muted-foreground truncate">
+                {formatDisplayAddress(walletAddress)}
+              </div>
+            </div>
+          ) : authenticated ? (
+            <div className="flex flex-col items-center p-4 mb-6 rounded-xl border-2 border-dashed border-muted-foreground text-center">
+              <WalletIcon className="h-8 w-8 mb-3 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground mb-3">
+                Connect your wallet via the main login/connect button to view assets.
+              </p>
             </div>
           ) : (
-            authenticated ? (
-              <div className="flex flex-col items-center p-4 mb-6 rounded-xl border-2 border-dashed border-muted-foreground text-center">
-                <Wallet className="h-8 w-8 mb-3 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground mb-3">
-                  Connect your wallet via the main login/connect button to view assets.
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center p-4 mb-6 rounded-xl border-2 border-dashed border-muted-foreground text-center">
-                <Wallet className="h-8 w-8 mb-3 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground mb-3">Please log in to connect a wallet.</p>
-              </div>
-            )
+            <div className="flex flex-col items-center p-4 mb-6 rounded-xl border-2 border-dashed border-muted-foreground text-center">
+              <WalletIcon className="h-8 w-8 mb-3 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground mb-3">
+                Please log in to connect a wallet.
+              </p>
+            </div>
           )}
 
           {/* Tab Content */}
@@ -275,12 +292,14 @@ function SidebarTabs({}: SidebarTabsProps) {
               {/* Assets Section Header */}
               <div className="mb-6">
                 <h3 className="font-bold text-2xl mb-4">Assets</h3>
-                
+
                 {/* ETH Token Card */}
                 {nativeTokenData.length > 0 ? (
                   <div className="mb-4">
-                    <div className="flex items-center justify-between p-4 rounded-xl border-2 border-black mb-3"
-                      style={{ boxShadow: "4px 4px 0px 0px #000000" }}>
+                    <div
+                      className="flex items-center justify-between p-4 rounded-xl border-2 border-black mb-3"
+                      style={{ boxShadow: '4px 4px 0px 0px #000000' }}
+                    >
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center">
                           <div className="h-6 w-6 rounded-full bg-white flex items-center justify-center">
@@ -288,20 +307,28 @@ function SidebarTabs({}: SidebarTabsProps) {
                           </div>
                         </div>
                         <div>
-                          <div className="font-bold">ETH <span className="text-gray-500 font-normal">(Base)</span></div>
+                          <div className="font-bold">
+                            ETH <span className="text-gray-500 font-normal">(Base)</span>
+                          </div>
                           <div className="text-gray-500 text-sm">Native Balance</div>
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="font-bold">{parseFloat(nativeTokenData[0]?.formattedBalance || '0').toFixed(3)}</div>
-                        <div className="text-gray-500 text-sm">${parseFloat(nativeTokenData[0]?.usdValue?.toFixed(2) || '0')}</div>
+                        <div className="font-bold">
+                          {parseFloat(nativeTokenData[0]?.formattedBalance || '0').toFixed(3)}
+                        </div>
+                        <div className="text-gray-500 text-sm">
+                          ${parseFloat(nativeTokenData[0]?.usdValue?.toFixed(2) || '0')}
+                        </div>
                       </div>
                     </div>
                   </div>
                 ) : isLoadingTokens ? (
                   <div className="mb-4">
-                    <div className="flex items-center justify-between p-4 rounded-xl border-2 border-black mb-3 animate-pulse"
-                      style={{ boxShadow: "4px 4px 0px 0px #000000" }}>
+                    <div
+                      className="flex items-center justify-between p-4 rounded-xl border-2 border-black mb-3 animate-pulse"
+                      style={{ boxShadow: '4px 4px 0px 0px #000000' }}
+                    >
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-gray-200"></div>
                         <div>
@@ -316,25 +343,25 @@ function SidebarTabs({}: SidebarTabsProps) {
                     </div>
                   </div>
                 ) : null}
-                
+
                 {/* Show Small Balances Button */}
                 <button
                   onClick={() => setShowAllTokens(!showAllTokens)}
                   className="w-full flex items-center justify-between p-3 rounded-xl border-2 border-black bg-yellow text-black font-bold"
-                  style={{ boxShadow: "4px 4px 0px 0px #000000" }}
+                  style={{ boxShadow: '4px 4px 0px 0px #000000' }}
                 >
                   <span>Show Small Balances</span>
                   <ChevronDown className="h-5 w-5" />
                 </button>
               </div>
-              
+
               {/* Separator Line */}
               <div className="border-b-2 border-black mb-6"></div>
-              
+
               {/* NFTs Section */}
               <button
                 className="w-full flex items-center justify-between p-3 rounded-xl border-2 border-black text-black font-bold"
-                style={{ boxShadow: "4px 4px 0px 0px #000000" }}
+                style={{ boxShadow: '4px 4px 0px 0px #000000' }}
               >
                 <div className="flex items-center gap-2">
                   <ImageIcon className="h-5 w-5" />

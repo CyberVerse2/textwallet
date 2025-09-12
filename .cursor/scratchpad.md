@@ -22,16 +22,16 @@ Primary goals:
 2. Auth model shift (Privy → Wallet)
 
    - Privy currently: client obtains Privy access token and server verifies it (`pages/api/sync-user.ts`).
-   - OnchainKit: no Privy JWT; identity is the connected wallet address. For server-side trust, we should verify ownership via signed nonce (SIWE-like) using `viem` on the server.
+   - OnchainKit: identity is the connected wallet address. Per product decision, we will use a static message signature (no nonce) to verify control of the address server-side.
    - Supabase user identity must migrate from `privy_user_id` to `wallet_address` (unique, lowercase checksum-insensitive). Backward compatibility needed during rollout.
 
 3. Code touchpoints to refactor
 
    - `app/providers.tsx`: Replace `PrivyProvider` with `OnchainKitProvider` (and add Wagmi/Query providers).
-   - `components/supabase-auth-sync.tsx`: Replace `usePrivy` logic with wallet connection detection + signed verification call; likely rename component.
+   - `components/supabase-auth-sync.tsx`: Replace `usePrivy` logic with wallet connection detection + signature verification call; likely rename component.
    - `hooks/usePrivyAuth.ts`: Remove/replace with a wallet-auth hook using Wagmi (`useAccount`, `useDisconnect`) and OnchainKit components.
    - `context/ChatContext.tsx`: Replace `usePrivy`/delegated actions with Wagmi/OnchainKit equivalents; provide `logout` via `disconnect`.
-   - `pages/api/sync-user.ts`: Replace Privy verification with signed-message verification and upsert by `wallet_address`.
+   - `pages/api/sync-user.ts`: Replace Privy verification with signature verification and upsert by `wallet_address`.
    - DB: add `wallet_address` to `users` table; update code to query by `wallet_address` instead of `privy_user_id`.
    - Docs/env: update `SUPABASE_SETUP.md`, `README.md`, and `.env` vars.
 
@@ -43,8 +43,7 @@ Primary goals:
 
 5. Security & UX
 
-   - Implement nonce issuance and signature verification to protect `/api/sync-user` from spoofing.
-   - Cache the session (e.g., httpOnly cookie with a short-lived signed session tied to address) if needed for repeated calls, or keep stateless upsert on each connect.
+   - Static message signature verification (no nonce) per product decision.
    - Maintain clear toasts/debug logs per User Specified Lessons.
 
 6. Rollback plan
@@ -68,20 +67,19 @@ Primary goals:
    - Add `Wallet` + `ConnectWallet` button in the sidebar (`app/sidebar.tsx`).
    - Success: Button connects to a wallet and displays connected state/avatar/name.
 
-4. Server-side signed auth endpoints
+4. Server-side signature verification endpoint
 
-   - Create `/app/api/auth/nonce/route.ts` to issue a nonce for an address.
-   - Create `/app/api/auth/verify/route.ts` to verify the signature with `viem` and return success + normalized address.
+   - Create `/app/api/auth/verify/route.ts` to verify a static message signature with `viem` and return success + normalized address. (Nonce issuance not required.)
    - Success: Invalid signatures are rejected; valid signatures return 200 with the expected address.
 
 5. Supabase user sync by wallet address
 
-   - Replace `/pages/api/sync-user.ts` or create `/app/api/sync-user/route.ts` to upsert user by `wallet_address` after successful verification.
+   - Implement `/app/api/sync-user/route.ts` to upsert user by `wallet_address` after successful verification.
    - Success: First-time connect creates user, subsequent connects update `last_login`.
 
 6. Migrate `components/supabase-auth-sync.tsx`
 
-   - Update to detect connected wallet; orchestrate nonce/sign/verify; call sync API; handle toasts/loading.
+   - Update to detect connected wallet; request signature; call verify API; call sync API; handle toasts/loading.
    - Success: On connect, user is synced and server wallet provisioning runs as before.
 
 7. Replace Privy hooks and contexts
@@ -111,11 +109,11 @@ Primary goals:
 
 ## Project Status Board
 
-- [ ] 1. Add OnchainKit + Wagmi + Query providers
-- [ ] 2. Configure env and Base chain
-- [ ] 3. Implement ConnectWallet in UI (sidebar)
-- [ ] 4. Add nonce and verify API routes
-- [ ] 5. Implement wallet-address user sync API
+- [x] 1. Add OnchainKit + Wagmi + Query providers
+- [x] 2. Configure env and Base chain
+- [x] 3. Implement ConnectWallet in UI (sidebar)
+- [x] 4. Add verify API route (no nonce)
+- [x] 5. Implement wallet-address user sync API
 - [ ] 6. Update Supabase sync provider component
 - [ ] 7. Replace Privy hooks/contexts
 - [ ] 8. [Cancelled] Zora custom actions (not used)
@@ -125,14 +123,10 @@ Primary goals:
 
 ## Current Status / Progress Tracking
 
-- In progress: 1) Providers setup. Blocked by npm peer dependency conflict (`react-day-picker@8.10.1` requires `date-fns ^2.28 || ^3`, but project has `date-fns@4.1.0`).
+- Providers, ConnectWallet UI, verify (no nonce), and sync-user routes are in place. Next: update client auth sync flow and DB migration.
 
 ## Executor's Feedback or Assistance Requests
 
-- How should we resolve the dependency conflict to proceed with installing OnchainKit/Wagmi/React Query?
-  - Option A: Use `npm install --legacy-peer-deps` for this install.
-  - Option B: Downgrade `date-fns` to `^3.6.0` (safer with `react-day-picker@8.10.1`).
-  - Option C: Switch to `pnpm` (lockfile exists) and install with relaxed peer resolution.
 - Confirm target chain(s): Base mainnet `8453`? Any testnet?
 - Approve DB migration to add `wallet_address` and gradually deprecate `privy_user_id`.
 

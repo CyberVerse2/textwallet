@@ -1,5 +1,5 @@
 import { useEffect, useState, createContext, useContext, ReactNode } from 'react';
-import { usePrivy } from '@privy-io/react-auth';
+import { useAccount, useSignMessage } from 'wagmi';
 import { useToast } from '@/components/ui/use-toast';
 // Keep the client-side supabase for other potential uses (like RLS-protected reads)
 import { supabase } from '@/lib/supabaseClient';
@@ -12,23 +12,18 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const SupabaseAuthSyncProvider = ({ children }: { children: ReactNode }) => {
-  const { ready, authenticated, user, getAccessToken } = usePrivy();
+  const { address } = useAccount();
+  const { signMessageAsync } = useSignMessage();
   const [isInitialized, setIsInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(true); // Start loading until ready/auth state is known
   const { toast } = useToast();
 
   useEffect(() => {
-    // Wait for Privy to be ready
-    if (!ready) {
-      setIsLoading(true);
+    // If no connected wallet, consider initialized for now
+    if (!address) {
+      setIsLoading(false);
+      setIsInitialized(true);
       return;
-    }
-
-    // If ready but not authenticated, or no user object, we are done loading
-    if (!authenticated || !user) {
-        setIsLoading(false);
-        setIsInitialized(true); // Consider initialized if definitely not logged in
-        return;
     }
 
     // Define the async function to sync and setup user
@@ -37,44 +32,54 @@ export const SupabaseAuthSyncProvider = ({ children }: { children: ReactNode }) 
       if (isLoading || isInitialized) return;
 
       setIsLoading(true);
-      console.log('[AuthSync] Privy authenticated, user:', user.id);
-      console.log('[AuthSync] Attempting backend sync...');
+      console.log('[AuthSync] Wallet connected:', address);
+      console.log('[AuthSync] Attempting signature verification and backend sync...');
 
       try {
-        // 1. Get Privy access token
-        const authToken = await getAccessToken();
-        if (!authToken) {
-          throw new Error('Could not retrieve Privy access token.');
+        // 1. Sign a static message
+        const message = 'Sign this message to verify your address for Text Wallet.';
+        const signature = await signMessageAsync({ message });
+        if (!signature) {
+          throw new Error('Signature was not obtained.');
         }
-        console.log('[AuthSync] Retrieved Privy token.');
+        console.log('[AuthSync] Obtained signature. Verifying...');
 
-        // 2. Call the backend API route to sync the user
-        const response = await fetch('/api/sync-user', {
+        // 2. Verify signature with backend
+        const verifyRes = await fetch('/api/auth/verify', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`,
+            'Content-Type': 'application/json'
           },
+          body: JSON.stringify({ address, signature })
         });
-
-        const result = await response.json();
-
-        if (!response.ok) {
-          console.error('❌ Error syncing user via backend:', result);
-          throw new Error(result.message || 'Failed to sync user via backend.');
+        const verifyJson = await verifyRes.json();
+        if (!verifyRes.ok) {
+          console.error('❌ Signature verification failed:', verifyJson);
+          throw new Error(verifyJson.message || 'Signature verification failed.');
         }
+        console.log('[AuthSync] Signature verified. Syncing user...');
 
-        console.log('[AuthSync] Backend sync successful:', result.message, 'User ID:', result.userId);
+        // 3. Call the backend API route to sync the user by wallet address
+        const syncRes = await fetch('/api/sync-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ address })
+        });
+        const syncJson = await syncRes.json();
+        if (!syncRes.ok) {
+          console.error('❌ Error syncing user via backend:', syncJson);
+          throw new Error(syncJson.message || 'Failed to sync user via backend.');
+        }
+        console.log('[AuthSync] Backend sync successful:', syncJson.message);
 
         setIsInitialized(true);
         console.log('[AuthSync] User sync and setup complete.');
-
       } catch (err: any) {
         console.error('❌ Error during auth sync process:', err);
         toast({
           title: 'Authentication Setup Error',
           description: err.message || 'Failed to complete setup. Please refresh and try again.',
-          variant: 'destructive',
+          variant: 'destructive'
         });
         // Keep loading false, but maybe set initialized false if setup is critical?
         // For now, let's assume partial success might be okay, or user needs to refresh.
@@ -88,12 +93,10 @@ export const SupabaseAuthSyncProvider = ({ children }: { children: ReactNode }) 
     syncAndSetupUser();
 
     // Dependencies: Run when auth state changes or essential functions become available
-  }, [ready, authenticated, user, getAccessToken, toast, isInitialized, isLoading]);
+  }, [address, signMessageAsync, toast, isInitialized, isLoading]);
 
   return (
-    <AuthContext.Provider value={{ isInitialized, isLoading }}>
-      {children}
-    </AuthContext.Provider>
+    <AuthContext.Provider value={{ isInitialized, isLoading }}>{children}</AuthContext.Provider>
   );
 };
 
