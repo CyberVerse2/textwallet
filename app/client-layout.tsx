@@ -54,7 +54,7 @@ interface SidebarProps {
 const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar(props, ref) {
   // Use Chat context setters and Wagmi account
   const { setIsWalletConnected, setWalletAddress } = useChatContext();
-  const { address } = useAccount();
+  const { address, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
 
   // State for copy address button
@@ -74,14 +74,14 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
   }));
 
   // Derived state for UI
-  const isWalletEffectivelyConnected = Boolean(address);
-  const displayAddress = address ?? null;
+  const isWalletEffectivelyConnected = isConnected;
+  const displayAddress = isConnected ? address ?? null : null;
 
   // Update context based on Wagmi state
   useEffect(() => {
-    setIsWalletConnected(Boolean(address));
-    setWalletAddress(address ?? null);
-  }, [address, setIsWalletConnected, setWalletAddress]);
+    setIsWalletConnected(isConnected);
+    setWalletAddress(isConnected ? address ?? null : null);
+  }, [address, isConnected, setIsWalletConnected, setWalletAddress]);
 
   // Funding/export actions removed with Privy
   const handleFundWallet = async () => {};

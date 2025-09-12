@@ -97,7 +97,10 @@ function SidebarTabs({}: SidebarTabsProps) {
   const { disconnect } = useDisconnect();
   const { connectors, connect, isPending } = useConnect();
   // Use optional chaining and memoization for stability
-  const walletAddress = useMemo(() => address ?? null, [address]);
+  const walletAddress = useMemo(
+    () => (isConnected ? address ?? null : null),
+    [address, isConnected]
+  );
 
   useEffect(() => {
     let isMounted = true; // Flag to prevent state updates on unmounted component
