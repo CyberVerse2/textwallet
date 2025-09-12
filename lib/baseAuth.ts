@@ -10,6 +10,9 @@ export async function signInWithBase(): Promise<{ address: string } | null> {
       globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2)
     ).replace(/-/g, '');
 
+    // 0 — request accounts first per provider requirements
+    await provider.request({ method: 'eth_requestAccounts' });
+
     await provider.request({
       method: 'wallet_switchEthereumChain',
       params: [{ chainId: '0x2105' }] // Base mainnet 8453
