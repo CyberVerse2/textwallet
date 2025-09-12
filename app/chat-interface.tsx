@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ArrowUp, Bot, Sparkles, ArrowLeft, RefreshCw } from 'lucide-react';
 import { useChatContext } from '@/context/ChatContext';
-import { usePrivy } from '@privy-io/react-auth';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -22,7 +21,6 @@ interface CodeProps {
 }
 
 const ChatInterface: React.FC<ChatInterfaceProps> = () => {
-  const { user } = usePrivy();
   const prevMessagesLengthRef = useRef<number>(0);
   const prevInputRef = useRef<string>('');
   const prevIsLoadingRef = useRef<boolean>(false);

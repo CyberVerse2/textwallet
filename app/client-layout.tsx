@@ -8,7 +8,6 @@ import ActivityList from "./activity-list"
 import "./globals.css"
 import { ChatProvider, useChatContext } from '@/context/ChatContext';
 import { shortenAddress } from "@/lib/utils"; // Import shortenAddress at the top
-import { usePrivy, useWallets, useFundWallet } from "@privy-io/react-auth"; // Remove delegation hook
 import { base } from "viem/chains"; // Import Base chain configuration
 import { EnrichedTokenBalance } from './token-list'; // Import the correct type
 

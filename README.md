@@ -1,6 +1,6 @@
 # Textwallet
 
-![text wallet](</public/home.png>)
+![text wallet](/public/home.png)
 TextWallet is a modular network of interoperable DeFi agents designed to bring the full functionality of EVM-compatible crypto wallets (and more) to a text-based interface. Interact with DeFi protocols, manage assets, conduct research, and get portfolio insights, all through text commands.
 
 ## Features
@@ -17,6 +17,8 @@ TextWallet is a modular network of interoperable DeFi agents designed to bring t
 
 - **Framework:** [Next.js](https://nextjs.org/) 15.2.4
 - **Library:** [React](https://reactjs.org/) 19
+- **Wallet & Identity:** [OnchainKit](https://onchainkit.xyz) + [Wagmi](https://wagmi.sh)
+- **Database:** [Supabase](https://supabase.com)
 
 ## Getting Started
 
@@ -46,7 +48,7 @@ Follow these instructions to set up and run the project locally.
    pnpm install
    ```
 
-   **Note:** If you encounter peer dependency conflicts, particularly related to `date-fns` and `react-day-picker`, you might need to use the `--legacy-peer-deps` flag:
+   **Note:** If you encounter peer dependency conflicts (e.g., `date-fns` vs `react-day-picker`), use the `--legacy-peer-deps` flag:
 
    ```bash
    npm install --legacy-peer-deps
@@ -72,7 +74,14 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 ## Known Issues
 
-- There was a known dependency conflict between `date-fns` v4.1.0 and `react-day-picker` v8.10.1 (which requires `date-fns` v2 or v3). Installing dependencies using the `--legacy-peer-deps` flag is the current workaround.
+- There may be a dependency conflict between `date-fns` v4.1.0 and `react-day-picker` v8.10.1 (which requires `date-fns` v2 or v3). Installing dependencies using the `--legacy-peer-deps` flag is the current workaround.
+
+## Authentication & Sync
+
+- The app uses OnchainKit’s `<Wallet>` and `<ConnectWallet>` for wallet-based login.
+- On connect, the client signs a static message and calls `/api/auth/verify`.
+- After verification, the client calls `/api/sync-user` to upsert the user by `wallet_address`.
+- Ensure you’ve run the migrations `001_create_tables.sql` and `002_add_wallet_address.sql` in Supabase.
 
 ## Contributing
 

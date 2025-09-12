@@ -190,7 +190,7 @@ function SidebarTabs({}: SidebarTabsProps) {
     return () => {
       isMounted = false; // Cleanup function to set flag on unmount
     };
-  }, [walletAddress, authenticated]); // Depend on walletAddress and authenticated status from Privy
+  }, [walletAddress]);
 
   // Combine and sort all balances for display
   const allBalances = useMemo(() => {
