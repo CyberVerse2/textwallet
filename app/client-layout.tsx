@@ -22,6 +22,7 @@ import { EnrichedTokenBalance } from './token-list'; // Import the correct type
 import { useAccount, useDisconnect } from 'wagmi';
 import { SignInWithBaseButton } from '@base-org/account-ui/react';
 import { signInWithBase } from '@/lib/baseAuth';
+import ReactMarkdown from 'react-markdown';
 
 // Create a ref to hold the SidebarTabs component
 const sidebarRef = React.createRef<{ refreshBalances: () => void }>();
@@ -274,85 +275,42 @@ function PositionsSection({
   isWalletConnected: boolean;
   walletAddress: string | null;
 }) {
-  // Accept address prop
-  // Add state for tokens and loading
-  const [tokens, setTokens] = useState<EnrichedTokenBalance[]>([]);
-  const [isLoading, setIsLoading] = useState(false); // Start not loading
-  const [error, setError] = useState<string | null>(null); // Add error state
-  const [showSmallBalances, setShowSmallBalances] = useState(false); // State to control small balances visibility
+  const [pos, setPos] = useState<{
+    title: string;
+    url?: string;
+    yesSize: number;
+    noSize: number;
+  } | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Calculate if we have small balances that are hidden
-  const hasSmallBalances = tokens.some((token) => {
-    // Consider a balance small if its USD value is less than $0.1
-    if (typeof token.usdValue === 'number' && token.usdValue < 0.1) {
-      return true;
-    }
-
-    // For tokens without USD value, check the formatted balance
-    const balance = parseFloat(token.formattedBalance || '0');
-    if ((token as any).isNative === true) {
-      // For native tokens (ETH), less than 0.001 is small
-      return balance < 0.001;
-    }
-
-    // For other tokens, less than 1 is small
-    return balance < 1;
-  });
+  useEffect(() => {
+    const run = async () => {
+      if (!walletAddress) return;
+      setIsLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(`/api/positions?userId=${walletAddress}`);
+        const json = await res.json();
+        const p = Array.isArray(json?.positions) ? json.positions[0] : null;
+        setPos(
+          p ? { title: p.title, url: p.url, yesSize: p.yesSize || 0, noSize: p.noSize || 0 } : null
+        );
+      } catch (e: any) {
+        setError(e?.message || 'failed');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    run();
+  }, [walletAddress]);
 
   // Create a function to fetch all balances that can be called from other components
-  const fetchAllBalances = async () => {
-    if (!walletAddress) {
-      setIsLoading(false);
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const nativeUrl = `/api/native-balances?address=${walletAddress}`;
-      const tokenUrl = `/api/tokens?address=${walletAddress}`;
-
-      const [nativeRes, tokenRes] = await Promise.all([fetch(nativeUrl), fetch(tokenUrl)]);
-
-      const nativeData: EnrichedTokenBalance | null = await nativeRes.json();
-      const tokenData: { tokens: EnrichedTokenBalance[] } | null = await tokenRes.json();
-
-      const nativeToken = nativeData;
-      const erc20Tokens = tokenData?.tokens || [];
-
-      let combinedTokens = nativeToken ? [nativeToken, ...erc20Tokens] : erc20Tokens;
-
-      // Filter out tokens with null USD value BEFORE sorting
-      combinedTokens = combinedTokens.filter(
-        (token: EnrichedTokenBalance) =>
-          typeof token.usdPricePerToken === 'number' && token.usdPricePerToken > 0
-      );
-
-      // Sort by USD value, descending
-      combinedTokens.sort(
-        (a: EnrichedTokenBalance, b: EnrichedTokenBalance) => (b.usdValue ?? 0) - (a.usdValue ?? 0)
-      );
-
-      setTokens(combinedTokens);
-    } catch (err: any) {
-      setError(`Failed to fetch balances: ${err.message}`);
-      setTokens([]); // Clear tokens on error
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const fetchAllBalances = async () => {};
 
   // Fetch data when the wallet is connected and address is available
   useEffect(() => {
-    if (isWalletConnected && walletAddress) {
-      fetchAllBalances();
-    } else {
-      // Clear tokens and errors if wallet disconnects or no address
-      setTokens([]);
-      setIsLoading(false);
-      setError(null);
-    }
+    // positions section no-op here
   }, [isWalletConnected, walletAddress]); // Re-run effect when connection or address changes
 
   return (
@@ -361,7 +319,42 @@ function PositionsSection({
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-bold text-lg">Positions</h3>
         </div>
-        <PositionsCard walletAddress={walletAddress} />
+        {isLoading && (
+          <div
+            className="p-4 rounded-xl border-2 border-black animate-pulse"
+            style={{ boxShadow: '2px 2px 0px 0px #000000' }}
+          >
+            Loading…
+          </div>
+        )}
+        {!isLoading && error && (
+          <div
+            className="p-4 rounded-xl border-2 border-black bg-red-50"
+            style={{ boxShadow: '2px 2px 0px 0px #000000' }}
+          >
+            Failed to load position
+          </div>
+        )}
+        {!isLoading && !error && pos && (
+          <div
+            className="p-4 rounded-xl border-2 border-black"
+            style={{ boxShadow: '2px 2px 0px 0px #000000' }}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <a href={pos.url} target="_blank" rel="noreferrer" className="font-bold underline">
+                {pos.title}
+              </a>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="text-sm">YES size</div>
+              <div className="font-bold">${pos.yesSize.toFixed(2)}</div>
+            </div>
+            <div className="flex items-center justify-between mt-1">
+              <div className="text-sm">NO size</div>
+              <div className="font-bold">${pos.noSize.toFixed(2)}</div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
