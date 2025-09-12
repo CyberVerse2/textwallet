@@ -253,7 +253,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
       <div className="p-4 w-full max-w-[50rem] flex items-center">
         <Button
           variant="outline"
-          className="hidden items-center justify-center h-auto py-2 px-4 border-2 border-black bg-yellow hover:bg-yellow/90 active:translate-y-px active:shadow-none transition-all duration-100 rounded-xl font-medium"
+          className="hidden items-center justify-center h-auto py-2 px-4 border-2 border-black bg-blue hover:bg-blue/90 active:translate-y-px active:shadow-none transition-all duration-100 rounded-xl font-medium"
           style={{ boxShadow: '2px 2px 0px 0px #000000' }}
         >
           <ArrowLeft className="h-4 w-4" />
@@ -277,7 +277,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
             // Determine alignment based on sender ('user' or 'assistant' from SDK)
             const isUser = message.role === 'user';
             const alignClass = isUser ? 'justify-end' : 'justify-start';
-            const bubbleClass = isUser ? 'bg-yellow text-black' : 'bg-white';
+            const bubbleClass = isUser ? 'bg-blue text-black' : 'bg-white';
             const avatarSrc = isUser ? '/path/to/user/avatar.png' : '/txt-logo.png'; // Replace with actual user avatar if available
             const avatarFallback = isUser ? 'U' : 'AI';
 
@@ -287,7 +287,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
                 className={`flex items-start gap-3 ${alignClass}`}
               >
                 {message.role === 'assistant' && (
-                  <div className="w-8 h-8 rounded-full bg-yellow flex items-center justify-center border-2 border-black flex-shrink-0">
+                  <div className="w-8 h-8 rounded-full bg-blue flex items-center justify-center border-2 border-black flex-shrink-0">
                     <Bot className="w-5 h-5 text-black" />
                   </div>
                 )}
@@ -433,7 +433,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
           })}
           {isLoading && (
             <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-full bg-yellow flex items-center justify-center border-2 border-black flex-shrink-0">
+              <div className="w-8 h-8 rounded-full bg-blue flex items-center justify-center border-2 border-black flex-shrink-0">
                 <Bot className="w-5 h-5 text-black" />
               </div>
               <div
@@ -446,7 +446,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
           )}
           {error && !isLoading && (
             <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-full bg-yellow flex items-center justify-center border-2 border-black flex-shrink-0">
+              <div className="w-8 h-8 rounded-full bg-blue flex items-center justify-center border-2 border-black flex-shrink-0">
                 <Bot className="w-5 h-5 text-black" />
               </div>
               <div
@@ -489,7 +489,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
           <Button
             type="submit"
             disabled={isDisabled || !input.trim()}
-            className="absolute right-2 top-2 bg-yellow hover:bg-yellow/90 text-black border-2 border-black rounded-xl h-9 w-9 p-0 flex items-center justify-center"
+            className="absolute right-2 top-2 bg-blue hover:bg-blue/90 text-black border-2 border-black rounded-xl h-9 w-9 p-0 flex items-center justify-center"
             style={{ boxShadow: '2px 2px 0px 0px #000000' }}
           >
             <ArrowUp className="h-5 w-5" />

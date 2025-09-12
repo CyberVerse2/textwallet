@@ -57,7 +57,7 @@ export default function Sidebar() {
           {isConnected ? (
             <Button
               variant="outline"
-              className="w-full justify-start mb-2 border-2 border-black hover:bg-yellow/20 active:translate-y-px active:shadow-none transition-all duration-100 rounded-xl font-bold"
+              className="w-full justify-start mb-2 border-2 border-black hover:bg-blue/20 active:translate-y-px active:shadow-none transition-all duration-100 rounded-xl font-bold"
               style={{ boxShadow: '3px 3px 0px 0px #000000' }}
             >
               <Settings className="mr-2 h-4 w-4" />
@@ -265,7 +265,7 @@ function SidebarTabs({}: SidebarTabsProps) {
         <button
           className={`flex-1 py-2 px-3 rounded-lg font-bold text-center transition-all duration-150 flex items-center justify-center gap-2 ${
             activeTab === 'assets'
-              ? 'bg-yellow text-black shadow-inner-sm' // Active state
+              ? 'bg-blue text-black shadow-inner-sm' // Active state
               : 'text-muted-foreground hover:bg-black/5 active:bg-black/10' // Inactive state
           }`}
           onClick={() => setActiveTab('assets')}
@@ -278,7 +278,7 @@ function SidebarTabs({}: SidebarTabsProps) {
         <button
           className={`flex-1 py-2 px-3 rounded-lg font-bold text-center transition-all duration-150 flex items-center justify-center gap-2 ${
             activeTab === 'activity'
-              ? 'bg-yellow text-black shadow-inner-sm' // Active state
+              ? 'bg-blue text-black shadow-inner-sm' // Active state
               : 'text-muted-foreground hover:bg-black/5 active:bg-black/10' // Inactive state
           }`}
           onClick={() => setActiveTab('activity')}
