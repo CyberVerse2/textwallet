@@ -1,5 +1,5 @@
 import { ClobClient, Side, OrderType, type ApiKeyCreds } from '@polymarket/clob-client';
-import { Wallet } from 'ethers';
+import { Wallet } from '@ethersproject/wallet';
 
 export interface PostOrderParams {
   tokenID: string;
@@ -7,7 +7,7 @@ export interface PostOrderParams {
   side: 'buy' | 'sell' | 'YES' | 'NO' | 'yes' | 'no';
   size: number; // in tokens (USDC notionals depend on price)
   feeRateBps?: number; // default 0
-  tickSize: string; // e.g. '0.001'
+  tickSize: number; // e.g. 0.001
   negRisk: boolean; // true for neg risk markets
   timeInForce?: OrderType; // default GTC
 }
@@ -47,8 +47,8 @@ export async function postOrder(params: PostOrderParams): Promise<PostOrderResul
         size: params.size,
         feeRateBps: params.feeRateBps ?? 0
       },
-      { tickSize: params.tickSize, negRisk: params.negRisk },
-      params.timeInForce ?? OrderType.GTC
+      { tickSize: params.tickSize as any, negRisk: params.negRisk },
+      (params.timeInForce as any) ?? OrderType.GTC
     );
     return { ok: true, order };
   } catch (e: any) {
