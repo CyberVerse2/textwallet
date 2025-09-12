@@ -27,7 +27,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'Signature invalid' }, { status: 401 });
     }
 
-    return NextResponse.json({ address: address.toLowerCase(), ok: true }, { status: 200 });
+    const normalized = address.toLowerCase();
+    const res = NextResponse.json({ address: normalized, ok: true }, { status: 200 });
+    // Set HttpOnly session cookie for 7 days
+    const maxAge = 60 * 60 * 24 * 7;
+    res.cookies.set('tw_session', JSON.stringify({ address: normalized }), {
+      httpOnly: true,
+      path: '/',
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      maxAge
+    });
+    return res;
   } catch (error) {
     return NextResponse.json({ message: 'Verification failed' }, { status: 500 });
   }
