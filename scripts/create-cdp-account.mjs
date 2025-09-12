@@ -1,4 +1,9 @@
 import { CdpClient } from '@coinbase/cdp-sdk';
+import dotenv from 'dotenv';
+
+// Load env from .env.local first (Next.js dev), then fallback to .env
+dotenv.config({ path: '.env.local' });
+dotenv.config();
 
 async function main() {
   try {

@@ -135,6 +135,7 @@ export interface Database {
           remaining_cents: number;
           period_start: string;
           updated_at: string;
+          permission_expires_at: string | null;
         };
         Insert: {
           user_id: string;
@@ -142,6 +143,7 @@ export interface Database {
           remaining_cents?: number;
           period_start?: string;
           updated_at?: string;
+          permission_expires_at?: string | null;
         };
         Update: Partial<Database['public']['Tables']['budgets']['Insert']>;
       };

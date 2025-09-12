@@ -676,6 +676,34 @@ export async function POST(req: Request) {
             return { ok: true, weekly_limit_cents: amountCents };
           }
         }),
+        grant_spend_permission: tool({
+          description: 'Grant spend permission until a specific ISO timestamp.',
+          parameters: z.object({ expiresAt: z.string() }),
+          execute: async ({ expiresAt }: { expiresAt: string }) => {
+            if (!normalizedUserId) return { error: 'missing_user' };
+            const time = Date.parse(expiresAt);
+            if (!Number.isFinite(time)) return { error: 'invalid_expiresAt' };
+            const { error: updErr } = await supabaseAdmin
+              .from('budgets')
+              .update({ permission_expires_at: new Date(time).toISOString() })
+              .eq('user_id', normalizedUserId);
+            if (updErr) return { error: updErr.message };
+            return { ok: true };
+          }
+        }),
+        revoke_spend_permission: tool({
+          description: 'Revoke spend permission immediately.',
+          parameters: z.object({}),
+          execute: async () => {
+            if (!normalizedUserId) return { error: 'missing_user' };
+            const { error: updErr } = await supabaseAdmin
+              .from('budgets')
+              .update({ permission_expires_at: null })
+              .eq('user_id', normalizedUserId);
+            if (updErr) return { error: updErr.message };
+            return { ok: true };
+          }
+        }),
         get_budget: tool({
           description: 'Get current weekly budget and remaining (cents).',
           parameters: z.object({}),
@@ -697,11 +725,13 @@ export async function POST(req: Request) {
             if (!normalizedUserId) return { error: 'missing_user' };
             const { data, error } = await supabaseAdmin
               .from('budgets')
-              .select('remaining_cents')
+              .select('remaining_cents, permission_expires_at')
               .eq('user_id', normalizedUserId)
               .maybeSingle();
             if (error) return { error: error.message };
             const remaining = data?.remaining_cents ?? 0;
+            const exp = data?.permission_expires_at ? Date.parse(data.permission_expires_at) : null;
+            if (!exp || Date.now() > exp) return { error: 'permission_expired' };
             if (remaining < amountCents) return { error: 'insufficient_budget' };
             const nowIso = new Date().toISOString();
             const { error: updErr } = await supabaseAdmin
