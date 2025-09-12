@@ -615,51 +615,6 @@ export async function POST(req: Request) {
             return { market: summary, details, researchQueries };
           }
         }),
-        // propose_trade_intent: tool({
-        //   description:
-        //     'Structure a proposed trade intent for a Polymarket order. This does not execute any trade; it only returns a validated plan.',
-        //   parameters: z.object({
-        //     marketId: z.string().describe('Polymarket market id from last picks'),
-        //     side: z.enum(['yes', 'no']).describe('Order side: yes/no'),
-        //     budgetUSDC: z.coerce
-        //       .number()
-        //       .positive()
-        //       .max(1000000)
-        //       .describe('Max USDC to allocate for this intent'),
-        //     limitPrice: z.coerce
-        //       .number()
-        //       .min(0)
-        //       .max(1)
-        //       .describe('Max buy price or min sell price (0-1)'),
-        //     maxSlippage: z.coerce
-        //       .number()
-        //       .min(0)
-        //       .max(0.2)
-        //       .default(0.02)
-        //       .describe('Allowed slippage (0-0.2)'),
-        //     autopilot: z.coerce.boolean().default(false),
-        //     notes: z.string().optional()
-        //   }),
-        //   execute: async (args: any) => {
-        //     const createdAt = new Date().toISOString();
-        //     const normalized = {
-        //       marketId: String(args.marketId),
-        //       side: args.side === 'no' ? 'no' : 'yes',
-        //       budgetUSDC: Number.isFinite(+args.budgetUSDC) ? +(+args.budgetUSDC).toFixed(2) : 0,
-        //       limitPrice: Number.isFinite(+args.limitPrice) ? +(+args.limitPrice).toFixed(4) : 0,
-        //       maxSlippage: Number.isFinite(+args.maxSlippage)
-        //         ? +(+args.maxSlippage).toFixed(4)
-        //         : 0.02,
-        //       autopilot: Boolean(args.autopilot),
-        //       notes: typeof args.notes === 'string' ? args.notes : undefined
-        //     };
-        //     return {
-        //       intent: { ...normalized, createdAt },
-        //       disclaimer:
-        //         'No onchain execution performed. This is a structured plan for review and future execution.'
-        //     };
-        //   }
-        // }),
         set_budget: tool({
           description:
             'Set or update weekly budget (cents) and reset remaining for the current period.',
@@ -782,6 +737,19 @@ export async function POST(req: Request) {
           execute: async ({ tokenID, side, price, size, tickSize, negRisk, feeRateBps }: any) => {
             if (!normalizedUserId) return { error: 'missing_user' };
             const costCents = Math.round(size * price * 100);
+            try {
+              console.log('🛒 place_order START', {
+                userId: normalizedUserId,
+                tokenID,
+                side,
+                price,
+                size,
+                tickSize,
+                negRisk,
+                feeRateBps,
+                costCents
+              });
+            } catch {}
             // Check permission and budget
             const { data: b, error: bErr } = await supabaseAdmin
               .from('budgets')
@@ -791,8 +759,35 @@ export async function POST(req: Request) {
             if (bErr) return { error: bErr.message };
             const remaining = b?.remaining_cents ?? 0;
             const exp = b?.permission_expires_at ? Date.parse(b.permission_expires_at) : null;
-            if (!exp || Date.now() > exp) return { error: 'permission_expired' };
-            if (remaining < costCents) return { error: 'insufficient_budget' };
+            try {
+              console.log('📊 budget_status', {
+                userId: normalizedUserId,
+                remaining_cents: remaining,
+                permission_expires_at: b?.permission_expires_at,
+                permission_expires_ms: exp,
+                now_ms: Date.now()
+              });
+            } catch {}
+            if (!exp || Date.now() > exp) {
+              try {
+                console.warn('⏰ permission_expired', {
+                  userId: normalizedUserId,
+                  permission_expires_at: b?.permission_expires_at,
+                  now: new Date().toISOString()
+                });
+              } catch {}
+              return { error: 'permission_expired' };
+            }
+            if (remaining < costCents) {
+              try {
+                console.warn('💸 insufficient_budget', {
+                  userId: normalizedUserId,
+                  remaining_cents: remaining,
+                  cost_cents: costCents
+                });
+              } catch {}
+              return { error: 'insufficient_budget' };
+            }
             // Deduct budget
             const nowIso = new Date().toISOString();
             const { error: updErr } = await supabaseAdmin
@@ -800,14 +795,40 @@ export async function POST(req: Request) {
               .update({ remaining_cents: remaining - costCents, updated_at: nowIso })
               .eq('user_id', normalizedUserId);
             if (updErr) return { error: updErr.message };
+            try {
+              console.log('✅ budget_deducted', {
+                userId: normalizedUserId,
+                before_cents: remaining,
+                after_cents: remaining - costCents
+              });
+            } catch {}
 
             // Pull Base USDC via spend permission
             try {
               const usdcUnits = BigInt(Math.round(size * price * 1_000_000));
+              try {
+                console.log('🔐 spendFromPermission ATTEMPT', {
+                  userId: normalizedUserId,
+                  usdc_units: usdcUnits.toString()
+                });
+              } catch {}
               const { spendFromPermission } = await import('@/lib/base/spend');
               const spend = await spendFromPermission(normalizedUserId, usdcUnits);
               if (!spend.ok) throw new Error(spend.error || 'spend_failed');
+              try {
+                console.log('🔐 spendFromPermission SUCCESS', {
+                  userId: normalizedUserId,
+                  result: { ok: spend.ok }
+                });
+              } catch {}
             } catch (e: any) {
+              try {
+                console.error('❌ spendFromPermission ERROR', {
+                  userId: normalizedUserId,
+                  message: e?.message,
+                  stack: e?.stack
+                });
+              } catch {}
               await supabaseAdmin
                 .from('budgets')
                 .update({ remaining_cents: remaining, updated_at: nowIso })
@@ -817,6 +838,17 @@ export async function POST(req: Request) {
 
             // Post the Polymarket order
             try {
+              try {
+                console.log('📤 postOrder ATTEMPT', {
+                  tokenID,
+                  side,
+                  price,
+                  size,
+                  tickSize,
+                  negRisk,
+                  feeRateBps
+                });
+              } catch {}
               const { postOrder } = await import('@/lib/polymarket/trading');
               const res = await postOrder({
                 tokenID,
@@ -839,8 +871,21 @@ export async function POST(req: Request) {
                 ),
                 status: 'posted'
               });
+              try {
+                console.log('✅ postOrder SUCCESS', {
+                  userId: normalizedUserId,
+                  orderId: (res.order as any)?.orderId || (res.order as any)?.id || ''
+                });
+              } catch {}
               return { ok: true, order: res.order };
             } catch (e: any) {
+              try {
+                console.error('❌ postOrder ERROR', {
+                  userId: normalizedUserId,
+                  message: e?.message,
+                  stack: e?.stack
+                });
+              } catch {}
               return { error: e?.message || 'order_failed' };
             }
           }
@@ -935,7 +980,8 @@ export async function POST(req: Request) {
           messages: coreMessages,
           tools,
           toolCallStreaming: true,
-          maxSteps: 4,
+          maxSteps: 8,
+          maxTokens: 1500,
           onStepFinish: async (event) => {
             try {
               console.log('🪜 onStepFinish', {
@@ -958,7 +1004,7 @@ export async function POST(req: Request) {
           },
           providerOptions: {
             anthropic: {
-              thinking: { type: 'enabled', budgetTokens: 12000 }
+              thinking: { type: 'enabled', budgetTokens: 20000 }
             } satisfies AnthropicProviderOptions
           },
           onFinish: async (event) => {

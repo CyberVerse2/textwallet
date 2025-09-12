@@ -63,6 +63,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
     let out = s.replace(/([^\n])(#\s)/g, '$1\n$2');
     // Ensure a blank line before top-level headings for better rendering
     out = out.replace(/\n(#\s)/g, '\n\n$1');
+    // Add a space after periods when followed by alphanumerics or markup to avoid run-ons
+    out = out.replace(/\.([A-Za-z0-9#\[])/g, '. $1');
+    // Put ACTION tags on their own block with a blank line before
+    out = out.replace(/\s*\[ACTION:/g, '\n\n[ACTION:');
     return out;
   }
 
@@ -143,6 +147,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
         }
         return [...prev, { role: 'assistant', content: successLine, id: `sys-${Date.now()}` }];
       });
+      if (pendingTrade) {
+        try {
+          await append({
+            role: 'user',
+            content: 'Spend permission complete. Proceed with the pending order.'
+          });
+        } catch {}
+      }
     } catch (e) {
       console.error('Spend permission flow failed:', e);
       const failLine = '❌ Spend permission setup failed or was rejected.';

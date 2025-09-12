@@ -14,21 +14,56 @@ export async function spendFromPermission(
   amountUnits: bigint
 ): Promise<SpendResult> {
   try {
+    const usdc = (await import('@/lib/cdp')).getUsdcAddress('base');
+    const userIdLower = userId.toLowerCase();
     const { data: perm, error } = await supabaseAdmin
       .from('spend_permissions')
-      .select('permission_json')
-      .eq('user_id', userId.toLowerCase())
+      .select('permission_json, permission_hash')
+      .eq('user_id', userIdLower)
+      .eq('token_address', usdc)
       .order('created_at', { ascending: false })
+      .limit(1)
       .maybeSingle();
-    if (error) return { ok: false, error: error.message };
-    if (!perm?.permission_json) return { ok: false, error: 'no_permission' };
+    if (error) {
+      try {
+        console.error('🔎 spendFromPermission query error', {
+          userId: userIdLower,
+          error: error.message
+        });
+      } catch {}
+      return { ok: false, error: error.message };
+    }
+    if (!perm?.permission_json) {
+      try {
+        console.warn('🔎 spendFromPermission no_permission', { userId: userIdLower });
+      } catch {}
+      return { ok: false, error: 'no_permission' };
+    }
 
     const permission = perm.permission_json as any;
-    const { prepareSpendCallData } = await import('@base-org/account/spend-permission');
-    const calls: any[] = await prepareSpendCallData({ permission, amount: amountUnits } as any);
+    // Runtime fallback: inject chainId if absent (Base mainnet 8453)
+    const ensuredPermission: any = { ...(permission || {}) };
+    if (!ensuredPermission.chainId) {
+      try {
+        console.warn('⚠️ spendFromPermission missing chainId, injecting 8453', {
+          userId: userIdLower,
+          permissionHash: (perm as any).permission_hash
+        });
+      } catch {}
+      ensuredPermission.chainId = 8453;
+    }
+    if (ensuredPermission.permission && !ensuredPermission.permission.chainId) {
+      ensuredPermission.permission.chainId = 8453;
+    }
 
-    const cdp = new CdpClient();
-    const spender = await getServerWalletAddress();
+    const { prepareSpendCallData } = await import('@base-org/account/spend-permission');
+    const calls: any[] = await prepareSpendCallData({
+      permission: ensuredPermission,
+      amount: amountUnits
+    } as any);
+
+    const cdp = new (await import('@coinbase/cdp-sdk')).CdpClient();
+    const spender = await (await import('@/lib/cdp')).getServerWalletAddress();
 
     let approveTx: string | undefined;
     let spendTx: string | undefined;
@@ -47,6 +82,12 @@ export async function spendFromPermission(
     }
     return { ok: true, approveTx, spendTx };
   } catch (e: any) {
+    try {
+      console.error('❌ spendFromPermission unexpected', {
+        userId: userId.toLowerCase(),
+        message: e?.message
+      });
+    } catch {}
     return { ok: false, error: e?.message || String(e) };
   }
 }

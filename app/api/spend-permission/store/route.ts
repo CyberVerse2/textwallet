@@ -20,6 +20,12 @@ export async function POST(req: NextRequest) {
     const computedHash =
       permissionHash ||
       '0x' + crypto.createHash('sha256').update(JSON.stringify(permission)).digest('hex');
+    // Ensure the stored permission JSON includes chainId (Base mainnet 8453)
+    const fixedPermission = {
+      ...(permission || {}),
+      chainId: permission && (permission as any).chainId ? (permission as any).chainId : 8453
+    };
+
     const { error } = await supabaseAdmin.from('spend_permissions').upsert({
       permission_hash: String(computedHash),
       user_id: String(userId).toLowerCase(),
@@ -28,7 +34,7 @@ export async function POST(req: NextRequest) {
       period_seconds: Number(periodSeconds),
       start_unix: startUnix ?? Math.floor(Date.now() / 1000),
       end_unix: endUnix ?? Math.floor(Date.now() / 1000) + Number(periodSeconds),
-      permission_json: permission
+      permission_json: fixedPermission
     });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     // Also update budgets.permission_expires_at to align with permission end time if a budget row exists
