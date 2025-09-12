@@ -806,12 +806,33 @@ export async function POST(req: Request) {
             periodDays: z.coerce.number().int().positive().default(7)
           }),
           execute: async ({ budgetUSD, periodDays }: { budgetUSD: number; periodDays: number }) => {
+            const spender = await getServerWalletAddress();
+            const tokenAddress = getUsdcAddress('base');
             return {
               ui: {
                 kind: 'request_spend_permission',
                 budgetUSD,
                 periodDays,
-                token: 'BaseUSDC'
+                token: 'BaseUSDC',
+                message: `Set your weekly budget to $${budgetUSD} and enable spend permissions for ${periodDays} days?`,
+                buttons: [
+                  {
+                    label: 'Confirm',
+                    value: 'confirm',
+                    onConfirm: {
+                      actions: [
+                        { type: 'set_budget', amountCents: Math.round(budgetUSD * 100) },
+                        {
+                          type: 'trigger_spend_permission',
+                          spender,
+                          chainId: 8453,
+                          tokenAddress
+                        }
+                      ]
+                    }
+                  },
+                  { label: 'Reject', value: 'reject' }
+                ]
               }
             };
           }
@@ -828,7 +849,8 @@ export async function POST(req: Request) {
                 kind: 'trigger_spend_permission',
                 spender,
                 chainId: 8453,
-                tokenAddress
+                tokenAddress,
+                message: 'Opening Base spend-permission flow…'
               }
             };
           }
