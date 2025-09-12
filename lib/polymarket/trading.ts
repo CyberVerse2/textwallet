@@ -40,8 +40,7 @@ export async function getPolymarketClient() {
   // Signature type: 0 = EOA (browser wallets), 1 = Magic/email login
   const signatureType = (() => {
     const raw = process.env.POLYMARKET_SIGNATURE_TYPE;
-    const parsed = raw != null ? Number(raw) : 0;
-    return parsed === 1 ? 1 : 0;
+    return raw != null ? Number(raw) : 0;
   })();
   // Use configured funder if provided; otherwise default to signer
   const funder = process.env.POLYMARKET_FUNDER_ADDRESS || signer.address;

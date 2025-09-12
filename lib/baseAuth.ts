@@ -18,7 +18,7 @@ export async function signInWithBase(): Promise<{ address: string } | null> {
       params: [{ chainId: '0x2105' }] // Base mainnet 8453
     });
 
-    const { accounts } = await provider.request({
+    const connectResponse: any = await provider.request({
       method: 'wallet_connect',
       params: [
         {
@@ -29,9 +29,12 @@ export async function signInWithBase(): Promise<{ address: string } | null> {
         }
       ]
     });
-
-    const { address } = accounts[0];
-    const { message, signature } = accounts[0].capabilities.signInWithEthereum;
+    const accounts = connectResponse?.accounts || [];
+    const { address } = accounts[0] || {};
+    const { message, signature } =
+      accounts[0]?.capabilities?.signInWithEthereum ||
+      (connectResponse?.signInWithEthereum as any) ||
+      {};
 
     const res = await fetch('/api/auth/verify', {
       method: 'POST',
