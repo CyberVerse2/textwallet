@@ -12,6 +12,7 @@ import { z } from 'zod';
 import { getPolymarketClient } from '@/lib/polymarket/client';
 // Zora custom actions removed
 import supabaseAdmin from '@/lib/supabaseAdmin';
+import { getServerWalletAddress, getUsdcAddress } from '@/lib/cdp';
 // import { zora } from 'viem/chains';
 
 // ---------- Local scoring helpers (adapted from events strategy) ----------
@@ -796,6 +797,41 @@ export async function POST(req: Request) {
             }
             return { ok: true, charged_cents: costCents };
           }
+        }),
+        request_spend_permission_prompt: tool({
+          description:
+            'Ask the client to show a spend-permission confirmation UI with a weekly budget. Returns UI metadata for the client to render.',
+          parameters: z.object({
+            budgetUSD: z.coerce.number().positive().default(100),
+            periodDays: z.coerce.number().int().positive().default(7)
+          }),
+          execute: async ({ budgetUSD, periodDays }: { budgetUSD: number; periodDays: number }) => {
+            return {
+              ui: {
+                kind: 'request_spend_permission',
+                budgetUSD,
+                periodDays,
+                token: 'BaseUSDC'
+              }
+            };
+          }
+        }),
+        trigger_spend_permission: tool({
+          description:
+            'Instruct the client to initiate a Base spend-permission signing flow. Returns spender/token details.',
+          parameters: z.object({}),
+          execute: async () => {
+            const spender = await getServerWalletAddress();
+            const tokenAddress = getUsdcAddress('base');
+            return {
+              ui: {
+                kind: 'trigger_spend_permission',
+                spender,
+                chainId: 8453,
+                tokenAddress
+              }
+            };
+          }
         })
         // duplicate removed
       };
@@ -818,6 +854,13 @@ export async function POST(req: Request) {
             '- Market picking: Use get_top_markets heuristics. If results are too few, the tool may relax constraints once (evaluator retry).\n' +
             '- Research and thesis: Web search is currently disabled; focus on on-chain signals and market stats only.\n' +
             '- When a user asks for details about a market, summarize key stats and thesis without external citations.\n' +
+            '- Spend permissions & budget UX: If place_order or charge_budget returns permission_expired or insufficient_budget, do NOT proceed. Ask for confirmation to set a weekly budget and grant spend permissions. Use this exact prompt format so the client can render buttons: \n' +
+            '[ACTION:REQUEST_SPEND_PERMISSION budgetUSD=<number> periodDays=7 token=BaseUSDC] Confirm | Reject' +
+            '\n' +
+            '- If the user replies Confirm with a dollar amount (e.g., $500), first call set_budget (amountCents), then instruct the client to request spend permission by emitting the exact line: \n' +
+            '[ACTION:TRIGGER_SPEND_PERMISSION]' +
+            '\n' +
+            '- After the client completes spend permission (they will re-try or say done), retry the pending order once.\n' +
             '- Safety: Do not claim to place trades. If asked to trade, ask for budget/limits and, if needed, call propose_trade_intent to structure the plan.\n' +
             '- Style: Be concise, numbers first, then brief rationale.',
           messages: coreMessages,

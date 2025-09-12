@@ -27,6 +27,14 @@ export async function POST(req: NextRequest) {
       permission_json: permission
     });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    // Also update budgets.permission_expires_at to align with permission end time if a budget row exists
+    try {
+      const effectiveEnd = endUnix ?? Math.floor(Date.now() / 1000) + Number(periodSeconds);
+      await supabaseAdmin
+        .from('budgets')
+        .update({ permission_expires_at: new Date(effectiveEnd * 1000).toISOString() })
+        .eq('user_id', String(userId).toLowerCase());
+    } catch {}
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'store_failed' }, { status: 500 });
