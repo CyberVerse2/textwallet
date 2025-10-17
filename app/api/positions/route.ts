@@ -2,18 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import supabaseAdmin from '@/lib/supabaseAdmin';
 import { getOrder, type OrderDetails } from '@/lib/polymarket/trading';
 
-// Helper to fetch market details by market ID
-async function fetchMarketById(marketId: string) {
+// Helper to fetch market details by token ID
+async function fetchMarketByTokenId(tokenId: string) {
   try {
-    const url = `https://gamma-api.polymarket.com/markets/${marketId}`;
-    const response = await fetch(url, {
+    const url = `https://gamma-api.polymarket.com/markets`;
+    const params = new URLSearchParams({ token_id: tokenId, limit: '1' });
+    const response = await fetch(`${url}?${params}`, {
       method: 'GET',
       headers: { accept: 'application/json' },
       cache: 'no-store'
     });
 
     if (!response.ok) return null;
-    const market = await response.json();
+    const markets = await response.json();
+    const market = Array.isArray(markets) ? markets[0] : null;
     if (!market) return null;
 
     return {
@@ -99,11 +101,11 @@ export async function GET(req: NextRequest) {
 
     for (const [key, position] of marketPositions) {
       try {
-        // Get market details using marketId (with caching)
+        // Get market details using tokenId (with caching)
         let market = marketCache.get(position.marketId);
         if (!market) {
-          console.log(`[Positions API] Fetching market details for marketId: ${position.marketId}`);
-          market = await fetchMarketById(position.marketId);
+          console.log(`[Positions API] Fetching market details for tokenId: ${position.marketId}`);
+          market = await fetchMarketByTokenId(position.marketId);
           if (market) {
             marketCache.set(position.marketId, market);
             console.log(`[Positions API] Market details received:`, {
@@ -111,7 +113,19 @@ export async function GET(req: NextRequest) {
               title: market.title,
               url: market.url
             });
+          } else {
+            console.warn(
+              `[Positions API] Failed to fetch market details for tokenId: ${position.marketId}`
+            );
           }
+        }
+
+        // Skip this position if market details are not available
+        if (!market) {
+          console.warn(
+            `[Positions API] Skipping position due to missing market details: ${position.marketId}`
+          );
+          continue;
         }
 
         // Get order details from Polymarket using the latest order ID
@@ -119,6 +133,10 @@ export async function GET(req: NextRequest) {
           `[Positions API] Fetching order details for orderId: ${position.latestOrderId}`
         );
         const orderResult = await getOrder(position.latestOrderId);
+        if (!orderResult.ok || !orderResult.order) {
+          console.warn(`[Positions API] Failed to get order details:`, orderResult.error);
+          continue;
+        }
         const orderDetails = orderResult.order;
         console.log(`[Positions API] Order details received:`, {
           id: orderDetails.id,
