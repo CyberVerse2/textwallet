@@ -18,6 +18,7 @@ import { PositionsDrawer } from '@/components/swipe/PositionsDrawer';
 import { SwipeToast } from '@/components/swipe/SwipeToast';
 import { createRoot } from 'react-dom/client';
 import { Sidebar } from '@/app/client-layout';
+import { DisclaimerModal } from '@/components/swipe/DisclaimerModal';
 
 type Market = {
   id: string;
@@ -50,6 +51,7 @@ export default function SwipeDeck() {
   const [displayAddress, setDisplayAddress] = useState<string | null>(null);
   const [usdcBalance, setUsdcBalance] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [showDisclaimer, setShowDisclaimer] = useState(false);
   // Base Sepolia USDC
   const USDC_BASE_SEPOLIA = '0x036CbD53842c5426634e7929541eC2318f3dCF7e' as const;
 
@@ -73,6 +75,11 @@ export default function SwipeDeck() {
   });
 
   useEffect(() => {
+    // Show disclaimer once per device
+    try {
+      const seen = localStorage.getItem('tw_seen_disclaimer');
+      if (!seen) setShowDisclaimer(true);
+    } catch {}
     const run = async () => {
       setLoading(true);
       try {
@@ -321,6 +328,16 @@ export default function SwipeDeck() {
     <div className="h-full flex flex-col items-center justify-start px-4 overflow-hidden">
       {/* Wallet header becomes part of main flow */}
       <div className="w-full max-w-md mx-auto mb-4 md:mb-16">
+        {showDisclaimer && (
+          <DisclaimerModal
+            onClose={() => {
+              setShowDisclaimer(false);
+              try {
+                localStorage.setItem('tw_seen_disclaimer', '1');
+              } catch {}
+            }}
+          />
+        )}
         <WalletHeader
           walletAddress={displayAddress ? shortenAddress(displayAddress) : null}
           onCopy={() => {
