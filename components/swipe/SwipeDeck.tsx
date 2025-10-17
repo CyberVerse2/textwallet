@@ -16,6 +16,7 @@ import { Drawer, DrawerContent, DrawerTrigger } from '@/components/ui/drawer';
 import { WalletHeader } from '@/components/swipe/WalletHeader';
 import { PositionsDrawer } from '@/components/swipe/PositionsDrawer';
 import { SwipeToast } from '@/components/swipe/SwipeToast';
+import { createRoot } from 'react-dom/client';
 import { Sidebar } from '@/app/client-layout';
 
 type Market = {
@@ -76,18 +77,38 @@ export default function SwipeDeck() {
               }
               let yesPrice: number | null = null;
               let noPrice: number | null = null;
+              // parse clobTokenIds for outcome mapping
+              const clobRaw = (m as any)?.clobTokenIds;
+              let clobIds: string[] = [];
+              if (Array.isArray(clobRaw)) clobIds = clobRaw.map((x: any) => String(x));
+              else if (typeof clobRaw === 'string') {
+                try {
+                  const arr = JSON.parse(clobRaw);
+                  if (Array.isArray(arr)) clobIds = arr.map((x: any) => String(x));
+                } catch {}
+              }
+              let yesTokenId: string | null = null;
+              let noTokenId: string | null = null;
               if (outcomes.length === 2 && prices.length === 2) {
                 const iYes = outcomes.findIndex((o) => o?.toLowerCase() === 'yes');
                 const iNo = outcomes.findIndex((o) => o?.toLowerCase() === 'no');
                 if (iYes > -1) yesPrice = Number(prices[iYes]);
                 if (iNo > -1) noPrice = Number(prices[iNo]);
+                if (iYes > -1 && clobIds[iYes]) yesTokenId = clobIds[iYes];
+                if (iNo > -1 && clobIds[iNo]) noTokenId = clobIds[iNo];
               }
+              const end =
+                m.endDate ||
+                (m as any).end_date ||
+                (m as any).endDateIso ||
+                (m as any).endsAt ||
+                null;
               return {
                 id: String(m.id || m.marketId || crypto.randomUUID()),
                 title: m.title || m.question,
                 image: m.image || m.icon || null,
                 icon: m.icon || null,
-                endsAt: m.endDate || null,
+                endsAt: end,
                 volume:
                   typeof m.volume === 'number'
                     ? m.volume
@@ -106,6 +127,8 @@ export default function SwipeDeck() {
                     : isFinite(Number(m.bestBid))
                     ? 1 - Number(m.bestBid)
                     : null,
+                yesTokenId,
+                noTokenId,
                 description: typeof m.description === 'string' ? m.description : null
               } as Market;
             })
@@ -194,12 +217,18 @@ export default function SwipeDeck() {
                 if (iYes > -1) yesPrice = Number(prices[iYes]);
                 if (iNo > -1) noPrice = Number(prices[iNo]);
               }
+              const end =
+                m.endDate ||
+                (m as any).end_date ||
+                (m as any).endDateIso ||
+                (m as any).endsAt ||
+                null;
               return {
                 id: String(m.id || m.marketId || crypto.randomUUID()),
                 title: m.title || m.question,
                 image: m.image || m.icon || null,
                 icon: m.icon || null,
-                endsAt: m.endDate || null,
+                endsAt: end,
                 volume:
                   typeof m.volume === 'number'
                     ? m.volume
@@ -233,30 +262,35 @@ export default function SwipeDeck() {
     if (cooldown) return;
     setCooldown(true);
     setTimeout(() => setCooldown(false), 1000);
-    await submit(market, side, SWIPE_SIZE_USD, SLIPPAGE);
+    // Resolve required order params for API: tokenID and price
+    const tokenID =
+      side === 'yes'
+        ? (market as any).yesTokenId || market.id
+        : (market as any).noTokenId || market.id;
+    const price = side === 'yes' ? market.yesPrice ?? 0.5 : market.noPrice ?? 0.5;
+    await submit(
+      { id: String(tokenID), title: market.title },
+      side,
+      SWIPE_SIZE_USD,
+      SLIPPAGE,
+      address ?? null
+    );
     setMarkets((prev) => prev.filter((m) => m.id !== market.id));
-    // Show swipe toast
+    // Show swipe toast (React 18 portal)
     const type = side === 'yes' ? 'YES' : ('NO' as const);
     const toastRoot = document.createElement('div');
     document.body.appendChild(toastRoot);
+    const root = createRoot(toastRoot);
     const cleanup = () => {
+      try {
+        root.unmount();
+      } catch {}
       try {
         document.body.removeChild(toastRoot);
       } catch {}
     };
-    // Render via React portal API
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const ReactDOM = require('react-dom');
-    ReactDOM.render(
-      <SwipeToast
-        type={type}
-        marketTitle={market.title}
-        onUndo={() => {
-          cleanup();
-        }}
-        onClose={cleanup}
-      />,
-      toastRoot
+    root.render(
+      <SwipeToast type={type} marketTitle={market.title} onUndo={cleanup} onClose={cleanup} />
     );
   };
 
@@ -285,7 +319,11 @@ export default function SwipeDeck() {
               >
                 <Menu className="h-6 w-6 text-white sm:h-8 sm:w-8" strokeWidth={3} />
               </button>
-              <PositionsDrawer isOpen={isPositionsOpen} onClose={() => setIsPositionsOpen(false)} />
+              <PositionsDrawer
+                isOpen={isPositionsOpen}
+                onClose={() => setIsPositionsOpen(false)}
+                userId={address ?? null}
+              />
             </>
           }
         />
@@ -391,21 +429,22 @@ export default function SwipeDeck() {
             if (m) {
               const toastRoot = document.createElement('div');
               document.body.appendChild(toastRoot);
+              const root = createRoot(toastRoot);
               const cleanup = () => {
+                try {
+                  root.unmount();
+                } catch {}
                 try {
                   document.body.removeChild(toastRoot);
                 } catch {}
               };
-              // eslint-disable-next-line @typescript-eslint/no-var-requires
-              const ReactDOM = require('react-dom');
-              ReactDOM.render(
+              root.render(
                 <SwipeToast
                   type={'SKIP'}
                   marketTitle={m.title}
                   onUndo={cleanup}
                   onClose={cleanup}
-                />,
-                toastRoot
+                />
               );
             }
           }}

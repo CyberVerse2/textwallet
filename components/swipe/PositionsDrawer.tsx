@@ -1,7 +1,7 @@
 'use client';
 
 import { X, ExternalLink } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 interface Position {
   market: string;
@@ -20,10 +20,12 @@ interface Position {
 interface PositionsDrawerProps {
   isOpen: boolean;
   onClose: () => void;
+  userId?: string | null;
 }
 
-export function PositionsDrawer({ isOpen, onClose }: PositionsDrawerProps) {
-  const positions: Position[] = [
+export function PositionsDrawer({ isOpen, onClose, userId }: PositionsDrawerProps) {
+  const [positions, setPositions] = useState<Position[] | null>(null);
+  const mock: Position[] = [
     {
       market: 'Will Tesla (TSLA) beat quarterly earnings?',
       avg: 'Yes 73¢',
@@ -102,6 +104,42 @@ export function PositionsDrawer({ isOpen, onClose }: PositionsDrawerProps) {
     };
   }, [isOpen]);
 
+  useEffect(() => {
+    const run = async () => {
+      if (!isOpen) return;
+      if (!userId) {
+        setPositions(mock);
+        return;
+      }
+      try {
+        const res = await fetch(`/api/positions?userId=${userId}`, { cache: 'no-store' });
+        if (!res.ok) {
+          setPositions(mock);
+          return;
+        }
+        const json = await res.json();
+        const list: any[] = Array.isArray(json?.positions) ? json.positions : [];
+        const mapped: Position[] = list.map((p: any) => ({
+          market: p.title || 'Position',
+          avg: '—',
+          now: `${(p.yesSize ?? 0) + (p.noSize ?? 0)} shares`,
+          bet: '—',
+          toWin: '—',
+          value: `$${((p.yesSize ?? 0) + (p.noSize ?? 0)).toFixed(2)}`,
+          currentPrice: '—',
+          previousPrice: '—',
+          change: '—',
+          changePercent: '—',
+          polymarketUrl: p.url || '#'
+        }));
+        setPositions(mapped.length ? mapped : mock);
+      } catch {
+        setPositions(mock);
+      }
+    };
+    run();
+  }, [isOpen, userId]);
+
   if (!isOpen) return null;
 
   return (
@@ -125,7 +163,7 @@ export function PositionsDrawer({ isOpen, onClose }: PositionsDrawerProps) {
           </div>
         </div>
         <div className="p-3 sm:p-4">
-          {positions.map((position, index) => (
+          {(positions || mock).map((position, index) => (
             <div
               key={index}
               className="mb-3 rounded-xl border-[4px] border-black bg-white p-3 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] sm:p-4"

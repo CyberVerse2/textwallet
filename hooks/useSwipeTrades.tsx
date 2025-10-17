@@ -13,7 +13,8 @@ export function useSwipeTrades() {
     market: { id: string; title: string },
     side: SwipeSide,
     sizeUsd = 2,
-    slippage = 0.01
+    slippage = 0.01,
+    userId?: string | null
   ) => {
     if (cooldownRef.current) return { skipped: true } as const;
     cooldownRef.current = true;
@@ -24,10 +25,17 @@ export function useSwipeTrades() {
 
     track('trade_submitted', { marketId: market.id, side, sizeUsd, slippage, source: 'swipe' });
 
-    const resPromise = fetch('/api/polymarket/trade', {
+    const resPromise = fetch('/api/polymarket/order', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ marketId: market.id, side, sizeUsd, slippage, source: 'swipe' }),
+      body: JSON.stringify({
+        marketId: market.id,
+        side,
+        sizeUsd,
+        slippage,
+        source: 'swipe',
+        userId
+      }),
       signal
     }).catch(() => undefined);
 
