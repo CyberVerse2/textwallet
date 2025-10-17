@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import React, { useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { ToastAction } from '@/components/ui/toast';
 import { track } from '@/lib/analytics';
@@ -9,7 +9,7 @@ export type SwipeSide = 'yes' | 'no';
 
 export function useSwipeTrades() {
   const cooldownRef = useRef(false);
-  const { toast, dismiss } = useToast();
+  const { toast } = useToast();
   const UNDO_MS = 2000;
 
   const submit = async (
@@ -32,11 +32,11 @@ export function useSwipeTrades() {
       try {
         controller.abort();
       } catch {}
-      t.update({ title: 'Undone', description: market.title });
-      setTimeout(() => t.dismiss(), 700);
+      toastApi.update({ title: 'Undone', description: market.title });
+      setTimeout(() => toastApi.dismiss(), 700);
     };
 
-    const t = toast({
+    const toastApi = toast({
       title: `${side.toUpperCase()} $${sizeUsd}`,
       description: market.title,
       action: (
@@ -48,7 +48,6 @@ export function useSwipeTrades() {
 
     track('trade_submitted', { marketId: market.id, side, sizeUsd, slippage, source: 'swipe' });
 
-    // Fire-and-forget trade
     const resPromise = fetch('/api/polymarket/trade', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -56,10 +55,8 @@ export function useSwipeTrades() {
       signal
     }).catch(() => undefined);
 
-    // Allow undo within UNDO_MS (best-effort; placeholder cancel)
     const undoTimer = setTimeout(() => {
-      // let trade complete; close toast
-      t.dismiss();
+      toastApi.dismiss();
     }, UNDO_MS);
 
     const cancel = () => {

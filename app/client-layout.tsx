@@ -39,10 +39,10 @@ const sidebarRef = React.createRef<{ refreshBalances: () => void }>();
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   return (
     <ChatProvider>
-      <div className="flex h-[100dvh] md:h-screen bg-background p-4 md:p-6 overflow-hidden">
-        <div className="w-full mx-auto flex gap-4 md:gap-6 h-full items-stretch min-h-0 min-w-0">
+      <div className="flex h-[100dvh] md:h-screen bg-background overflow-hidden">
+        <div className="w-full mx-auto flex gap-4 md:gap-6 h-full items-stretch min-h-0 min-w-0 px-4 md:px-6 py-4 md:py-6">
           {/* Sidebar (desktop only) */}
-          <div className="hidden md:block">
+          <div className="hidden md:block overflow-hidden">
             <Sidebar ref={sidebarRef} />
           </div>
 
@@ -191,7 +191,7 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
 
   return (
     <aside
-      className="w-full md:w-[28rem] h-auto md:h-full bg-white rounded-2xl p-4 flex flex-col justify-between border-2 border-black overflow-y-auto"
+      className="w-full md:w-[28rem] h-auto md:h-full bg-white rounded-2xl p-4 flex flex-col justify-between border-2 border-black overflow-hidden"
       style={{ boxShadow: '8px 8px 0px 0px #000000' }}
     >
       <div>

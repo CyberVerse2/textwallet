@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import MarketCard from './MarketCard';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { useSwipeTrades } from '@/hooks/useSwipeTrades';
+import { useSwipeTrades } from '@/hooks/useSwipeTrades.tsx';
 
 type Market = {
   id: string;
@@ -78,11 +78,11 @@ export default function SwipeDeck() {
   };
 
   return (
-    <div className="h-full flex flex-col items-center justify-center px-4">
+    <div className="h-full flex flex-col items-center justify-center px-4 overflow-hidden">
       {loading && <div className="text-sm">Loading…</div>}
       {!loading && error && <div className="text-sm text-red-500">Failed to load markets</div>}
       {!loading && !error && (
-        <div className="relative w-full max-w-md h-[70vh]">
+        <div className="relative w-full max-w-md h-[70vh] overflow-hidden">
           {markets.slice(0, 3).map((m, i) => (
             <div
               key={m.id}
