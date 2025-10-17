@@ -314,22 +314,7 @@ export default function SwipeDeck() {
       address ?? null
     );
     setMarkets((prev) => prev.filter((m) => m.id !== market.id));
-    // Show swipe toast (React 18 portal)
-    const type = side === 'yes' ? 'YES' : ('NO' as const);
-    const toastRoot = document.createElement('div');
-    document.body.appendChild(toastRoot);
-    const root = createRoot(toastRoot);
-    const cleanup = () => {
-      try {
-        root.unmount();
-      } catch {}
-      try {
-        document.body.removeChild(toastRoot);
-      } catch {}
-    };
-    root.render(
-      <SwipeToast type={type} marketTitle={market.title} onUndo={cleanup} onClose={cleanup} />
-    );
+    // Do not show YES/NO toast here; the hook will show PENDING then final toast
   };
 
   return (

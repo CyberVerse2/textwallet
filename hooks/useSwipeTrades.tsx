@@ -166,7 +166,7 @@ export function useSwipeTrades() {
       cleanupToast();
     };
 
-    // When order promise resolves, replace PENDING with ORDER toast
+    // When order promise resolves, replace PENDING with final YES/NO toast, or ORDER on failure
     (async () => {
       try {
         const res = await resPromise;
@@ -185,12 +185,16 @@ export function useSwipeTrades() {
             document.body.removeChild(mount);
           } catch {}
         };
-        const ok = res && 'ok' in (res as any) ? (res as any).ok : true;
+        const ok = !!res && 'ok' in (res as any) ? (res as any).ok : (res as any)?.ok !== false;
+        const type = ok ? (side.toUpperCase() as 'YES' | 'NO') : 'ORDER';
+        const title = ok
+          ? `${side.toUpperCase()} • ${market.title}`
+          : `Order failed: ${market.title}`;
         r.render(
           // @ts-ignore dynamic props
           React.createElement(SwipeToast as any, {
-            type: 'ORDER',
-            marketTitle: ok ? `Order posted: ${market.title}` : `Order failed: ${market.title}`,
+            type,
+            marketTitle: title,
             onClose: close
           })
         );
