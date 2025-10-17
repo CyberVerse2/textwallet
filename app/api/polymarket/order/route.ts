@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import supabaseAdmin from '@/lib/supabaseAdmin';
-import { postOrder } from '@/lib/polymarket/trading';
+import { postMarketOrder } from '@/lib/polymarket/trading';
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,37 +11,25 @@ export async function POST(req: NextRequest) {
     // Resolve inputs (support swipe payloads)
     const resolvedTokenId = String(tokenID || marketId || '');
     const resolvedPrice = typeof price === 'number' ? price : undefined;
-    let resolvedSize: number | undefined = typeof size === 'number' ? size : undefined;
-    if (
-      !resolvedSize &&
-      typeof sizeUsd === 'number' &&
-      typeof resolvedPrice === 'number' &&
-      resolvedPrice > 0
-    ) {
-      resolvedSize = Number((sizeUsd / resolvedPrice).toFixed(6));
+    // For market orders, compute dollar notional (amountUSD)
+    let amountUSD: number | undefined = typeof sizeUsd === 'number' ? sizeUsd : undefined;
+    if (amountUSD == null && typeof size === 'number' && typeof resolvedPrice === 'number') {
+      amountUSD = Number((size * resolvedPrice).toFixed(2));
     }
 
-    if (
-      !resolvedTokenId ||
-      typeof resolvedPrice !== 'number' ||
-      !side ||
-      typeof resolvedSize !== 'number'
-    ) {
+    if (!resolvedTokenId || !side || typeof amountUSD !== 'number') {
       return NextResponse.json({ error: 'missing_params' }, { status: 400 });
     }
 
-    // Place the Polymarket order directly (no budgets or spend permissions)`
-    const result = await postOrder({
+    // Place a MARKET order (FOK) using dollar notional
+    const result = await postMarketOrder({
       tokenID: resolvedTokenId,
-      price: resolvedPrice,
       side,
-      size: 5,
-      tickSize,
-      negRisk,
-      feeRateBps
+      amountUSD,
+      feeRateBps,
+      price: resolvedPrice
     });
     if (!result.ok) {
-      console.log(result);
       return NextResponse.json({ error: result.error }, { status: 500 });
     }
 
@@ -51,8 +39,8 @@ export async function POST(req: NextRequest) {
         user_id: userId.toLowerCase(),
         market_id: resolvedTokenId,
         side: String(side).toLowerCase() === 'no' ? 'no' : 'yes',
-        price: resolvedPrice,
-        size: resolvedSize,
+        price: resolvedPrice ?? null,
+        size: amountUSD,
         polymarket_order_id: String(result.order?.orderId || result.order?.id || ''),
         status: 'posted'
       });

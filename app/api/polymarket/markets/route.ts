@@ -65,7 +65,6 @@ export async function GET(req: NextRequest) {
           ...m
         }));
     });
-    console.log(markets);
     return NextResponse.json({ markets }, { status: 200 });
   } catch (err: any) {
     console.error('Polymarket markets error:', err);

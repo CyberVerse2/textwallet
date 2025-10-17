@@ -56,7 +56,7 @@ export async function postOrder(params: PostOrderParams): Promise<PostOrderResul
       .createAndPostOrder(
         {
           tokenID: params.tokenID,
-          price: params.price* 1.05,
+          price: params.price * 1.05,
           side,
           size: params.size,
           feeRateBps: params.feeRateBps ?? 0
@@ -64,7 +64,8 @@ export async function postOrder(params: PostOrderParams): Promise<PostOrderResul
         { tickSize: params.tickSize as any, negRisk: params.negRisk },
         (params.timeInForce as any) ?? OrderType.GTC
       )
-      .catch((err) => console.log(err));
+      .catch((err) => console.log('error', err));
+    console.log(order);
     console.log('🧩 Polymarket postOrder success', { order });
     return { ok: true, order };
   } catch (e: any) {
@@ -96,15 +97,34 @@ export async function postMarketOrder(params: PostMarketOrderParams): Promise<Po
     });
     try {
       const resp = await client.postOrder(order, OrderType.FOK);
+      // Some environments return `orderID` (capital D) rather than camelCase
       const extractedId =
         (resp as any)?.orderId ||
+        (resp as any)?.orderID ||
         (resp as any)?.id ||
         (resp as any)?.data?.orderId ||
+        (resp as any)?.data?.orderID ||
         (resp as any)?.data?.id ||
         (order as any)?.orderId ||
+        (order as any)?.orderID ||
         (order as any)?.id ||
         '';
       const normalized = { ...order, postResponse: resp, id: extractedId, orderId: extractedId };
+
+      // Treat non-fully-filled FOK as failure
+      const respAny: any = resp as any;
+      const success = Boolean(respAny?.success);
+      const statusOk =
+        typeof respAny?.status === 'number'
+          ? respAny.status >= 200 && respAny.status < 300
+          : undefined;
+      const hasError = Boolean(respAny?.error || respAny?.errorMsg);
+      if (!success || statusOk === false || hasError) {
+        const errMsg = String(respAny?.error || respAny?.errorMsg || 'order_failed');
+        console.error('🧩 Polymarket postOrder FOK not filled', { errMsg, resp: respAny });
+        return { ok: false, error: errMsg };
+      }
+
       console.log('🧩 Polymarket postOrder success', { order: normalized });
       return { ok: true, order: normalized };
     } catch (e: any) {
