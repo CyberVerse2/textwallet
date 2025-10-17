@@ -52,6 +52,29 @@ export default function SwipeDeck() {
   const [usdcBalance, setUsdcBalance] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [showDisclaimer, setShowDisclaimer] = useState(false);
+  const [swipedIds, setSwipedIds] = useState<Set<string>>(new Set());
+
+  // Load swiped market ids
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('tw_swiped_markets');
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) setSwipedIds(new Set(arr.map((x: any) => String(x))));
+      }
+    } catch {}
+  }, []);
+
+  const persistSwipedId = (id: string) => {
+    setSwipedIds((prev) => {
+      const next = new Set(prev);
+      next.add(String(id));
+      try {
+        localStorage.setItem('tw_swiped_markets', JSON.stringify(Array.from(next)));
+      } catch {}
+      return next;
+    });
+  };
   // Base Sepolia USDC
   const USDC_BASE_SEPOLIA = '0x036CbD53842c5426634e7929541eC2318f3dCF7e' as const;
 
@@ -85,7 +108,7 @@ export default function SwipeDeck() {
       try {
         const res = await fetch('/api/polymarket/markets?limit=10');
         const json = await res.json();
-        const list: Market[] = Array.isArray(json?.markets)
+        const listRaw: Market[] = Array.isArray(json?.markets)
           ? json.markets.map((m: any) => {
               // Parse outcomes/prices for YES/NO
               const outcomesRaw = m.outcomes;
@@ -162,6 +185,7 @@ export default function SwipeDeck() {
               } as Market;
             })
           : [];
+        const list = listRaw.filter((m) => !swipedIds.has(String(m.id)));
         setMarkets(list);
       } catch (e: any) {
         setError(e?.message || 'failed');
@@ -170,7 +194,7 @@ export default function SwipeDeck() {
       }
     };
     run();
-  }, []);
+  }, [swipedIds]);
 
   useEffect(() => {
     try {
@@ -235,7 +259,7 @@ export default function SwipeDeck() {
       try {
         const res = await fetch('/api/polymarket/markets?limit=10');
         const json = await res.json();
-        const list: Market[] = Array.isArray(json?.markets)
+        const listRaw: Market[] = Array.isArray(json?.markets)
           ? json.markets.map((m: any) => {
               const outcomesRaw = m.outcomes;
               const pricesRaw = m.outcomePrices;
@@ -295,11 +319,12 @@ export default function SwipeDeck() {
               } as Market;
             })
           : [];
+        const list = listRaw.filter((m) => !swipedIds.has(String(m.id)));
         setMarkets((prev) => [...prev, ...list]);
       } catch {}
     };
     prefetch();
-  }, [markets, loading]);
+  }, [markets, loading, swipedIds]);
 
   const handleSwipe = async (market: Market, side: 'yes' | 'no') => {
     if (showGuides) setShowGuides(false);
@@ -313,13 +338,38 @@ export default function SwipeDeck() {
         : (market as any).noTokenId || market.id;
     const price = side === 'yes' ? market.yesPrice ?? 0.5 : market.noPrice ?? 0.5;
     // Fire-and-forget: do not block UI on transfer/order
-    void submit(
-      { id: String(tokenID), title: market.title },
-      side,
-      SWIPE_SIZE_USD,
-      SLIPPAGE,
-      address ?? null
-    );
+    (async () => {
+      try {
+        const out = await submit(
+          { id: String(tokenID), title: market.title },
+          side,
+          SWIPE_SIZE_USD,
+          SLIPPAGE,
+          address ?? null
+        );
+        if (out && out.pending) {
+          try {
+            const res = await out.pending;
+            const ok =
+              !!res && ('ok' in (res as any) ? (res as any).ok : (res as any)?.ok !== false);
+            if (ok) {
+              const idStr = String(market.id);
+              const raw = localStorage.getItem('tw_swiped_markets');
+              const arr = raw ? (JSON.parse(raw) as any[]) : [];
+              if (!arr.includes(idStr)) arr.push(idStr);
+              localStorage.setItem('tw_swiped_markets', JSON.stringify(arr));
+            }
+          } catch {}
+        }
+      } catch {}
+    })();
+    try {
+      const idStr = String(market.id);
+      const raw = localStorage.getItem('tw_swiped_markets');
+      const arr = raw ? (JSON.parse(raw) as any[]) : [];
+      if (!arr.includes(idStr)) arr.push(idStr);
+      localStorage.setItem('tw_swiped_markets', JSON.stringify(arr));
+    } catch {}
     setMarkets((prev) => prev.filter((m) => m.id !== market.id));
     // Do not show YES/NO toast here; the hook will show PENDING then final toast
   };
@@ -447,6 +497,13 @@ export default function SwipeDeck() {
                     if (direction === 'left') return handleSwipe(m, 'no');
                     if (direction === 'right') return handleSwipe(m, 'yes');
                     // up => skip
+                    try {
+                      const idStr = String(m.id);
+                      const raw = localStorage.getItem('tw_swiped_markets');
+                      const arr = raw ? (JSON.parse(raw) as any[]) : [];
+                      if (!arr.includes(idStr)) arr.push(idStr);
+                      localStorage.setItem('tw_swiped_markets', JSON.stringify(arr));
+                    } catch {}
                     setMarkets((prev) => prev.filter((x) => x.id !== m.id));
                   }}
                 />
@@ -492,7 +549,17 @@ export default function SwipeDeck() {
           onNo={() => markets[0] && handleSwipe(markets[0], 'no')}
           onSkip={() => {
             if (showGuides) setShowGuides(false);
-            markets[0] && setMarkets((prev) => prev.filter((x) => x.id !== markets[0].id));
+            const m0 = markets[0];
+            if (m0) {
+              try {
+                const idStr = String(m0.id);
+                const raw = localStorage.getItem('tw_swiped_markets');
+                const arr = raw ? (JSON.parse(raw) as any[]) : [];
+                if (!arr.includes(idStr)) arr.push(idStr);
+                localStorage.setItem('tw_swiped_markets', JSON.stringify(arr));
+              } catch {}
+              setMarkets((prev) => prev.filter((x) => x.id !== m0.id));
+            }
             // Skip toast
             const m = markets[0];
             if (m) {
