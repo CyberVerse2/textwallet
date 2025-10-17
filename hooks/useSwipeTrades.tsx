@@ -2,12 +2,19 @@
 
 import React, { useRef } from 'react';
 import { track } from '@/lib/analytics';
+import { getBaseAccountProvider } from '@/lib/baseAccountSdk';
+import { encodeFunctionData, erc20Abi } from 'viem';
+import { baseSepolia } from 'viem/chains';
+import { useConnections } from 'wagmi';
 
 export type SwipeSide = 'yes' | 'no';
+
+const USDC_BASE_SEPOLIA = '0x036CbD53842c5426634e7929541eC2318f3dCF7e' as const;
 
 export function useSwipeTrades() {
   const cooldownRef = useRef(false);
   const UNDO_MS = 2000;
+  const connections = useConnections();
 
   const submit = async (
     market: { id: string; title: string },
@@ -22,6 +29,63 @@ export function useSwipeTrades() {
 
     const controller = new AbortController();
     const signal = controller.signal;
+
+    try {
+      // 1) Resolve subaccount (first account from wagmi connections if available)
+      let from: string | undefined;
+      try {
+        const flat = connections.flatMap((c) => (c as any).accounts as string[]);
+        if (flat.length > 0) from = flat[0];
+      } catch {}
+
+      // 2) Resolve server wallet address
+      const statusRes = await fetch('/api/status', { cache: 'no-store' });
+      if (!statusRes.ok) throw new Error('status_failed');
+      const statusJson = await statusRes.json();
+      const serverWallet: string | undefined = statusJson?.serverWallet?.address;
+      if (!serverWallet) throw new Error('missing_server_wallet');
+
+      // 3) Build ERC-20 transfer data for sizeUsd (6 decimals)
+      const amountUnits = BigInt(Math.round(sizeUsd * 1_000_000));
+      const data = encodeFunctionData({
+        abi: erc20Abi,
+        functionName: 'transfer',
+        args: [serverWallet as `0x${string}`, amountUnits]
+      });
+
+      // 4) Send calls via Base Account provider from subaccount
+      const provider = getBaseAccountProvider();
+      // Ensure connection
+      await provider.request({ method: 'eth_requestAccounts', params: [] });
+      if (!from) {
+        const accs = (await provider.request({ method: 'eth_accounts', params: [] })) as string[];
+        from = accs?.[0];
+      }
+      if (!from) throw new Error('missing_from_address');
+
+      await provider.request({
+        method: 'wallet_sendCalls',
+        params: [
+          {
+            version: '2.0',
+            atomicRequired: true,
+            chainId: `0x${baseSepolia.id.toString(16)}`,
+            from,
+            calls: [
+              {
+                to: USDC_BASE_SEPOLIA,
+                data,
+                value: '0x0'
+              }
+            ]
+          }
+        ]
+      });
+    } catch (e) {
+      // If transfer fails, stop here
+      console.error('USDC transfer failed:', e);
+      return { skipped: true } as const;
+    }
 
     track('trade_submitted', { marketId: market.id, side, sizeUsd, slippage, source: 'swipe' });
 

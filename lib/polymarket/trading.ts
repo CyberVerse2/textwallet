@@ -52,17 +52,19 @@ export async function postOrder(params: PostOrderParams): Promise<PostOrderResul
   try {
     const { client } = await getPolymarketClient();
     const side = normalizeSide(params.side);
-    const order = await client.createAndPostOrder(
-      {
-        tokenID: params.tokenID,
-        price: params.price,
-        side,
-        size: params.size,
-        feeRateBps: params.feeRateBps ?? 0
-      },
-      { tickSize: params.tickSize as any, negRisk: params.negRisk },
-      (params.timeInForce as any) ?? OrderType.GTC
-    );
+    const order = await client
+      .createAndPostOrder(
+        {
+          tokenID: params.tokenID,
+          price: params.price* 1.05,
+          side,
+          size: params.size,
+          feeRateBps: params.feeRateBps ?? 0
+        },
+        { tickSize: params.tickSize as any, negRisk: params.negRisk },
+        (params.timeInForce as any) ?? OrderType.GTC
+      )
+      .catch((err) => console.log(err));
     console.log('🧩 Polymarket postOrder success', { order });
     return { ok: true, order };
   } catch (e: any) {
