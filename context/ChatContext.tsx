@@ -7,11 +7,12 @@ import React, {
   useEffect,
   useCallback,
   ReactNode,
-  useRef
+  useRef,
+  JSX
 } from 'react';
 import { useAccount } from 'wagmi';
 import { supabase } from '@/lib/supabaseClient'; // Corrected import path
-import { Message as SdkMessage, useChat, UseChatHelpers } from 'ai/react';
+import { UIMessage as SdkMessage, useChat } from '@ai-sdk/react';
 
 // Define the structure matching the chat_history table
 interface DbMessage {
@@ -25,16 +26,16 @@ interface DbMessage {
 
 interface ChatContextType {
   messages: SdkMessage[];
-  input: UseChatHelpers['input'];
-  handleInputChange: UseChatHelpers['handleInputChange'];
-  handleSubmit: UseChatHelpers['handleSubmit'];
-  isLoading: UseChatHelpers['isLoading'];
-  reload: UseChatHelpers['reload'];
-  stop: UseChatHelpers['stop'];
-  setInput: UseChatHelpers['setInput'];
-  error: UseChatHelpers['error'];
-  append: UseChatHelpers['append'];
-  setMessages: UseChatHelpers['setMessages'];
+  input: string;
+  handleInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
+  isLoading: boolean;
+  reload: () => void;
+  stop: () => void;
+  setInput: (value: string) => void;
+  error: Error | undefined;
+  append: (message: { role: 'user'; content: string } | string) => void;
+  setMessages: (messages: SdkMessage[] | ((m: SdkMessage[]) => SdkMessage[])) => void;
   loadingHistory: boolean;
   isWalletConnected: boolean;
   setIsWalletConnected: (connected: boolean) => void;
@@ -45,7 +46,7 @@ interface ChatContextType {
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
 
-export const ChatProvider = ({ children }: { children: ReactNode }) => {
+export function ChatProvider({ children }: { children: ReactNode }): JSX.Element {
   // State for wallet connection
   const [isWalletConnected, setIsWalletConnected] = useState(false);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
@@ -70,35 +71,9 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   // Initialize Vercel AI Chat with proper naming
   const effectiveUserId = address || walletAddress || undefined;
 
-  const {
-    messages,
-    input,
-    handleInputChange,
-    handleSubmit,
-    isLoading,
-    reload,
-    stop,
-    error,
-    setInput,
-    setMessages,
-    append
-  } = useChat({
-    api: '/api/chat', // Your backend endpoint
-    id: effectiveUserId ? `chat_${effectiveUserId.toLowerCase()}` : undefined, // Unique ID for the chat session
-    body: {
-      userId: effectiveUserId ? effectiveUserId.toLowerCase() : undefined, // Normalize
-      walletId: effectiveUserId ? effectiveUserId.toLowerCase() : undefined
-    },
-    onResponse: (response: Response) => {
-      // Add type to response
-      if (!response.ok) {
-        console.error(
-          ' Chat History: [onResponse] Error response:',
-          response.status,
-          response.statusText
-        );
-      }
-    },
+  const [input, setInput] = useState('');
+  const { messages, status, error, sendMessage, setMessages, stop } = useChat({
+    id: effectiveUserId ? `chat_${effectiveUserId.toLowerCase()}` : undefined,
     onFinish: async () => {
       try {
         if (effectiveUserId) {
@@ -109,11 +84,40 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
         console.error('Chat UI: failed to refresh grouped history after finish', e);
       }
     },
-    onError: (error: Error) => {
-      // Add type to error parameter
-      console.error(' Chat History: [onError] Vercel AI SDK error:', error);
+    onError: (err: Error) => {
+      console.error(' Chat History: [onError] AI SDK error:', err);
     }
   });
+  const isLoading = status === 'submitted' || status === 'streaming';
+  const reload = () => {};
+  const append = (message: { role: 'user'; content: string } | string) => {
+    const text = typeof message === 'string' ? message : message?.content;
+    if (text)
+      sendMessage(
+        { role: 'user', parts: [{ type: 'text', text }] as any },
+        {
+          body: {
+            userId: effectiveUserId ? effectiveUserId.toLowerCase() : undefined,
+            walletId: effectiveUserId ? effectiveUserId.toLowerCase() : undefined
+          }
+        }
+      );
+  };
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => setInput(e.target.value);
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!input.trim()) return;
+    sendMessage(
+      { role: 'user', parts: [{ type: 'text', text: input }] as any },
+      {
+        body: {
+          userId: effectiveUserId ? effectiveUserId.toLowerCase() : undefined,
+          walletId: effectiveUserId ? effectiveUserId.toLowerCase() : undefined
+        }
+      }
+    );
+    setInput('');
+  };
 
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [initialHistoryLoaded, setInitialHistoryLoaded] = useState(false);
@@ -179,9 +183,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
               const ai = stepIndexMap.get(a) ?? 9999;
               const bi = stepIndexMap.get(b) ?? 9999;
               if (ai !== bi) return ai - bi;
-              const am = messageMap.get(a);
-              const bm = messageMap.get(b);
-              return (am?.createdAt?.getTime?.() || 0) - (bm?.createdAt?.getTime?.() || 0);
+              return 0;
             });
             for (const childId of sortedChildIds) {
               const childMsg = messageMap.get(childId);
@@ -222,11 +224,10 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   // Helper function to convert DB message format to Vercel SDK format
   function convertSingleDbMessageToVercelFormat(dbMsg: DbMessage): SdkMessage {
     return {
-      id: dbMsg.id, // Map dbMsg.id to SdkMessage.id
+      id: dbMsg.id,
       role: dbMsg.sender === 'ai' ? 'assistant' : 'user',
-      content: dbMsg.message,
-      createdAt: new Date(dbMsg.created_at)
-    };
+      parts: [{ type: 'text', text: dbMsg.message }] as any
+    } as SdkMessage;
   }
 
   // Effect to load history when wallet connects
@@ -241,7 +242,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   }, [effectiveUserId, initialHistoryLoaded, fetchChatHistory]); // Removed setMessages from deps
 
   // Combine Vercel AI state with custom state
-  const value = {
+  const value: ChatContextType = {
     messages,
     input,
     handleInputChange,
@@ -262,7 +263,7 @@ export const ChatProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
-};
+}
 
 export const useChatContext = () => {
   // Rename the exported hook

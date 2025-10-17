@@ -1,6 +1,13 @@
 'use client';
 
-import React, { useEffect, useState, useRef, forwardRef, useImperativeHandle } from 'react';
+import React, {
+  useEffect,
+  useState,
+  useRef,
+  forwardRef,
+  useImperativeHandle,
+  useMemo
+} from 'react';
 import {
   ChevronDown,
   Image,
@@ -19,10 +26,10 @@ import './globals.css';
 import { ChatProvider, useChatContext } from '@/context/ChatContext';
 import { shortenAddress } from '@/lib/utils'; // Import shortenAddress at the top
 import { EnrichedTokenBalance } from './token-list'; // Import the correct type
-import { useAccount, useDisconnect } from 'wagmi';
-import { SignInWithBaseButton } from '@base-org/account-ui/react';
-import { signInWithBase } from '@/lib/baseAuth';
+import { useAccount, useDisconnect, useConnect, useConnections } from 'wagmi';
+// Sign in with Base removed; will be reimplemented from scratch
 import ReactMarkdown from 'react-markdown';
+import { getBaseAccountProvider, verifySubAccountCreated } from '@/lib/baseAccountSdk';
 
 // Create a ref to hold the SidebarTabs component
 const sidebarRef = React.createRef<{ refreshBalances: () => void }>();
@@ -58,7 +65,9 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
   const { isWalletConnected, walletAddress, setIsWalletConnected, setWalletAddress } =
     useChatContext();
   const { address, isConnected } = useAccount();
+  const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
+  const connections = useConnections();
 
   // State for copy address button
   const [isCopied, setIsCopied] = useState(false);
@@ -67,6 +76,7 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
   // USDC balance state
   const [usdcBalance, setUsdcBalance] = useState<string | null>(null);
   const [subAddress, setSubAddress] = useState<string | null>(null);
+  const [universalAddress, setUniversalAddress] = useState<string | null>(null);
   // Create a ref to the SidebarTabs component to access the refresh function
   const tabsRef = useRef<{ refreshBalances: () => void } | null>(null);
 
@@ -88,6 +98,19 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
     setIsWalletConnected(isConnected);
     setWalletAddress(isConnected ? address ?? null : null);
   }, [address, isConnected, setIsWalletConnected, setWalletAddress]);
+
+  // Derive sub and universal addresses from current connections
+  useEffect(() => {
+    try {
+      const flat = connections.flatMap((c) => (c as any).accounts as string[]);
+      const [_sub, universal] = flat;
+      setSubAddress((_sub as any) ?? address ?? null);
+      setUniversalAddress((universal as any) ?? null);
+    } catch {
+      setSubAddress(address ?? null);
+      setUniversalAddress(null);
+    }
+  }, [connections, address]);
 
   // Fetch Base USDC balance when address changes
   useEffect(() => {
@@ -184,6 +207,11 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
                 Sub: {shortenAddress(subAddress)}
               </div>
             )}
+            {isWalletEffectivelyConnected && universalAddress && (
+              <div className="text-xs text-muted-foreground truncate" title={universalAddress}>
+                Universal: {shortenAddress(universalAddress)}
+              </div>
+            )}
             {isWalletEffectivelyConnected && usdcBalance && (
               <div className="text-xs text-black mt-1">Base USDC: {usdcBalance}</div>
             )}
@@ -214,17 +242,37 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
           </>
         ) : (
           <div className="w-full">
-            <SignInWithBaseButton
-              colorScheme="light"
+            <Button
+              variant="outline"
+              className="w-full justify-start border-2 border-black rounded-xl font-bold"
+              style={{ boxShadow: '4px 4px 0px 0px #000000' }}
+              size="sm"
               onClick={async () => {
-                const result = await signInWithBase();
-                if (result) {
-                  setIsWalletConnected(true);
-                  setWalletAddress(result.address);
-                  if (result.subAddress) setSubAddress(result.subAddress);
+                try {
+                  const provider = getBaseAccountProvider();
+                  // Ensure Base Account quickstart flow runs and creates sub account
+                  await provider.request({ method: 'wallet_connect', params: [] });
+                  await provider.request({ method: 'eth_requestAccounts', params: [] });
+                  const verification = await verifySubAccountCreated();
+                  if (verification.verified) {
+                    setSubAddress(verification.subAccount || null);
+                    setUniversalAddress(verification.universalAccount || null);
+                  } else {
+                    console.warn('Subaccount verification failed', verification.reason);
+                  }
+                } catch (e) {
+                  // Fallback: continue to wagmi connect even if SDK pre-connect fails
+                  console.error('Base Account SDK connect failed', e);
+                } finally {
+                  const baseConnector =
+                    connectors.find((c) => (c.name || '').toLowerCase().includes('base')) ??
+                    connectors[0];
+                  if (baseConnector) connect({ connector: baseConnector });
                 }
               }}
-            />
+            >
+              Sign In
+            </Button>
           </div>
         )}
         {isWalletEffectivelyConnected && (
@@ -240,6 +288,7 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
               setIsWalletConnected(false);
               setWalletAddress(null);
               setSubAddress(null);
+              setUniversalAddress(null);
             }}
           >
             <LogOut className="mr-2 h-4 w-4" />

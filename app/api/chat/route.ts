@@ -1,13 +1,13 @@
 // AgentKit removed: using AI SDK only
 import {
   streamText,
-  Message as VercelMessage,
+  UIMessage as VercelMessage,
   StreamTextResult,
   tool,
-  convertToCoreMessages
+  convertToModelMessages
 } from 'ai';
 
-import { anthropic, AnthropicProviderOptions } from '@ai-sdk/anthropic';
+import { openai } from '@ai-sdk/openai';
 import { z } from 'zod';
 import { getPolymarketClient } from '@/lib/polymarket/client';
 // Zora custom actions removed
@@ -87,8 +87,34 @@ export async function POST(req: Request) {
   let genericErrorMessage =
     'Sorry, I encountered an issue processing that request. Please try again.'; // Default error
 
-  const { messages, userId, walletId }: RequestBody = await req.json();
-  const coreMessages = Array.isArray(messages) ? convertToCoreMessages(messages) : [];
+  const body = (await req.json()) as Partial<RequestBody>;
+  const messages: VercelMessage[] = Array.isArray(body.messages)
+    ? (body.messages as VercelMessage[])
+    : [];
+  const userId = body.userId;
+  const walletId = body.walletId;
+  try {
+    const bodyPreview = {
+      userId,
+      walletId,
+      messagesCount: Array.isArray(body.messages) ? body.messages.length : 0,
+      messagesPreview: Array.isArray(body.messages)
+        ? body.messages.map((m) => ({
+            role: (m as any).role,
+            hasParts: Array.isArray((m as any).parts),
+            text: Array.isArray((m as any).parts)
+              ? (m as any).parts
+                  .filter((p: any) => p && p.type === 'text')
+                  .map((p: any) => String(p.text ?? ''))
+                  .join(' ')
+                  .slice(0, 200)
+              : String((m as any).content ?? '').slice(0, 200)
+          }))
+        : []
+    };
+    console.log('🧾 Chat API Route: Request body parsed', bodyPreview);
+  } catch {}
+  const coreMessages = messages.length > 0 ? convertToModelMessages(messages) : [];
   const normalizedUserId = userId ? userId.toLowerCase() : undefined;
   try {
     console.log('🤖 Chat API Route: Incoming request', {
@@ -142,14 +168,27 @@ export async function POST(req: Request) {
   }
 
   // --- Save User Message --- Check for Non-Nullability
-  const userMessage = messages[messages.length - 1];
+  const userMessage: VercelMessage | undefined =
+    Array.isArray(messages) && messages.length > 0 ? messages[messages.length - 1] : undefined;
   if (userMessage && userMessage.role === 'user' && normalizedUserId) {
+    const userText = (() => {
+      try {
+        const parts = (userMessage as any).parts as Array<{ type: string; text?: string }> | null;
+        if (!Array.isArray(parts)) return '';
+        return parts
+          .map((p) => (p && p.type === 'text' ? String(p.text ?? '') : ''))
+          .join(' ')
+          .trim();
+      } catch {
+        return '';
+      }
+    })();
     try {
       const { data, error } = await supabaseAdmin
         .from('chat_history')
         .insert({
           user_id: normalizedUserId,
-          message: userMessage.content,
+          message: userText,
           sender: 'user'
         })
         .select('id')
@@ -199,15 +238,23 @@ export async function POST(req: Request) {
     } else {
       // Fallback: stream conversational response with AI SDK tools
       let stepIndexCounter = 0;
+      const defineTool: any = tool as any;
       const tools: Record<string, any> = {
-        get_orders: tool({
+        get_orders: defineTool({
           description:
             'Fetch recent orders for the current user. Returns list sorted by newest first.',
-          parameters: z.object({
-            limit: z.coerce.number().int().min(1).max(100).default(20),
+          inputSchema: z.object({
+            limit: z.number().int().min(1).max(100).optional(),
             status: z.enum(['created', 'posted', 'filled', 'cancelled']).optional()
           }),
           execute: async ({ limit, status }: { limit?: number; status?: string }) => {
+            try {
+              console.log('🛠️ TOOL get_orders START', {
+                userId: normalizedUserId,
+                limit,
+                status
+              });
+            } catch {}
             if (!normalizedUserId) return { error: 'missing_user' };
             const q = supabaseAdmin
               .from('orders')
@@ -217,45 +264,21 @@ export async function POST(req: Request) {
               .limit(limit ?? 20);
             if (status) q.eq('status', status);
             const { data, error } = await q;
+            try {
+              console.log('🛠️ TOOL get_orders DONE', {
+                ok: !error,
+                count: data?.length ?? 0,
+                error: error?.message
+              });
+            } catch {}
             if (error) return { error: error.message };
             return { orders: data ?? [] };
           }
         }),
-        get_top_markets: tool({
+        get_top_markets: defineTool({
           description:
             'Fetch current Polymarket events ranked by liquidity-weighted upside. Uses /events filters; defaults to current (closed=false, end_date_min=now).',
-          parameters: z.object({
-            limit: z.coerce.number().int().min(1).max(100).default(40),
-            offset: z.coerce.number().int().min(0).default(0),
-            order: z.string().optional(),
-            ascending: z.coerce.boolean().optional(),
-            id: z.array(z.coerce.number().int()).optional(),
-            slug: z.array(z.string()).optional(),
-            tag_id: z.coerce.number().int().optional(),
-            exclude_tag_id: z.array(z.coerce.number().int()).optional(),
-            related_tags: z.coerce.boolean().optional(),
-            featured: z.coerce.boolean().optional(),
-            cyom: z.coerce.boolean().optional(),
-            include_chat: z.coerce.boolean().optional(),
-            include_template: z.coerce.boolean().optional(),
-            recurrence: z.string().optional(),
-            start_date_min: z.string().optional(),
-            start_date_max: z.string().optional(),
-            end_date_min: z.string().optional(),
-            end_date_max: z.string().optional(),
-            closed: z.coerce.boolean().optional(),
-            // Local heuristic knobs
-            limitPicks: z.coerce.number().int().min(1).max(25).default(5),
-            maxDaysToEnd: z.coerce.number().int().min(1).max(365).default(180),
-            minConsensus: z.coerce.number().min(0.5).max(0.99).default(0.7),
-            minLiquidityLocal: z.coerce.number().min(0).default(1500),
-            maxSpreadLocal: z.coerce.number().min(0).max(0.5).default(0.04),
-            includeAmbiguous: z.coerce.boolean().default(false),
-            // Research controls
-            research: z.coerce.boolean().default(true),
-            researchPicks: z.coerce.number().int().min(1).max(10).default(5),
-            researchUsesPerPick: z.coerce.number().int().min(1).max(5).default(2)
-          }),
+          inputSchema: z.object({}),
           execute: async (args: any) => {
             const startedAt = Date.now();
             const nowIso = new Date().toISOString();
@@ -512,12 +535,12 @@ export async function POST(req: Request) {
             }
           }
         }),
-        get_market_details: tool({
+        get_market_details: defineTool({
           description:
             'Return details for one of the last suggested markets without refetching. Identify by id, index (1-based), or title substring.',
-          parameters: z.object({
+          inputSchema: z.object({
             id: z.string().optional(),
-            index: z.coerce.number().int().min(1).optional(),
+            index: z.number().int().min(1).optional(),
             titleContains: z.string().optional()
           }),
           execute: async ({
@@ -667,10 +690,10 @@ export async function POST(req: Request) {
             return { market: summary, details, researchQueries };
           }
         }),
-        set_budget: tool({
+        set_budget: defineTool({
           description:
             'Set or update weekly budget (cents) and reset remaining for the current period.',
-          parameters: z.object({ amountCents: z.coerce.number().int().min(0) }),
+          inputSchema: z.object({ amountCents: z.number().int().min(0) }),
           execute: async ({ amountCents }: { amountCents: number }) => {
             if (!normalizedUserId) return { error: 'missing_user' };
             const nowIso = new Date().toISOString();
@@ -685,9 +708,9 @@ export async function POST(req: Request) {
             return { ok: true, weekly_limit_cents: amountCents };
           }
         }),
-        grant_spend_permission: tool({
+        grant_spend_permission: defineTool({
           description: 'Grant spend permission until a specific ISO timestamp.',
-          parameters: z.object({ expiresAt: z.string() }),
+          inputSchema: z.object({ expiresAt: z.string() }),
           execute: async ({ expiresAt }: { expiresAt: string }) => {
             if (!normalizedUserId) return { error: 'missing_user' };
             const time = Date.parse(expiresAt);
@@ -700,9 +723,9 @@ export async function POST(req: Request) {
             return { ok: true };
           }
         }),
-        revoke_spend_permission: tool({
+        revoke_spend_permission: defineTool({
           description: 'Revoke spend permission immediately.',
-          parameters: z.object({}),
+          inputSchema: z.object({}),
           execute: async () => {
             if (!normalizedUserId) return { error: 'missing_user' };
             const { error: updErr } = await supabaseAdmin
@@ -713,9 +736,9 @@ export async function POST(req: Request) {
             return { ok: true };
           }
         }),
-        get_budget: tool({
+        get_budget: defineTool({
           description: 'Get current weekly budget and remaining (cents).',
-          parameters: z.object({}),
+          inputSchema: z.object({}),
           execute: async () => {
             if (!normalizedUserId) return { error: 'missing_user' };
             const { data, error } = await supabaseAdmin
@@ -727,9 +750,9 @@ export async function POST(req: Request) {
             return data ?? { weekly_limit_cents: 0, remaining_cents: 0 };
           }
         }),
-        charge_budget: tool({
+        charge_budget: defineTool({
           description: 'Charge budget by an amount (cents). Fails if insufficient remaining.',
-          parameters: z.object({ amountCents: z.coerce.number().int().min(1) }),
+          inputSchema: z.object({ amountCents: z.number().int().min(1) }),
           execute: async ({ amountCents }: { amountCents: number }) => {
             if (!normalizedUserId) return { error: 'missing_user' };
             const { data, error } = await supabaseAdmin
@@ -751,9 +774,9 @@ export async function POST(req: Request) {
             return { ok: true, remaining_cents: remaining - amountCents };
           }
         }),
-        refund_budget: tool({
+        refund_budget: defineTool({
           description: 'Refund budget by an amount (cents).',
-          parameters: z.object({ amountCents: z.coerce.number().int().min(1) }),
+          inputSchema: z.object({ amountCents: z.number().int().min(1) }),
           execute: async ({ amountCents }: { amountCents: number }) => {
             if (!normalizedUserId) return { error: 'missing_user' };
             const { data, error } = await supabaseAdmin
@@ -774,17 +797,17 @@ export async function POST(req: Request) {
             return { ok: true, remaining_cents: newRemaining };
           }
         }),
-        place_order: tool({
+        place_order: defineTool({
           description:
             'Place a Polymarket order with JIT escrow: charge budget, pull Base USDC via spend permission, then post order on Polygon.',
-          parameters: z.object({
+          inputSchema: z.object({
             tokenID: z.string(),
             side: z.enum(['yes', 'no']),
-            price: z.coerce.number().min(0).max(1),
-            size: z.coerce.number().positive(),
-            tickSize: z.coerce.number().positive().default(0.001),
-            negRisk: z.coerce.boolean().default(false),
-            feeRateBps: z.coerce.number().int().min(0).max(1000).default(0)
+            price: z.number().min(0).max(1),
+            size: z.number().positive(),
+            tickSize: z.number().positive().optional(),
+            negRisk: z.boolean().optional(),
+            feeRateBps: z.number().int().min(0).max(1000).optional()
           }),
           execute: async ({ tokenID, side, price, size, tickSize, negRisk, feeRateBps }: any) => {
             if (!normalizedUserId) return { error: 'missing_user' };
@@ -946,15 +969,15 @@ export async function POST(req: Request) {
             }
           }
         }),
-        place_market_order: tool({
+        place_market_order: defineTool({
           description:
             'Place a Polymarket market order (FOK) with JIT escrow: charge budget in USD, pull Base USDC, then post market order using amountUSD.',
-          parameters: z.object({
+          inputSchema: z.object({
             tokenID: z.string(),
             side: z.enum(['yes', 'no']),
-            amountUSD: z.coerce.number().positive(),
-            feeRateBps: z.coerce.number().int().min(0).max(1000).default(0),
-            priceHint: z.coerce.number().min(0).max(1).optional()
+            amountUSD: z.number().positive(),
+            feeRateBps: z.number().int().min(0).max(1000).optional(),
+            priceHint: z.number().min(0).max(1).optional()
           }),
           execute: async ({ tokenID, side, amountUSD, feeRateBps, priceHint }: any) => {
             if (!normalizedUserId) return { error: 'missing_user' };
@@ -1054,12 +1077,12 @@ export async function POST(req: Request) {
             }
           }
         }),
-        request_spend_permission_prompt: tool({
+        request_spend_permission_prompt: defineTool({
           description:
             'Ask the client to show a spend-permission confirmation UI with a weekly budget. Returns UI metadata for the client to render.',
-          parameters: z.object({
-            budgetUSD: z.coerce.number().positive(),
-            periodDays: z.coerce.number().int().positive().default(7)
+          inputSchema: z.object({
+            budgetUSD: z.number().positive(),
+            periodDays: z.number().int().min(1).optional()
           }),
           execute: async ({ budgetUSD, periodDays }: { budgetUSD: number; periodDays: number }) => {
             const spender = await getServerWalletAddress();
@@ -1093,10 +1116,10 @@ export async function POST(req: Request) {
             };
           }
         }),
-        trigger_spend_permission: tool({
+        trigger_spend_permission: defineTool({
           description:
             'Instruct the client to initiate a Base spend-permission signing flow. Returns spender/token details.',
-          parameters: z.object({}),
+          inputSchema: z.object({}),
           execute: async () => {
             const spender = await getServerWalletAddress();
             const tokenAddress = getUsdcAddress('base');
@@ -1115,15 +1138,36 @@ export async function POST(req: Request) {
       };
       // Web search temporarily disabled
       try {
-        if (!process.env.ANTHROPIC_API_KEY) {
-          console.error('🤖 Chat API Route: Missing ANTHROPIC_API_KEY');
-          return new Response(JSON.stringify({ error: 'Server is missing ANTHROPIC_API_KEY' }), {
+        if (!process.env.OPENAI_API_KEY) {
+          console.error('🤖 Chat API Route: Missing OPENAI_API_KEY');
+          return new Response(JSON.stringify({ error: 'Server is missing OPENAI_API_KEY' }), {
             status: 500,
             headers: { 'Content-Type': 'application/json' }
           });
         }
+        try {
+          console.log('🤖 Chat API Route: Tools configured', Object.keys(tools));
+        } catch {}
+        try {
+          const uiMessagesPreview = messages.map((m) => ({
+            role: (m as any).role,
+            text: Array.isArray((m as any).parts)
+              ? (m as any).parts
+                  .filter((p: any) => p && p.type === 'text')
+                  .map((p: any) => String(p.text ?? ''))
+                  .join(' ')
+                  .slice(0, 200)
+              : String((m as any).content ?? '').slice(0, 200)
+          }));
+          console.log('🛰️ OpenAI request preview', {
+            model: 'gpt-4o-2024-11-20',
+            tools: Object.keys(tools),
+            uiMessagesCount: uiMessagesPreview.length,
+            uiMessagesPreview
+          });
+        } catch {}
         const result = streamText({
-          model: anthropic('claude-3-7-sonnet-20250219'),
+          model: openai('gpt-4o-2024-11-20'),
           system:
             'You are an onchain AI assistant for prediction markets.\n\n' +
             '- Route intent:\n' +
@@ -1145,9 +1189,9 @@ export async function POST(req: Request) {
             '- Style: Be concise, numbers first, then brief rationale.',
           messages: coreMessages,
           tools,
-          toolCallStreaming: true,
-          maxSteps: 8,
-          maxTokens: 1500,
+          // toolCallStreaming: true,
+          // maxSteps: 8,
+          // maxTokens: 1500,
           onStepFinish: async (event) => {
             try {
               console.log('🪜 onStepFinish', {
@@ -1158,7 +1202,7 @@ export async function POST(req: Request) {
                 })),
                 toolResults: (event as any).toolResults?.map((r: any) => ({
                   name: r.toolName,
-                  ok: r.result != null
+                  hasOutput: r.output != null
                 })),
                 text:
                   typeof (event as any).text === 'string'
@@ -1168,11 +1212,7 @@ export async function POST(req: Request) {
               // Avoid persisting intermediate text deltas to prevent duplicates.
             } catch {}
           },
-          providerOptions: {
-            anthropic: {
-              thinking: { type: 'enabled', budgetTokens: 20000 }
-            } satisfies AnthropicProviderOptions
-          },
+          // No providerOptions required for default OpenAI usage
           onFinish: async (event) => {
             if (typeof event.text === 'string' && event.text.length > 0) {
               console.log('🧠 AI onFinish length:', event.text.length);
@@ -1203,9 +1243,36 @@ export async function POST(req: Request) {
             }
           }
         });
-        return result.toDataStreamResponse();
+        return result.toUIMessageStreamResponse({
+          onError: (err: any) => {
+            try {
+              console.error('🧵 Chat stream error:', {
+                message: err?.message || String(err),
+                name: err?.name,
+                stack: err?.stack,
+                url: (err as any)?.url,
+                statusCode: (err as any)?.statusCode,
+                requestBodyValues: (err as any)?.requestBodyValues.input,
+                responseBody: (err as any)?.responseBody
+              });
+            } catch {}
+            return 'An error occurred.';
+          }
+        });
       } catch (fallbackErr: any) {
-        console.error('🤖 Chat API Route: Fallback streaming error:', fallbackErr);
+        try {
+          console.error('🤖 Chat API Route: Fallback streaming error:', {
+            message: fallbackErr?.message || String(fallbackErr),
+            name: fallbackErr?.name,
+            url: fallbackErr?.url,
+            statusCode: fallbackErr?.statusCode,
+            requestBodyValues: fallbackErr?.requestBodyValues,
+            responseBody: fallbackErr?.responseBody,
+            stack: fallbackErr?.stack
+          });
+        } catch {
+          console.error('🤖 Chat API Route: Fallback streaming error:', fallbackErr);
+        }
         // Save generic error
         if (normalizedUserId && parentDbId) {
           try {

@@ -5,18 +5,20 @@ import { SupabaseAuthSyncProvider } from '@/components/supabase-auth-sync';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { WagmiProvider } from 'wagmi';
 import { OnchainKitProvider } from '@coinbase/onchainkit';
-import { wagmiConfig } from '@/lib/wagmi';
-import { base } from 'wagmi/chains';
+import { getConfig, wagmiConfig } from '@/lib/wagmi';
+import { baseSepolia } from 'wagmi/chains';
+import { useState } from 'react';
 
 const queryClient = new QueryClient();
 
 export function Providers({ children }: { children: React.ReactNode }) {
+  const [config] = useState(() => getConfig());
   const onchainkitApiKey = process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY;
 
   return (
     <QueryClientProvider client={queryClient}>
-      <WagmiProvider config={wagmiConfig}>
-        <OnchainKitProvider apiKey={onchainkitApiKey} chain={base}>
+      <WagmiProvider config={config}>
+        <OnchainKitProvider apiKey={onchainkitApiKey} chain={baseSepolia}>
           <SupabaseAuthSyncProvider>
             <ChatProvider>
               <Toaster />

@@ -1,4 +1,4 @@
-import { useEffect, useState, createContext, useContext, ReactNode } from 'react';
+import { useEffect, useState, createContext, useContext, ReactNode, useRef } from 'react';
 import { useAccount, useSignMessage } from 'wagmi';
 import { useToast } from '@/components/ui/use-toast';
 // Keep the client-side supabase for other potential uses (like RLS-protected reads)
@@ -17,6 +17,7 @@ export const SupabaseAuthSyncProvider = ({ children }: { children: ReactNode }) 
   const [isInitialized, setIsInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const lastVerifiedFor = useRef<string | null>(null);
 
   useEffect(() => {
     // If no connected wallet, ensure sync is not marked initialized
@@ -25,6 +26,8 @@ export const SupabaseAuthSyncProvider = ({ children }: { children: ReactNode }) 
       setIsInitialized(false);
       return;
     }
+    // Avoid re-verifying in a loop for the same address
+    if (isInitialized && lastVerifiedFor.current === address.toLowerCase()) return;
 
     // Define the async function to sync and setup user
     const syncAndSetupUser = async () => {
@@ -36,6 +39,13 @@ export const SupabaseAuthSyncProvider = ({ children }: { children: ReactNode }) 
       console.log('[AuthSync] Attempting signature verification and backend sync...');
 
       try {
+        // 0. Prefetch nonce (sets HttpOnly cookie) for replay protection
+        const nonceRes = await fetch('/api/auth/nonce', {
+          cache: 'no-store',
+          credentials: 'include'
+        });
+        const nonce = (await nonceRes.text()).trim();
+
         // 1. Sign a static message
         const message = 'Sign this message to verify your address for PolyAgent.';
         const signature = await signMessageAsync({ message });
@@ -50,7 +60,8 @@ export const SupabaseAuthSyncProvider = ({ children }: { children: ReactNode }) 
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ address, message, signature })
+          credentials: 'include',
+          body: JSON.stringify({ address, message, signature, nonce, chainId: '0x14a34' })
         });
         const verifyJson = await verifyRes.json();
         if (!verifyRes.ok) {
@@ -96,7 +107,7 @@ export const SupabaseAuthSyncProvider = ({ children }: { children: ReactNode }) 
     syncAndSetupUser();
 
     // Dependencies: Run when auth state changes or essential functions become available
-  }, [address, signMessageAsync, toast, isInitialized, isLoading]);
+  }, [address, signMessageAsync, toast]);
 
   return (
     <AuthContext.Provider value={{ isInitialized, isLoading }}>{children}</AuthContext.Provider>

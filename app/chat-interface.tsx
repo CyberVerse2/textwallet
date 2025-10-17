@@ -45,9 +45,24 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
   const [isActing, setIsActing] = useState(false);
   const triggeredIdsRef = useRef<Set<string>>(new Set());
 
+  // Helper to extract display text from UIMessage (AI SDK v5) or fallback to legacy content
+  function getMessageText(m: any): string {
+    try {
+      if (Array.isArray(m?.parts)) {
+        return m.parts
+          .map((p: any) => (p && p.type === 'text' ? String(p.text ?? '') : ''))
+          .join(' ')
+          .trim();
+      }
+      return String(m?.content ?? '');
+    } catch {
+      return '';
+    }
+  }
+
   function parseSpendPermissionTag(content: string) {
     const re =
-      /\[ACTION:REQUEST_SPEND_PERMISSION\s+budgetUSD=(\d+(?:\.\d+)?)\s+periodDays=(\d+)\s+token=([^\]]+)\]/;
+      /\[ACTION:REQUEST_SPEND_PERMISSION\s+budgetUSD=(\d+(?:\.\d+)?)\s+periodDays=(\d+)\s+token([^\]]+)\]/;
     const m = content.match(re);
     if (!m) return null;
     const budgetUSD = parseFloat(m[1]);
@@ -60,9 +75,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
   function normalizeMarkdown(s: string) {
     if (!s) return s;
     // Ensure headings start on a new line
-    let out = s.replace(/([^\n])(#\s)/g, '$1\n$2');
+    let out = s.replace(/([^\n])(#+\s)/g, '$1\n$2');
     // Ensure a blank line before top-level headings for better rendering
-    out = out.replace(/\n(#\s)/g, '\n\n$1');
+    out = out.replace(/\n(#+\s)/g, '\n\n$1');
     // Add a space after periods when followed by alphanumerics or markup to avoid run-ons
     out = out.replace(/\.([A-Za-z0-9#\[])/g, '. $1');
     // Put ACTION tags on their own block with a blank line before
@@ -137,15 +152,23 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
         const updated = [...prev];
         for (let i = updated.length - 1; i >= 0; i--) {
           if ((updated[i] as any).role === 'assistant') {
-            const existing = (updated[i] as any).content || '';
+            const existing = getMessageText(updated[i]);
+            const newText = existing ? `${existing}\n\n${successLine}` : successLine;
             updated[i] = {
               ...(updated[i] as any),
-              content: existing ? `${existing}\n\n${successLine}` : successLine
-            };
+              parts: [{ type: 'text', text: newText }]
+            } as any;
             return updated;
           }
         }
-        return [...prev, { role: 'assistant', content: successLine, id: `sys-${Date.now()}` }];
+        return [
+          ...prev,
+          {
+            role: 'assistant',
+            parts: [{ type: 'text', text: successLine }],
+            id: `sys-${Date.now()}`
+          } as any
+        ];
       });
       if (pendingTrade) {
         try {
@@ -162,15 +185,23 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
         const updated = [...prev];
         for (let i = updated.length - 1; i >= 0; i--) {
           if ((updated[i] as any).role === 'assistant') {
-            const existing = (updated[i] as any).content || '';
+            const existing = getMessageText(updated[i]);
+            const newText = existing ? `${existing}\n\n${failLine}` : failLine;
             updated[i] = {
               ...(updated[i] as any),
-              content: existing ? `${existing}\n\n${failLine}` : failLine
-            };
+              parts: [{ type: 'text', text: newText }]
+            } as any;
             return updated;
           }
         }
-        return [...prev, { role: 'assistant', content: failLine, id: `sys-${Date.now()}` }];
+        return [
+          ...prev,
+          {
+            role: 'assistant',
+            parts: [{ type: 'text', text: failLine }],
+            id: `sys-${Date.now()}`
+          } as any
+        ];
       });
     } finally {
       setIsActing(false);
@@ -182,7 +213,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
     const last = messages[messages.length - 1];
     if (!last || last.role !== 'assistant') return;
     if (triggeredIdsRef.current.has(last.id || String(messages.length))) return;
-    const parsed = parseTriggerTag(last.content || '');
+    const parsed = parseTriggerTag(getMessageText(last));
     if (!parsed) return;
     let budget = parsed.budgetUSD;
     if (budget == null) {
@@ -192,7 +223,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
       } catch {}
     }
     const period = parsed.periodDays ?? 7;
-    const likelyPending = /order|trade|proceed/i.test(last.content || '');
+    const likelyPending = /order|trade|proceed/i.test(getMessageText(last));
     if (budget && !isActing) {
       triggeredIdsRef.current.add(last.id || String(messages.length));
       onConfirmSpendPermission(budget, period, likelyPending);
@@ -296,11 +327,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
                   style={{ boxShadow: '4px 4px 0px 0px #000000' }}
                 >
                   {message.role === 'user' ? (
-                    <p className="text-sm">{message.content}</p>
+                    <p className="text-sm">{getMessageText(message)}</p>
                   ) : (
                     (() => {
-                      const parsed = parseSpendPermissionTag(message.content || '');
-                      const display = parsed?.cleaned ?? message.content;
+                      const baseText = getMessageText(message);
+                      const parsed = parseSpendPermissionTag(baseText);
+                      const display = parsed?.cleaned ?? baseText;
                       const normalizedDisplay = normalizeMarkdown(display || '');
                       return (
                         <div className="markdown-content text-sm prose prose-sm max-w-none">
@@ -399,17 +431,22 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
                                     const updated = [...prev];
                                     for (let i = updated.length - 1; i >= 0; i--) {
                                       if ((updated[i] as any).role === 'assistant') {
-                                        const existing = (updated[i] as any).content || '';
+                                        const existing = getMessageText(updated[i]);
+                                        const newText = existing ? `${existing}\n\n${msg}` : msg;
                                         updated[i] = {
                                           ...(updated[i] as any),
-                                          content: existing ? `${existing}\n\n${msg}` : msg
-                                        };
+                                          parts: [{ type: 'text', text: newText }]
+                                        } as any;
                                         return updated;
                                       }
                                     }
                                     return [
                                       ...prev,
-                                      { role: 'assistant', content: msg, id: `sys-${Date.now()}` }
+                                      {
+                                        role: 'assistant',
+                                        parts: [{ type: 'text', text: msg }],
+                                        id: `sys-${Date.now()}`
+                                      } as any
                                     ];
                                   })
                                 }

@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createPublicClient, http, recoverMessageAddress } from 'viem';
-import { base } from 'viem/chains';
+import { base, baseSepolia } from 'viem/chains';
 import { consumeNonce } from '@/lib/nonceStore';
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { address, message, signature } = body || {};
+    const clientChainId: string | number | undefined = (body || {}).chainId;
     // Prefer explicit nonce from client; fallback to parsing from SIWE message
     let { nonce } = (body || {}) as { nonce?: string };
     const cookieNonce = req.cookies.get('tw_nonce')?.value || null;
@@ -48,11 +49,17 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Select chain based on provided chainId (supports Base Sepolia) with sensible defaults
+    const isSepolia =
+      String(clientChainId || '').toLowerCase() === '0x14a34' ||
+      String(clientChainId || '') === String(baseSepolia.id);
+    const chain = isSepolia ? baseSepolia : base;
+    const defaultRpc = isSepolia ? 'https://sepolia.base.org' : 'https://mainnet.base.org';
     const rpcUrl =
-      process.env.BASE_RPC_URL ||
+      (isSepolia ? process.env.BASE_SEPOLIA_RPC_URL : process.env.BASE_RPC_URL) ||
       process.env.NEXT_PUBLIC_BASE_RPC_URL ||
-      'https://mainnet.base.org';
-    const client = createPublicClient({ chain: base, transport: http(rpcUrl) });
+      defaultRpc;
+    const client = createPublicClient({ chain, transport: http(rpcUrl) });
     let valid = false;
     try {
       valid = await client.verifyMessage({ address, message, signature });
