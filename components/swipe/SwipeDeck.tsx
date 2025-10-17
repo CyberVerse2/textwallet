@@ -9,7 +9,7 @@ import { ArrowUp, Menu, Copy as CopyIcon, Check, X } from 'lucide-react';
 import { ActionButtons } from '@/components/swipe/ActionButtons';
 import { useToast } from '@/hooks/use-toast';
 import { useSwipeTrades } from '@/hooks/useSwipeTrades';
-import { useAccount, useConnect, useConnections } from 'wagmi';
+import { useAccount, useConnect, useConnections, useBalance } from 'wagmi';
 import { getBaseAccountProvider, verifySubAccountCreated } from '@/lib/baseAccountSdk';
 import { shortenAddress } from '@/lib/utils';
 import { Drawer, DrawerContent, DrawerTrigger } from '@/components/ui/drawer';
@@ -49,6 +49,27 @@ export default function SwipeDeck() {
   const [displayAddress, setDisplayAddress] = useState<string | null>(null);
   const [usdcBalance, setUsdcBalance] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  // Base Sepolia USDC
+  const USDC_BASE_SEPOLIA = '0x036CbD53842c5426634e7929541eC2318f3dCF7e' as const;
+
+  // Derive sub and universal accounts from Base Account connection
+  const [subAccountAddr, universalAccountAddr] = useMemo(() => {
+    try {
+      const flat = connections.flatMap((c) => (c as any).accounts as string[]);
+      const sub = flat?.[0] ?? address ?? null;
+      const uni = flat?.[1] ?? null;
+      return [sub, uni] as const;
+    } catch {
+      return [address ?? null, null] as const;
+    }
+  }, [connections, address]);
+
+  // Universal account USDC balance via wagmi (Base Sepolia)
+  const { data: universalBalance } = useBalance({
+    address: (universalAccountAddr || undefined) as any,
+    token: USDC_BASE_SEPOLIA as any,
+    query: { enabled: !!universalAccountAddr, refetchInterval: 10000 }
+  });
 
   useEffect(() => {
     const run = async () => {
@@ -186,6 +207,18 @@ export default function SwipeDeck() {
       abort = true;
     };
   }, [displayAddress]);
+
+  // Prefer wagmi universal balance if available
+  useEffect(() => {
+    if (!universalBalance) return;
+    try {
+      const raw = universalBalance.value;
+      const decimals = universalBalance.decimals ?? 6;
+      const amount = Number(raw) / 10 ** decimals;
+      const formatted = Math.floor(amount).toLocaleString(undefined, { maximumFractionDigits: 0 });
+      setUsdcBalance(`${formatted} USDC`);
+    } catch {}
+  }, [universalBalance]);
 
   // Prefetch when low
   useEffect(() => {
