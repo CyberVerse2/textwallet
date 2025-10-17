@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
     url.searchParams.set('limit', limit);
     url.searchParams.set('active', 'true');
     url.searchParams.set('archived', 'false');
-    url.searchParams.set('tag_slug', 'sports');
+    url.searchParams.set('tag_slug', 'finance');
     url.searchParams.set('closed', 'false');
     url.searchParams.set('order', 'volume');
     url.searchParams.set('ascending', 'false');
@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
           ...m
         }));
     });
-    console.log(markets)
+    console.log(markets);
     return NextResponse.json({ markets }, { status: 200 });
   } catch (err: any) {
     console.error('Polymarket markets error:', err);

@@ -53,12 +53,16 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           {/* Mobile header with drawer moved into SwipeDeck */}
 
           {/* Main Content */}
-          <div
-            className="flex-1 bg-white rounded-2xl flex flex-col relative h-full md:h-full min-h-0 min-w-0 overflow-hidden"
-            style={{ boxShadow: '8px 8px 0px 0px #000000' }}
-          >
+          {hideSidebar ? (
             <div className="flex-1 min-h-0 overflow-hidden">{children}</div>
-          </div>
+          ) : (
+            <div
+              className="flex-1 bg-white rounded-2xl flex flex-col relative h-full md:h-full min-h-0 min-w-0 overflow-hidden"
+              style={{ boxShadow: '8px 8px 0px 0px #000000' }}
+            >
+              <div className="flex-1 min-h-0 overflow-hidden">{children}</div>
+            </div>
+          )}
         </div>
       </div>
     </ChatProvider>

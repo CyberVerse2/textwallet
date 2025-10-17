@@ -13,6 +13,8 @@ import { useAccount, useConnect, useConnections } from 'wagmi';
 import { getBaseAccountProvider, verifySubAccountCreated } from '@/lib/baseAccountSdk';
 import { shortenAddress } from '@/lib/utils';
 import { Drawer, DrawerContent, DrawerTrigger } from '@/components/ui/drawer';
+import { WalletHeader } from '@/components/swipe/WalletHeader';
+import { PositionsDrawer } from '@/components/swipe/PositionsDrawer';
 import { Sidebar } from '@/app/client-layout';
 
 type Market = {
@@ -36,6 +38,7 @@ export default function SwipeDeck() {
   const [error, setError] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(false);
   const [showGuides, setShowGuides] = useState(true);
+  const [isPositionsOpen, setIsPositionsOpen] = useState(false);
   const { toast } = useToast();
   const { submit } = useSwipeTrades();
   const { address } = useAccount();
@@ -236,107 +239,32 @@ export default function SwipeDeck() {
   return (
     <div className="h-full flex flex-col items-center justify-start px-4 overflow-hidden">
       {/* Wallet header becomes part of main flow */}
-      <div className="w-full mb-4 md:mb-16">
-        <div
-          className="bg-white rounded-xl border-2 border-black p-3 flex items-center justify-between gap-3"
-          style={{ boxShadow: '4px 4px 0px 0px #000000' }}
-        >
-          {displayAddress ? (
+      <div className="w-full max-w-md mx-auto mb-4 md:mb-16">
+        <WalletHeader
+          walletAddress={displayAddress ? shortenAddress(displayAddress) : null}
+          onCopy={() => {
+            if (!displayAddress) return;
+            try {
+              navigator.clipboard.writeText(displayAddress);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1200);
+            } catch {}
+          }}
+          copied={copied}
+          balance={usdcBalance}
+          menuButton={
             <>
-              {/* Left: address */}
-              <div className="flex items-center gap-2">
-                <div className="text-sm font-semibold">{shortenAddress(displayAddress)}</div>
-                <button
-                  className="p-1 border-2 border-black rounded-md hover:bg-yellow/20"
-                  title="Copy address"
-                  onClick={() => {
-                    try {
-                      navigator.clipboard.writeText(displayAddress);
-                      setCopied(true);
-                      setTimeout(() => setCopied(false), 1200);
-                    } catch {}
-                  }}
-                >
-                  {copied ? (
-                    <Check className="h-3.5 w-3.5 text-green-600" />
-                  ) : (
-                    <CopyIcon className="h-3.5 w-3.5" />
-                  )}
-                </button>
-              </div>
-              {/* Middle: USDC icon + balance */}
-              <div className="flex-1 flex items-center justify-center gap-2 text-xs font-bold">
-                <Image
-                  src="/usdc.svg"
-                  alt="USDC"
-                  width={25}
-                  height={25}
-                  style={{ boxShadow: '2px 2px 0px 0px #000000', borderRadius: '50%' }}
-                />
-                <span>{usdcBalance || '—'}</span>
-              </div>
-              {/* Right-side menu handled below */}
-            </>
-          ) : (
-            <Button
-              variant="outline"
-              className="w-full justify-center border-2 border-black rounded-xl font-bold"
-              style={{ boxShadow: '2px 2px 0px 0px #000000' }}
-              onClick={async () => {
-                try {
-                  const provider = getBaseAccountProvider();
-                  await provider.request({ method: 'wallet_connect', params: [] });
-                  await provider.request({ method: 'eth_requestAccounts', params: [] });
-                  await verifySubAccountCreated();
-                } catch {}
-                const baseConnector =
-                  connectors.find((c) => (c.name || '').toLowerCase().includes('base')) ??
-                  connectors[0];
-                if (baseConnector) connect({ connector: baseConnector });
-              }}
-            >
-              Sign In
-            </Button>
-          )}
-          {/* Top up button links to Circle faucet */}
-          {displayAddress && (
-            <a
-              href="https://faucet.circle.com"
-              target="_blank"
-              rel="noreferrer"
-              className="ml-2"
-              title="Top up USDC"
-            >
-              <Button
-                variant="outline"
-                className="h-9 px-3 text-xs border-2 border-black rounded-lg"
-                style={{ boxShadow: '2px 2px 0px 0px #000000' }}
-              >
-                Top Up
-              </Button>
-            </a>
-          )}
-          {/* Menu button sits inside the header on mobile */}
-          <Drawer>
-            <DrawerTrigger asChild>
-              <Button
-                variant="outline"
-                className="border-2 border-black rounded-xl font-bold h-9 w-9 p-0"
-                style={{ boxShadow: '2px 2px 0px 0px #000000' }}
+              <button
+                onClick={() => setIsPositionsOpen(true)}
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border-[4px] border-black bg-[#34302B] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:translate-x-[5px] active:translate-y-[5px] active:shadow-none sm:h-auto sm:w-16 sm:rounded-2xl sm:border-[5px]"
                 aria-label="Menu"
               >
-                <Menu className="h-5 w-5" />
-              </Button>
-            </DrawerTrigger>
-            <DrawerContent className="h-[90dvh] md:h-[90dvh]">
-              <div className="p-4 h-full overflow-y-auto md:flex md:items-stretch md:justify-center">
-                <div className="w-full md:w-auto md:h-full">
-                  <Sidebar ref={{ current: null } as any} />
-                </div>
-              </div>
-            </DrawerContent>
-          </Drawer>
-        </div>
+                <Menu className="h-6 w-6 text-white sm:h-8 sm:w-8" strokeWidth={3} />
+              </button>
+              <PositionsDrawer isOpen={isPositionsOpen} onClose={() => setIsPositionsOpen(false)} />
+            </>
+          }
+        />
       </div>
       {loading && <div className="text-sm">Loading…</div>}
       {!loading && error && <div className="text-sm text-red-500">Failed to load markets</div>}
