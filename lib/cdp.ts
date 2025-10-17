@@ -2,18 +2,24 @@
 
 import { CdpClient } from '@coinbase/cdp-sdk';
 import { Address, createPublicClient, erc20Abi, http, parseUnits } from 'viem';
-import { base, polygon } from 'viem/chains';
+import { base, baseSepolia, polygon } from 'viem/chains';
 
-export type SupportedEvmNetwork = 'base' | 'polygon';
+export type SupportedEvmNetwork = 'base' | 'base-sepolia' | 'polygon';
 
 const DEFAULT_USDC_ADDRESSES: Record<SupportedEvmNetwork, Address> = {
+  // Base mainnet USDC
   base: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+  // Base Sepolia USDC (provided by user)
+  'base-sepolia': '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
+  // Polygon USDC.e
   polygon: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359'
 };
 
 export function getUsdcAddress(network: SupportedEvmNetwork): Address {
-  const envKey =
-    network === 'base' ? process.env.USDC_BASE_ADDRESS : process.env.USDC_POLYGON_ADDRESS;
+  let envKey: string | undefined;
+  if (network === 'base') envKey = process.env.USDC_BASE_ADDRESS;
+  else if (network === 'base-sepolia') envKey = process.env.USDC_BASE_SEPOLIA_ADDRESS;
+  else envKey = process.env.USDC_POLYGON_ADDRESS;
   const fallback = DEFAULT_USDC_ADDRESSES[network];
   return (envKey as Address) || fallback;
 }
@@ -34,7 +40,7 @@ export async function getServerWalletAddress(): Promise<Address> {
 }
 
 export function getPublicClient(network: SupportedEvmNetwork) {
-  const chain = network === 'base' ? base : polygon;
+  const chain = network === 'base' ? base : network === 'base-sepolia' ? baseSepolia : polygon;
   return createPublicClient({ chain, transport: http() });
 }
 

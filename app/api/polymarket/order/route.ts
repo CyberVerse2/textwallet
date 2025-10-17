@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
       tokenID: resolvedTokenId,
       price: resolvedPrice,
       side,
-      size: resolvedSize,
+      size: 5,
       tickSize,
       negRisk,
       feeRateBps
