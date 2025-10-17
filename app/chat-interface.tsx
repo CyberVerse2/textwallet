@@ -160,7 +160,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
       className="flex h-[100dvh] md:h-full min-h-0 flex-col items-center bg-white rounded-2xl overflow-hidden relative"
       style={{ boxShadow: '8px 8px 0px 0px #000000' }}
     >
-      <div className="p-2 md:p-4 w-full max-w-[50rem] flex items-center flex-none">
+      <div className="p-2 md:p-4 w-full max-w-none flex items-center flex-none">
         <Button
           variant="outline"
           className="hidden items-center justify-center h-auto py-2 px-4 border-2 border-black bg-blue hover:bg-blue/90 active:translate-y-px active:shadow-none transition-all duration-100 rounded-xl font-medium"
@@ -171,7 +171,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
       </div>
       <ScrollArea
         ref={scrollAreaRef}
-        className="flex-1 min-h-0 overflow-hidden md:overflow-auto p-2 md:p-4 w-full max-w-[46rem] md:max-w-[46rem] max-md:max-w-full pb-0 md:pb-40"
+        className="flex-1 min-h-0 overflow-hidden md:overflow-auto p-2 md:p-4 w-full max-w-none pb-24 md:pb-40"
       >
         <div className="space-y-4 w-full">
           {messages.length === 0 && (
@@ -368,27 +368,32 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
         </div>
       </ScrollArea>
 
-      <div className="p-4 bg-white w-full max-w-[46rem] md:max-w-[46rem] max-md:max-w-full sticky bottom-0 z-20 border-t-2 border-black">
-        <form className="relative w-full" onSubmit={handleSubmit}>
-          <Input
-            type="text"
-            placeholder={placeholderText}
-            value={input}
-            onChange={handleInputChange}
-            disabled={isDisabled}
-            className="pr-16 py-6 text-base border-2 border-black rounded-xl"
-            style={{ boxShadow: '4px 4px 0px 0px #000000' }}
-            ref={inputRef as any}
-          />
-          <Button
-            type="submit"
-            disabled={isDisabled || !input.trim()}
-            className="absolute right-2 top-2 bg-blue hover:bg-blue/90 text-black border-2 border-black rounded-xl h-9 w-9 p-0 flex items-center justify-center"
-            style={{ boxShadow: '2px 2px 0px 0px #000000' }}
-          >
-            <ArrowUp className="h-5 w-5" />
-          </Button>
-        </form>
+      <div
+        className="fixed md:sticky left-0 right-0 md:left-auto md:right-auto bottom-0 md:bottom-0 z-20 px-2 md:px-0"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        <div className="mx-auto w-full md:max-w-none bg-white md:border-t-2 md:border-black p-2 md:p-4 rounded-t-2xl">
+          <form className="relative w-full" onSubmit={handleSubmit}>
+            <Input
+              type="text"
+              placeholder={placeholderText}
+              value={input}
+              onChange={handleInputChange}
+              disabled={isDisabled}
+              className="pr-12 md:pr-16 py-4 md:py-6 text-base border-2 border-black rounded-xl"
+              style={{ boxShadow: '4px 4px 0px 0px #000000' }}
+              ref={inputRef as any}
+            />
+            <Button
+              type="submit"
+              disabled={isDisabled || !input.trim()}
+              className="absolute right-2 top-2 md:top-2 bg-blue hover:bg-blue/90 text-black border-2 border-black rounded-xl h-9 w-9 p-0 flex items-center justify-center"
+              style={{ boxShadow: '2px 2px 0px 0px #000000' }}
+            >
+              <ArrowUp className="h-5 w-5" />
+            </Button>
+          </form>
+        </div>
       </div>
     </div>
   );
