@@ -251,18 +251,24 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
                 try {
                   const provider = getBaseAccountProvider();
                   // Ensure Base Account quickstart flow runs and creates sub account
+                  console.debug('[SignIn] wallet_connect');
                   await provider.request({ method: 'wallet_connect', params: [] });
+                  console.debug('[SignIn] eth_requestAccounts');
                   await provider.request({ method: 'eth_requestAccounts', params: [] });
                   const verification = await verifySubAccountCreated();
                   if (verification.verified) {
+                    console.debug('[SignIn] Subaccount verified', {
+                      sub: verification.subAccount,
+                      universal: verification.universalAccount
+                    });
                     setSubAddress(verification.subAccount || null);
                     setUniversalAddress(verification.universalAccount || null);
                   } else {
-                    console.warn('Subaccount verification failed', verification.reason);
+                    console.warn('[SignIn] Subaccount verification failed', verification.reason);
                   }
                 } catch (e) {
                   // Fallback: continue to wagmi connect even if SDK pre-connect fails
-                  console.error('Base Account SDK connect failed', e);
+                  console.error('[SignIn] Base Account SDK connect failed', e);
                 } finally {
                   const baseConnector =
                     connectors.find((c) => (c.name || '').toLowerCase().includes('base')) ??
