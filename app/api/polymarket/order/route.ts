@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
           market_id: resolvedTokenId,
           side: String(side).toLowerCase() === 'no' ? 'no' : 'yes',
           price: resolvedPrice ?? null,
-          size: amountUSD,
+          size: 1,
           polymarket_order_id: String(result.order?.orderId || result.order?.id || ''),
           status: 'posted'
         })
