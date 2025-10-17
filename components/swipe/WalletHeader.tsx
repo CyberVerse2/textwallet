@@ -10,6 +10,7 @@ interface WalletHeaderProps {
   balance: string | null;
   topUpHref?: string;
   menuButton?: React.ReactNode;
+  onConnect?: () => void;
 }
 
 export function WalletHeader({
@@ -18,7 +19,8 @@ export function WalletHeader({
   copied,
   balance,
   topUpHref = 'https://faucet.circle.com',
-  menuButton
+  menuButton,
+  onConnect
 }: WalletHeaderProps) {
   return (
     <header className="relative w-full">
@@ -27,16 +29,27 @@ export function WalletHeader({
         <div className="flex flex-1 flex-col gap-2 sm:gap-3">
           {/* Wallet Address Card */}
           <div className="flex items-center gap-2 rounded-xl border-[4px] border-black bg-[#FFF8F0] p-2 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] sm:rounded-2xl sm:border-[5px] sm:p-3">
-            <span className="flex-1 text-sm font-bold text-black sm:text-base">
-              {walletAddress ?? '—'}
-            </span>
-            <button
-              onClick={onCopy}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border-3 border-black bg-[#FF6B35] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none sm:h-10 sm:w-10 sm:rounded-xl sm:border-4 sm:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]"
-              aria-label="Copy wallet address"
-            >
-              <Copy className="h-4 w-4 text-white sm:h-5 sm:w-5" />
-            </button>
+            {walletAddress ? (
+              <>
+                <span className="flex-1 text-sm font-bold text-black sm:text-base">
+                  {walletAddress}
+                </span>
+                <button
+                  onClick={onCopy}
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border-3 border-black bg-[#FF6B35] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none sm:h-10 sm:w-10 sm:rounded-xl sm:border-4 sm:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]"
+                  aria-label="Copy wallet address"
+                >
+                  <Copy className="h-4 w-4 text-white sm:h-5 sm:w-5" />
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={onConnect}
+                className="ml-auto flex items-center justify-center rounded-xl border-[4px] border-black bg-[#FF6B35] px-4 py-2 text-base font-black text-white shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:translate-x-[5px] active:translate-y-[5px] active:shadow-none sm:px-5 sm:py-3"
+              >
+                Connect
+              </button>
+            )}
           </div>
 
           {/* Balance Card - Prominent Display */}
