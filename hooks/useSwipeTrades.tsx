@@ -31,12 +31,57 @@ export function useSwipeTrades() {
     const signal = controller.signal;
 
     try {
-      // 1) Resolve subaccount (first account from wagmi connections if available)
+      // 1) Resolve subaccount using Base Account SDK flow (ensure sub exists)
       let from: string | undefined;
+      let universal: string | undefined;
       try {
-        const flat = connections.flatMap((c) => (c as any).accounts as string[]);
-        if (flat.length > 0) from = flat[0];
+        const provider = getBaseAccountProvider();
+        // Connect and get universal account
+        await provider.request({ method: 'eth_requestAccounts', params: [] });
+        const accounts = (await provider.request({
+          method: 'eth_accounts',
+          params: []
+        })) as string[];
+        universal = accounts?.[0];
+        // Query subaccounts
+        let subAddress: string | undefined;
+        if (universal) {
+          try {
+            const resp = (await provider.request({
+              method: 'wallet_getSubAccounts',
+              params: [
+                {
+                  account: universal,
+                  domain: typeof window !== 'undefined' ? window.location.origin : ''
+                }
+              ]
+            })) as { subAccounts?: Array<{ address: string }> };
+            subAddress = resp?.subAccounts?.[0]?.address as string | undefined;
+          } catch {}
+          // Create if missing
+          if (!subAddress) {
+            try {
+              const created = (await provider.request({
+                method: 'wallet_addSubAccount',
+                params: [
+                  {
+                    account: { type: 'create' }
+                  }
+                ]
+              })) as { address?: string };
+              subAddress = created?.address as string | undefined;
+            } catch {}
+          }
+          from = subAddress || universal;
+        }
       } catch {}
+      // Fallback to wagmi connections if SDK flow above failed
+      if (!from) {
+        try {
+          const flat = connections.flatMap((c) => (c as any).accounts as string[]);
+          if (flat.length > 0) from = flat[0];
+        } catch {}
+      }
 
       // 2) Resolve server wallet address
       const statusRes = await fetch('/api/status', { cache: 'no-store' });
@@ -55,12 +100,6 @@ export function useSwipeTrades() {
 
       // 4) Send calls via Base Account provider from subaccount
       const provider = getBaseAccountProvider();
-      // Ensure connection
-      await provider.request({ method: 'eth_requestAccounts', params: [] });
-      if (!from) {
-        const accs = (await provider.request({ method: 'eth_accounts', params: [] })) as string[];
-        from = accs?.[0];
-      }
       if (!from) throw new Error('missing_from_address');
 
       await provider.request({
