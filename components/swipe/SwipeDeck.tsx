@@ -161,9 +161,12 @@ export default function SwipeDeck() {
           setUsdcBalance(null);
           return;
         }
-        const res = await fetch(`/api/usdc-balance?address=${displayAddress}`, {
-          cache: 'no-store'
-        });
+        const res = await fetch(
+          `/api/usdc-balance?address=${displayAddress}&network=base-sepolia`,
+          {
+            cache: 'no-store'
+          }
+        );
         if (!res.ok) throw new Error('usdc_balance_failed');
         const json = await res.json();
         if (abort) return;

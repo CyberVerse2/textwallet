@@ -8,7 +8,9 @@ export async function GET(req: NextRequest) {
     const owner = (searchParams.get('address') || '').toLowerCase() as Address;
     if (!owner) return NextResponse.json({ error: 'Missing address' }, { status: 400 });
 
-    const { balance, decimals } = await getUsdcBalance('base', owner);
+    const network = (searchParams.get('network') || 'base-sepolia').toLowerCase();
+    const mapped = network.includes('sepolia') ? 'base-sepolia' : 'base';
+    const { balance, decimals } = await getUsdcBalance(mapped as any, owner);
     return NextResponse.json({ balance: balance.toString(), decimals });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'failed' }, { status: 500 });

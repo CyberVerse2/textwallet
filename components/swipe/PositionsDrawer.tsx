@@ -163,48 +163,56 @@ export function PositionsDrawer({ isOpen, onClose, userId }: PositionsDrawerProp
           </div>
         </div>
         <div className="p-3 sm:p-4">
-          {(positions || mock).map((position, index) => (
-            <div
-              key={index}
-              className="mb-3 rounded-xl border-[4px] border-black bg-white p-3 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] sm:p-4"
-            >
-              <h3 className="mb-2 line-clamp-1 text-sm font-black leading-tight text-black sm:text-base">
-                {position.market}
-              </h3>
-              <div className="mb-2 flex items-center justify-between gap-2 text-xs sm:text-sm">
-                <div className="flex items-center gap-2">
-                  <span className="rounded-md border-[3px] border-black bg-[#FFD700] px-2 py-1 font-black text-black">
-                    {position.avg}
-                  </span>
-                  <span className="font-bold text-black/70">{position.now}</span>
-                </div>
-                <div className="text-right">
-                  <div className="text-base font-black text-black sm:text-lg">{position.value}</div>
-                  <div
-                    className={`text-xs font-bold ${
-                      position.change.startsWith('+') ? 'text-green-600' : 'text-red-600'
-                    }`}
-                  >
-                    {position.change} ({position.changePercent})
+          {(() => {
+            const list = positions ?? mock;
+            return list.map((position, index) => (
+              <div
+                key={index}
+                className="mb-3 rounded-xl border-[4px] border-black bg-white p-3 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] sm:p-4"
+              >
+                <h3 className="mb-2 line-clamp-1 text-sm font-black leading-tight text-black sm:text-base">
+                  {position.market}
+                </h3>
+                <div className="mb-2 flex items-center justify-between gap-2 text-xs sm:text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-md border-[3px] border-black bg-[#FFD700] px-2 py-1 font-black text-black">
+                      {position.avg}
+                    </span>
+                    <span className="font-bold text-black/70">{position.now}</span>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-base font-black text-black sm:text-lg">
+                      {position.value}
+                    </div>
+                    <div
+                      className={`text-xs font-bold ${
+                        position.change.startsWith('+') ? 'text-green-600' : 'text-red-600'
+                      }`}
+                    >
+                      {position.change} ({position.changePercent})
+                    </div>
                   </div>
                 </div>
+                <div className="flex gap-2">
+                  <button className="flex-1 rounded-lg border-[3px] border-black bg-[#D50A0A] py-2 text-xs font-black text-white shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none sm:text-sm">
+                    Sell
+                  </button>
+                  <a
+                    href={position.polymarketUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center rounded-lg border-[3px] border-black bg-[#34302B] px-3 py-2 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none"
+                  >
+                    <ExternalLink className="h-4 w-4 text-white" strokeWidth={3} />
+                  </a>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <button className="flex-1 rounded-lg border-[3px] border-black bg-[#D50A0A] py-2 text-xs font-black text-white shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none sm:text-sm">
-                  Sell
-                </button>
-                <a
-                  href={position.polymarketUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center rounded-lg border-[3px] border-black bg-[#34302B] px-3 py-2 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none"
-                >
-                  <ExternalLink className="h-4 w-4 text-white" strokeWidth={3} />
-                </a>
-              </div>
-            </div>
-          ))}
-          {positions.length === 0 && (
+            ));
+          })()}
+          {(() => {
+            const list = positions ?? mock;
+            return list.length === 0;
+          })() && (
             <div className="rounded-2xl border-[5px] border-black bg-white p-8 text-center shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
               <p className="text-lg font-black text-black/50">No positions yet</p>
             </div>
