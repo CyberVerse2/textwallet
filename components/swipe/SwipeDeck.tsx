@@ -9,7 +9,7 @@ import { ArrowUp, Menu, Copy as CopyIcon, Check, X } from 'lucide-react';
 import { ActionButtons } from '@/components/swipe/ActionButtons';
 import { useToast } from '@/hooks/use-toast';
 import { useSwipeTrades } from '@/hooks/useSwipeTrades';
-import { useAccount, useConnect, useConnections, useBalance } from 'wagmi';
+import { useAccount, useConnect, useConnections, useBalance, useDisconnect } from 'wagmi';
 import { getBaseAccountProvider, verifySubAccountCreated } from '@/lib/baseAccountSdk';
 import { shortenAddress } from '@/lib/utils';
 import { Drawer, DrawerContent, DrawerTrigger } from '@/components/ui/drawer';
@@ -46,6 +46,7 @@ export default function SwipeDeck() {
   const { address } = useAccount();
   const { connect, connectors } = useConnect();
   const connections = useConnections();
+  const { disconnect } = useDisconnect();
   const [displayAddress, setDisplayAddress] = useState<string | null>(null);
   const [usdcBalance, setUsdcBalance] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -357,12 +358,23 @@ export default function SwipeDeck() {
           }}
           onDisconnect={async () => {
             try {
+              disconnect();
+            } catch {}
+            try {
               await fetch('/api/auth/logout', { method: 'POST' });
             } catch {}
             try {
-              // Best-effort: clear cookie storage rehydration by reloading
-              window.location.reload();
+              localStorage.removeItem('tw_address');
+              localStorage.removeItem('tw_verified_addr');
+              localStorage.removeItem('tw_verified_until');
             } catch {}
+            try {
+              const provider = getBaseAccountProvider();
+              // Best-effort; some providers implement an explicit disconnect
+              await (provider as any).request?.({ method: 'wallet_disconnect', params: [] });
+            } catch {}
+            setDisplayAddress(null);
+            setUsdcBalance(null);
           }}
           menuButton={
             <>

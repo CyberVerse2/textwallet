@@ -34,44 +34,26 @@ export const SupabaseAuthSyncProvider = ({ children }: { children: ReactNode }) 
       // Prevent starting sync if already loading
       if (isLoading) return;
 
+      // Client-side cache to avoid repeated signature prompts within a window of time
+      try {
+        const cachedAddr = localStorage.getItem('tw_verified_addr');
+        const cachedUntil = Number(localStorage.getItem('tw_verified_until') || '0');
+        if (cachedAddr && cachedAddr === address.toLowerCase() && cachedUntil > Date.now()) {
+          lastVerifiedFor.current = address.toLowerCase();
+          setIsInitialized(true);
+          return;
+        }
+      } catch {}
+
       setIsLoading(true);
       console.log('[AuthSync] Wallet connected:', address);
-      console.log('[AuthSync] Attempting signature verification and backend sync...');
+      console.log('[AuthSync] Starting lightweight session sync (no signature)...');
 
       try {
-        // 0. Prefetch nonce (sets HttpOnly cookie) for replay protection
-        const nonceRes = await fetch('/api/auth/nonce', {
-          cache: 'no-store',
-          credentials: 'include'
-        });
-        const nonce = (await nonceRes.text()).trim();
-
-        // 1. Sign a static message
-        const message = 'Sign this message to verify your address for PolyAgent.';
-        const signature = await signMessageAsync({ message });
-        if (!signature) {
-          throw new Error('Signature was not obtained.');
-        }
-        console.log('[AuthSync] Obtained signature. Verifying...');
-
-        // 2. Verify signature with backend
-        const verifyRes = await fetch('/api/auth/verify', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          credentials: 'include',
-          body: JSON.stringify({ address, message, signature, nonce, chainId: '0x14a34' })
-        });
-        const verifyJson = await verifyRes.json();
-        if (!verifyRes.ok) {
-          console.error('❌ Signature verification failed:', verifyJson);
-          throw new Error(verifyJson.message || 'Signature verification failed.');
-        }
+        // Lightweight session: store address locally without signing
         try {
           localStorage.setItem('tw_address', address.toLowerCase());
         } catch {}
-        console.log('[AuthSync] Signature verified. Syncing user...');
 
         // 3. Call the backend API route to sync the user by wallet address
         const syncRes = await fetch('/api/sync-user', {
@@ -85,9 +67,9 @@ export const SupabaseAuthSyncProvider = ({ children }: { children: ReactNode }) 
           throw new Error(syncJson.message || 'Failed to sync user via backend.');
         }
         console.log('[AuthSync] Backend sync successful:', syncJson.message);
-
+        lastVerifiedFor.current = address.toLowerCase();
         setIsInitialized(true);
-        console.log('[AuthSync] User sync and setup complete.');
+        console.log('[AuthSync] User sync complete (no signature).');
       } catch (err: any) {
         console.error('❌ Error during auth sync process:', err);
         toast({

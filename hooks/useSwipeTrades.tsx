@@ -77,24 +77,38 @@ export function useSwipeTrades() {
       // 4) Send calls via Base Account provider from subaccount
       const provider = getBaseAccountProvider();
 
-      await provider.request({
-        method: 'wallet_sendCalls',
-        params: [
-          {
-            version: '2.0',
-            atomicRequired: true,
-            chainId: `0x${baseSepolia.id.toString(16)}`,
-            from,
-            calls: [
-              {
-                to: USDC_BASE_SEPOLIA,
-                data,
-                value: '0x0'
-              }
-            ]
-          }
-        ]
-      });
+      const sendCalls = async () =>
+        provider.request({
+          method: 'wallet_sendCalls',
+          params: [
+            {
+              version: '2.0',
+              atomicRequired: true,
+              chainId: `0x${baseSepolia.id.toString(16)}`,
+              from,
+              calls: [
+                {
+                  to: USDC_BASE_SEPOLIA,
+                  data,
+                  value: '0x0'
+                }
+              ]
+            }
+          ]
+        });
+
+      try {
+        await sendCalls();
+      } catch (err: any) {
+        const code = err?.code;
+        const msg = String(err?.message || err?.data?.message || '').toLowerCase();
+        if (code === -32602 || msg.includes('replacement underpriced')) {
+          await new Promise((r) => setTimeout(r, 2000));
+          await sendCalls();
+        } else {
+          throw err;
+        }
+      }
     } catch (e) {
       // If transfer fails, stop here
       console.error('USDC transfer failed:', e);
