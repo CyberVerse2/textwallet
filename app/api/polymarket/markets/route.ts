@@ -1,22 +1,63 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getPolymarketClient } from '@/lib/polymarket/client';
 
+// Fetch markets from Polymarket using the events/pagination endpoint and
+// filter to YES/NO markets only, ordered by volume desc.
 export async function GET(req: NextRequest) {
   try {
-    const client = getPolymarketClient();
-    const { searchParams } = new URL(req.url);
-    const filters: Record<string, any> = {};
-    const limit = Number(searchParams.get('limit') || 20);
-    searchParams.forEach((v, k) => {
-      // collect multiple values (arrays) using append style
-      if (filters[k]) {
-        if (Array.isArray(filters[k])) filters[k].push(v);
-        else filters[k] = [filters[k], v];
-      } else {
-        filters[k] = v;
-      }
+    const incoming = new URL(req.url);
+    const limit = incoming.searchParams.get('limit') || '50';
+
+    const url = new URL('https://gamma-api.polymarket.com/events/pagination');
+    // Required filters per request (match user-provided criteria)
+    url.searchParams.set('limit', limit);
+    url.searchParams.set('active', 'true');
+    url.searchParams.set('archived', 'false');
+    url.searchParams.set('tag_slug', 'sports');
+    url.searchParams.set('closed', 'false');
+    url.searchParams.set('order', 'volume');
+    url.searchParams.set('ascending', 'false');
+
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`polymarket_${res.status}`);
+    const json = (await res.json()) as any;
+    const events: any[] = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
+
+    // Flatten YES/NO markets
+    const markets = events.flatMap((ev) => {
+      const evTitle: string = ev?.title ?? ev?.name ?? '';
+      const inner: any[] = Array.isArray(ev?.markets) ? ev.markets : [];
+      return inner
+        .filter((m) => {
+          const rawOut = m?.outcomes;
+          let outcomes: any[] = [];
+          if (Array.isArray(rawOut)) outcomes = rawOut;
+          else if (typeof rawOut === 'string') {
+            try {
+              const parsed = JSON.parse(rawOut);
+              if (Array.isArray(parsed)) outcomes = parsed;
+            } catch {}
+          }
+          if (outcomes.length !== 2) return false;
+          const o0 = String(outcomes[0] ?? '').toLowerCase();
+          const o1 = String(outcomes[1] ?? '').toLowerCase();
+          return (o0 === 'yes' && o1 === 'no') || (o0 === 'no' && o1 === 'yes');
+        })
+        .map((m) => ({
+          id: String(m?.id ?? ev?.id),
+          title: m?.question ?? evTitle,
+          // pass through useful fields if needed later
+          bestBid: typeof m?.bestBid === 'number' ? m.bestBid : Number(m?.bestBid) || null,
+          bestAsk: typeof m?.bestAsk === 'number' ? m.bestAsk : Number(m?.bestAsk) || null,
+          lastPrice:
+            typeof m?.lastTradePrice === 'number'
+              ? m.lastTradePrice
+              : Number(m?.lastTradePrice) || null,
+          volume24h:
+            typeof m?.volume24hr === 'number' ? m.volume24hr : Number(m?.volume24hr) || null,
+          ...m
+        }));
     });
-    const markets = await client.fetchMarkets({ ...filters, limit });
+    console.log(markets)
     return NextResponse.json({ markets }, { status: 200 });
   } catch (err: any) {
     console.error('Polymarket markets error:', err);

@@ -2,9 +2,11 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import MarketCard from '@/components/swipe/MarketCard';
+import { SwipeCard } from '@/components/swipe/SwipeCard';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
 import { ArrowUp, Menu, Copy as CopyIcon, Check } from 'lucide-react';
+import { ActionButtons } from '@/components/swipe/ActionButtons';
 import { useToast } from '@/hooks/use-toast';
 import { useSwipeTrades } from '@/hooks/useSwipeTrades';
 import { useAccount, useConnect, useConnections } from 'wagmi';
@@ -16,8 +18,13 @@ import { Sidebar } from '@/app/client-layout';
 type Market = {
   id: string;
   title: string;
-  subtitle?: string;
-  icon?: string;
+  image?: string | null;
+  icon?: string | null;
+  endsAt?: string | null;
+  volume?: number | null;
+  yesPrice?: number | null;
+  noPrice?: number | null;
+  description?: string | null;
 };
 
 const SWIPE_SIZE_USD = 2;
@@ -44,12 +51,59 @@ export default function SwipeDeck() {
         const res = await fetch('/api/polymarket/markets?limit=10');
         const json = await res.json();
         const list: Market[] = Array.isArray(json?.markets)
-          ? json.markets.map((m: any) => ({
-              id: m.id || m.marketId || String(Math.random()),
-              title: m.title || m.question,
-              subtitle: m.subtitle,
-              icon: m.icon
-            }))
+          ? json.markets.map((m: any) => {
+              // Parse outcomes/prices for YES/NO
+              const outcomesRaw = m.outcomes;
+              const pricesRaw = m.outcomePrices;
+              let outcomes: string[] = [];
+              let prices: number[] = [];
+              if (Array.isArray(outcomesRaw)) outcomes = outcomesRaw.map((x: any) => String(x));
+              else if (typeof outcomesRaw === 'string') {
+                try {
+                  outcomes = JSON.parse(outcomesRaw);
+                } catch {}
+              }
+              if (Array.isArray(pricesRaw)) prices = pricesRaw.map((x: any) => Number(x));
+              else if (typeof pricesRaw === 'string') {
+                try {
+                  prices = JSON.parse(pricesRaw).map((x: any) => Number(x));
+                } catch {}
+              }
+              let yesPrice: number | null = null;
+              let noPrice: number | null = null;
+              if (outcomes.length === 2 && prices.length === 2) {
+                const iYes = outcomes.findIndex((o) => o?.toLowerCase() === 'yes');
+                const iNo = outcomes.findIndex((o) => o?.toLowerCase() === 'no');
+                if (iYes > -1) yesPrice = Number(prices[iYes]);
+                if (iNo > -1) noPrice = Number(prices[iNo]);
+              }
+              return {
+                id: String(m.id || m.marketId || crypto.randomUUID()),
+                title: m.title || m.question,
+                image: m.image || m.icon || null,
+                icon: m.icon || null,
+                endsAt: m.endDate || null,
+                volume:
+                  typeof m.volume === 'number'
+                    ? m.volume
+                    : Number(m.volume) || Number(m.volumeNum) || Number(m.volumeClob) || null,
+                yesPrice:
+                  typeof yesPrice === 'number' && isFinite(yesPrice)
+                    ? yesPrice
+                    : typeof m.bestAsk === 'number'
+                    ? m.bestAsk
+                    : Number(m.bestAsk) || null,
+                noPrice:
+                  typeof noPrice === 'number' && isFinite(noPrice)
+                    ? noPrice
+                    : typeof m.bestBid === 'number'
+                    ? 1 - m.bestBid
+                    : isFinite(Number(m.bestBid))
+                    ? 1 - Number(m.bestBid)
+                    : null,
+                description: typeof m.description === 'string' ? m.description : null
+              } as Market;
+            })
           : [];
         setMarkets(list);
       } catch (e: any) {
@@ -110,12 +164,58 @@ export default function SwipeDeck() {
         const res = await fetch('/api/polymarket/markets?limit=10');
         const json = await res.json();
         const list: Market[] = Array.isArray(json?.markets)
-          ? json.markets.map((m: any) => ({
-              id: m.id || m.marketId || String(Math.random()),
-              title: m.title || m.question,
-              subtitle: m.subtitle,
-              icon: m.icon
-            }))
+          ? json.markets.map((m: any) => {
+              const outcomesRaw = m.outcomes;
+              const pricesRaw = m.outcomePrices;
+              let outcomes: string[] = [];
+              let prices: number[] = [];
+              if (Array.isArray(outcomesRaw)) outcomes = outcomesRaw.map((x: any) => String(x));
+              else if (typeof outcomesRaw === 'string') {
+                try {
+                  outcomes = JSON.parse(outcomesRaw);
+                } catch {}
+              }
+              if (Array.isArray(pricesRaw)) prices = pricesRaw.map((x: any) => Number(x));
+              else if (typeof pricesRaw === 'string') {
+                try {
+                  prices = JSON.parse(pricesRaw).map((x: any) => Number(x));
+                } catch {}
+              }
+              let yesPrice: number | null = null;
+              let noPrice: number | null = null;
+              if (outcomes.length === 2 && prices.length === 2) {
+                const iYes = outcomes.findIndex((o) => o?.toLowerCase() === 'yes');
+                const iNo = outcomes.findIndex((o) => o?.toLowerCase() === 'no');
+                if (iYes > -1) yesPrice = Number(prices[iYes]);
+                if (iNo > -1) noPrice = Number(prices[iNo]);
+              }
+              return {
+                id: String(m.id || m.marketId || crypto.randomUUID()),
+                title: m.title || m.question,
+                image: m.image || m.icon || null,
+                icon: m.icon || null,
+                endsAt: m.endDate || null,
+                volume:
+                  typeof m.volume === 'number'
+                    ? m.volume
+                    : Number(m.volume) || Number(m.volumeNum) || Number(m.volumeClob) || null,
+                yesPrice:
+                  typeof yesPrice === 'number' && isFinite(yesPrice)
+                    ? yesPrice
+                    : typeof m.bestAsk === 'number'
+                    ? m.bestAsk
+                    : Number(m.bestAsk) || null,
+                noPrice:
+                  typeof noPrice === 'number' && isFinite(noPrice)
+                    ? noPrice
+                    : typeof m.bestBid === 'number'
+                    ? 1 - m.bestBid
+                    : isFinite(Number(m.bestBid))
+                    ? 1 - Number(m.bestBid)
+                    : null,
+                description: typeof m.description === 'string' ? m.description : null
+              } as Market;
+            })
           : [];
         setMarkets((prev) => [...prev, ...list]);
       } catch {}
@@ -240,20 +340,58 @@ export default function SwipeDeck() {
       {!loading && error && <div className="text-sm text-red-500">Failed to load markets</div>}
       {!loading && !error && (
         <div className="relative w-full max-w-md h-[65vh] md:h-[60vh] overflow-visible mx-auto">
-          {markets.slice(0, 3).map((m, i) => (
-            <div
-              key={m.id}
-              className="absolute inset-0"
-              style={{ transform: `translateY(${i * 12}px) scale(${1 - i * 0.03})` }}
-            >
-              <MarketCard
-                market={m}
-                onSwipeLeft={() => handleSwipe(m, 'no')}
-                onSwipeRight={() => handleSwipe(m, 'yes')}
-                onSwipeUp={() => setMarkets((prev) => prev.filter((x) => x.id !== m.id))}
-              />
-            </div>
-          ))}
+          {markets.slice(0, 3).map((m, i) => {
+            const yesAmount =
+              typeof m.yesPrice === 'number' && isFinite(m.yesPrice)
+                ? `$${(2 / Math.max(0.01, m.yesPrice)).toFixed(2)}`
+                : '—';
+            const noAmount =
+              typeof m.noPrice === 'number' && isFinite(m.noPrice)
+                ? `$${(2 / Math.max(0.01, m.noPrice)).toFixed(2)}`
+                : '—';
+            const yesPriceStr =
+              typeof m.yesPrice === 'number' ? `${(m.yesPrice * 100).toFixed(1)}¢` : '—';
+            const noPriceStr =
+              typeof m.noPrice === 'number' ? `${(m.noPrice * 100).toFixed(1)}¢` : '—';
+            const formatAbbrev = (n?: number | null) => {
+              if (!n || !isFinite(n)) return undefined;
+              if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}b`;
+              if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}m`;
+              if (n >= 1_000) return `${Math.round(n / 1_000)}k`;
+              return `${Math.round(n)}`;
+            };
+            const card = {
+              id: i,
+              logo: (m.title?.[0] || 'M').toUpperCase(),
+              logoUrl: m.image || m.icon || undefined,
+              logoColor: 'bg-blue-400',
+              question: m.title,
+              description: m.description || '',
+              yesAmount,
+              yesPrice: yesPriceStr,
+              noAmount,
+              noPrice: noPriceStr,
+              endDate: m.endsAt ? new Date(m.endsAt).toLocaleDateString() : '',
+              volume: m.volume ? `$${formatAbbrev(m.volume)}` : undefined
+            } as const;
+            return (
+              <div
+                key={m.id}
+                className="absolute inset-0"
+                style={{ transform: `translateY(${i * 12}px) scale(${1 - i * 0.03})` }}
+              >
+                <SwipeCard
+                  card={card}
+                  onSwipe={(direction) => {
+                    if (direction === 'left') return handleSwipe(m, 'no');
+                    if (direction === 'right') return handleSwipe(m, 'yes');
+                    // up => skip
+                    setMarkets((prev) => prev.filter((x) => x.id !== m.id));
+                  }}
+                />
+              </div>
+            );
+          })}
           {markets.length === 0 && (
             <div className="text-sm text-muted-foreground">No more markets</div>
           )}
@@ -261,35 +399,14 @@ export default function SwipeDeck() {
       )}
 
       {/* Bottom actions */}
-      <div className="mt-16 md:mt-20 flex gap-8 shrink-0 items-center">
-        <Button
-          variant="outline"
-          className="rounded-full h-12 w-12 md:h-20 md:w-20 p-0 flex items-center justify-center border-2 border-black bg-white hover:bg-yellow/20"
-          style={{ boxShadow: '4px 4px 0px 0px #000000' }}
-          onClick={() => markets[0] && handleSwipe(markets[0], 'no')}
-        >
-          <Image src="/bad.svg" alt="No" width={28} height={28} className="md:w-10 md:h-10" />
-        </Button>
-        <Button
-          variant="outline"
-          className="rounded-full h-10 w-10 md:h-16 md:w-16 p-0 flex items-center justify-center border-2 border-black bg-white hover:bg-yellow/20"
-          style={{ boxShadow: '4px 4px 0px 0px #000000' }}
-          onClick={() =>
+      <div className="mt-16 md:mt-20 shrink-0">
+        <ActionButtons
+          onNo={() => markets[0] && handleSwipe(markets[0], 'no')}
+          onSkip={() =>
             markets[0] && setMarkets((prev) => prev.filter((x) => x.id !== markets[0].id))
           }
-          aria-label="Skip"
-          title="Skip"
-        >
-          <ArrowUp className="h-6 w-6 md:h-8 md:w-8" />
-        </Button>
-        <Button
-          variant="outline"
-          className="rounded-full h-12 w-12 md:h-20 md:w-20 p-0 flex items-center justify-center border-2 border-black bg-white hover:bg-yellow/20"
-          style={{ boxShadow: '4px 4px 0px 0px #000000' }}
-          onClick={() => markets[0] && handleSwipe(markets[0], 'yes')}
-        >
-          <Image src="/good.svg" alt="Yes" width={28} height={28} className="md:w-10 md:h-10" />
-        </Button>
+          onYes={() => markets[0] && handleSwipe(markets[0], 'yes')}
+        />
       </div>
     </div>
   );
