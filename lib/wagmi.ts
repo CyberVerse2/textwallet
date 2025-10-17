@@ -7,7 +7,7 @@ export function getConfig() {
     chains: [baseSepolia],
     connectors: [
       baseAccount({
-        appName: 'Intern',
+        appName: 'TextWallet',
         subAccounts: {
           creation: 'on-connect',
           defaultAccount: 'sub'

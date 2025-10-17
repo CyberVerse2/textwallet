@@ -34,8 +34,7 @@ export function useSwipeTrades() {
       let universal: string | undefined;
       try {
         const provider = getBaseAccountProvider();
-        // Connect and get universal account
-        await provider.request({ method: 'eth_requestAccounts', params: [] });
+        // Read existing session only – avoid triggering a connect popup here
         const accounts = (await provider.request({
           method: 'eth_accounts',
           params: []
@@ -56,23 +55,10 @@ export function useSwipeTrades() {
             })) as { subAccounts?: Array<{ address: string }> };
             subAddress = resp?.subAccounts?.[0]?.address as string | undefined;
           } catch {}
-          // Create if missing
-          if (!subAddress) {
-            try {
-              const created = (await provider.request({
-                method: 'wallet_addSubAccount',
-                params: [
-                  {
-                    account: { type: 'create' }
-                  }
-                ]
-              })) as { address?: string };
-              subAddress = created?.address as string | undefined;
-            } catch {}
-          }
           from = subAddress || universal;
         }
       } catch {}
+      if (!from) throw new Error('not_connected');
       // 2) Resolve server wallet address
       const statusRes = await fetch('/api/status', { cache: 'no-store' });
       if (!statusRes.ok) throw new Error('status_failed');
@@ -90,7 +76,6 @@ export function useSwipeTrades() {
 
       // 4) Send calls via Base Account provider from subaccount
       const provider = getBaseAccountProvider();
-      if (!from) throw new Error('missing_from_address');
 
       await provider.request({
         method: 'wallet_sendCalls',
