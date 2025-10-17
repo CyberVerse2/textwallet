@@ -20,6 +20,7 @@ import {
   Check
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Drawer, DrawerContent, DrawerTrigger } from '@/components/ui/drawer';
 import TokenList from './token-list';
 import ActivityList from './activity-list';
 import './globals.css';
@@ -37,14 +38,38 @@ const sidebarRef = React.createRef<{ refreshBalances: () => void }>();
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   return (
     <ChatProvider>
-      <div className="flex h-screen bg-background p-6 overflow-hidden">
-        <div className="w-full mx-auto flex gap-6 h-full">
-          {/* Sidebar */}
-          <Sidebar ref={sidebarRef} />
+      <div className="flex min-h-screen md:h-screen bg-background p-4 md:p-6 overflow-x-hidden overflow-y-auto md:overflow-hidden">
+        <div className="w-full mx-auto flex gap-4 md:gap-6 min-h-screen md:h-screen items-stretch min-h-0">
+          {/* Sidebar (desktop only) */}
+          <div className="hidden md:block">
+            <Sidebar ref={sidebarRef} />
+          </div>
+
+          {/* Mobile header with drawer */}
+          <div className="md:hidden w-full">
+            <Drawer>
+              <div className="mb-3">
+                <DrawerTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="border-2 border-black rounded-xl font-bold"
+                    style={{ boxShadow: '4px 4px 0px 0px #000000' }}
+                  >
+                    Menu
+                  </Button>
+                </DrawerTrigger>
+              </div>
+              <DrawerContent className="max-w-[75vw] ml-auto mr-0 rounded-tl-2xl rounded-tr-none">
+                <div className="p-4 w-[75vw]">
+                  <Sidebar ref={sidebarRef} />
+                </div>
+              </DrawerContent>
+            </Drawer>
+          </div>
 
           {/* Main Content */}
           <div
-            className="flex-1 bg-white rounded-2xl overflow-hidden flex flex-col relative"
+            className="flex-1 bg-white rounded-2xl flex flex-col relative h-full md:h-full min-h-0 overflow-hidden"
             style={{ boxShadow: '8px 8px 0px 0px #000000' }}
           >
             {children}
@@ -164,7 +189,7 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
 
   return (
     <aside
-      className="w-72 bg-white rounded-2xl p-4 flex flex-col justify-between border-2 border-black"
+      className="w-full md:w-[28rem] h-auto md:h-full bg-white rounded-2xl p-4 flex flex-col justify-between border-2 border-black overflow-hidden"
       style={{ boxShadow: '8px 8px 0px 0px #000000' }}
     >
       <div>
@@ -230,16 +255,7 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
       {/* Bottom Actions */}
       <div className="space-y-2">
         {isWalletEffectivelyConnected ? (
-          <>
-            <Button
-              variant="outline"
-              className="w-full justify-start border-2 border-black hover:bg-yellow/20 active:translate-y-1 active:shadow-none transition-all duration-100 rounded-xl font-bold"
-              style={{ boxShadow: '4px 4px 0px 0px #000000' }}
-            >
-              <Settings className="mr-2 h-4 w-4" />
-              <span>Settings</span>
-            </Button>
-          </>
+          <></>
         ) : (
           <div className="w-full">
             <Button
@@ -316,7 +332,7 @@ const SidebarTabs = forwardRef<
     walletAddress: string | null;
   }
 >(function SidebarTabs({ isWalletConnected, walletAddress }, ref) {
-  const [activeTab, setActiveTab] = useState<'positions' | 'activity'>('positions');
+  const [activeTab, setActiveTab] = useState<'assets' | 'positions' | 'activity'>('positions');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Function to refresh balances
@@ -332,9 +348,9 @@ const SidebarTabs = forwardRef<
   return (
     <div>
       {/* Tab Buttons - Updated Styling */}
-      <div className="flex mb-6 p-1 border-2 border-black rounded-xl">
+      <div className="flex mb-6 p-1 border-2 border-black rounded-xl overflow-x-auto">
         <button
-          className={`flex-1 py-2 px-4 rounded-lg font-bold transition-all duration-150 flex items-center justify-center gap-2 ${
+          className={`md:flex-1 flex-none py-2 md:py-2 px-3 md:px-4 rounded-lg font-bold transition-all duration-150 flex items-center justify-center gap-2 ${
             activeTab === 'positions'
               ? 'bg-blue text-black border-2 border-black'
               : 'text-black hover:bg-blue/50 active:translate-y-px'
@@ -345,7 +361,18 @@ const SidebarTabs = forwardRef<
           <BarChart2 className="h-4 w-4" /> Positions
         </button>
         <button
-          className={`flex-1 py-2 px-4 rounded-lg font-bold transition-all duration-150 flex items-center justify-center gap-2 ${
+          className={`md:flex-1 flex-none py-2 md:py-2 px-3 md:px-4 rounded-lg font-bold transition-all duration-150 flex items-center justify-center gap-2 ${
+            activeTab === 'assets'
+              ? 'bg-blue text-black border-2 border-black'
+              : 'text-black hover:bg-blue/50 active:translate-y-px'
+          }`}
+          style={activeTab === 'assets' ? { boxShadow: '2px 2px 0px 0px #000000' } : {}}
+          onClick={() => setActiveTab('assets')}
+        >
+          <Wallet className="h-4 w-4" /> Assets
+        </button>
+        <button
+          className={`md:flex-1 flex-none py-2 md:py-2 px-3 md:px-4 rounded-lg font-bold transition-all duration-150 flex items-center justify-center gap-2 ${
             activeTab === 'activity'
               ? 'bg-blue text-black border-2 border-black'
               : 'text-black hover:bg-blue/50 active:translate-y-px'
@@ -359,16 +386,87 @@ const SidebarTabs = forwardRef<
 
       {/* Tab Content */}
       <div className="space-y-6">
+        {activeTab === 'assets' && (
+          <AssetsSection isWalletConnected={isWalletConnected} walletAddress={walletAddress} />
+        )}
         {activeTab === 'positions' && (
           <PositionsSection isWalletConnected={isWalletConnected} walletAddress={walletAddress} />
         )}
         {activeTab === 'activity' && (
-          <ActivityList walletAddress={walletAddress} refreshTrigger={refreshTrigger} />
+          <ActivityList walletAddress={walletAddress} refreshTrigger={refreshTrigger} limit={5} />
         )}
       </div>
     </div>
   );
 });
+
+function AssetsSection({
+  isWalletConnected,
+  walletAddress
+}: {
+  isWalletConnected: boolean;
+  walletAddress: string | null;
+}) {
+  const [tokens, setTokens] = useState<EnrichedTokenBalance[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const run = async () => {
+      if (!walletAddress) {
+        setTokens(null);
+        return;
+      }
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(`/api/tokens?address=${walletAddress}`);
+        const json = await res.json();
+        const list = Array.isArray(json?.tokens) ? json.tokens : [];
+        const baseOnly = list.filter((t: any) =>
+          String(t?.network || '')
+            .toLowerCase()
+            .includes('base')
+        );
+        setTokens(baseOnly);
+      } catch (e: any) {
+        setError(e?.message || 'failed');
+      } finally {
+        setLoading(false);
+      }
+    };
+    run();
+  }, [walletAddress]);
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-lg">Assets (Base)</h3>
+        </div>
+        {loading && (
+          <div
+            className="p-4 rounded-xl border-2 border-black animate-pulse"
+            style={{ boxShadow: '2px 2px 0px 0px #000000' }}
+          >
+            Loading…
+          </div>
+        )}
+        {!loading && error && (
+          <div
+            className="p-4 rounded-xl border-2 border-black bg-red-50"
+            style={{ boxShadow: '2px 2px 0px 0px #000000' }}
+          >
+            Failed to load assets
+          </div>
+        )}
+        {!loading && !error && (
+          <TokenList tokens={tokens || []} isLoading={false} walletAddress={walletAddress} />
+        )}
+      </div>
+    </div>
+  );
+}
 
 // --- AssetsSection ---
 function PositionsSection({

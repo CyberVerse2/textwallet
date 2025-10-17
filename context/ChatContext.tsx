@@ -68,22 +68,15 @@ export function ChatProvider({ children }: { children: ReactNode }): JSX.Element
     setWalletAddress(effective);
   }, [address]);
 
-  // Initialize Vercel AI Chat with proper naming
+  // Initialize Vercel AI Chat with session-based ID so reload starts fresh
   const effectiveUserId = address || walletAddress || undefined;
+  const [sessionId] = useState(() => Math.random().toString(36).slice(2));
 
   const [input, setInput] = useState('');
   const { messages, status, error, sendMessage, setMessages, stop } = useChat({
-    id: effectiveUserId ? `chat_${effectiveUserId.toLowerCase()}` : undefined,
-    onFinish: async () => {
-      try {
-        if (effectiveUserId) {
-          const history = await fetchChatHistory(effectiveUserId.toLowerCase());
-          setMessages(history);
-        }
-      } catch (e) {
-        console.error('Chat UI: failed to refresh grouped history after finish', e);
-      }
-    },
+    id: effectiveUserId ? `chat_${effectiveUserId.toLowerCase()}_${sessionId}` : undefined,
+    // Start fresh per refresh; do not auto-load historical DB messages on finish
+    onFinish: () => {},
     onError: (err: Error) => {
       console.error(' Chat History: [onError] AI SDK error:', err);
     }
@@ -230,16 +223,10 @@ export function ChatProvider({ children }: { children: ReactNode }): JSX.Element
     } as SdkMessage;
   }
 
-  // Effect to load history when wallet connects
+  // Skip auto-loading historical messages so each refresh starts a new chat session
   useEffect(() => {
-    if (effectiveUserId && !initialHistoryLoaded) {
-      fetchChatHistory(effectiveUserId.toLowerCase()).then((history) => {
-        setMessages(history); // Overwrite initial state from useChat with DB history
-        setInitialHistoryLoaded(true); // Mark history as loaded
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveUserId, initialHistoryLoaded, fetchChatHistory]); // Removed setMessages from deps
+    // intentionally no-op
+  }, [effectiveUserId, initialHistoryLoaded, fetchChatHistory]);
 
   // Combine Vercel AI state with custom state
   const value: ChatContextType = {

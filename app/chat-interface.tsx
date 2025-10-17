@@ -36,6 +36,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
     stop,
     append,
     setMessages,
+    setInput,
     // Custom context values
     isWalletConnected,
     walletAddress,
@@ -44,6 +45,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
 
   const [isActing, setIsActing] = useState(false);
   const triggeredIdsRef = useRef<Set<string>>(new Set());
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   // Helper to extract display text from UIMessage (AI SDK v5) or fallback to legacy content
   function getMessageText(m: any): string {
@@ -60,16 +62,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
     }
   }
 
-  function parseSpendPermissionTag(content: string) {
-    const re =
-      /\[ACTION:REQUEST_SPEND_PERMISSION\s+budgetUSD=(\d+(?:\.\d+)?)\s+periodDays=(\d+)\s+token([^\]]+)\]/;
-    const m = content.match(re);
-    if (!m) return null;
-    const budgetUSD = parseFloat(m[1]);
-    const periodDays = parseInt(m[2], 10);
-    const token = m[3];
-    const cleaned = content.replace(re, '').trim();
-    return { budgetUSD, periodDays, token, cleaned };
+  // Spend permission flow removed (subaccounts auto-spend). Leaving no-op helpers for backward compatibility.
+  function parseSpendPermissionTag(_content: string) {
+    return null;
   }
 
   function normalizeMarkdown(s: string) {
@@ -85,150 +80,13 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
     return out;
   }
 
-  function parseTriggerTag(content: string) {
-    const re =
-      /\[ACTION:TRIGGER_SPEND_PERMISSION(?:\s+budgetUSD=(\d+(?:\.\d+)?))?(?:\s+periodDays=(\d+))?\]/;
-    const m = content.match(re);
-    if (!m) return null;
-    const budgetUSD = m[1] ? parseFloat(m[1]) : undefined;
-    const periodDays = m[2] ? parseInt(m[2], 10) : undefined;
-    return { budgetUSD, periodDays };
+  function parseTriggerTag(_content: string) {
+    return null;
   }
 
-  async function onConfirmSpendPermission(
-    budgetUSD: number,
-    periodDays: number,
-    pendingTrade: boolean
-  ) {
-    if (!walletAddress) return;
-    try {
-      setIsActing(true);
-      // 1) Set budget
-      await fetch('/api/budget/set', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: walletAddress, amountCents: Math.round(budgetUSD * 100) })
-      });
-      try {
-        localStorage.setItem('tw_budget_usd', String(budgetUSD));
-      } catch {}
-      // 2) Fetch spender (CDP server wallet address)
-      const addrRes = await fetch('/api/cdp/account');
-      const addrJson = await addrRes.json();
-      const spender = addrJson.address as string;
-      const tokenAddress = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913'; // Base USDC
-      // 3) Request spend permission via Base Account SDK (client only)
-      const { createBaseAccountSDK } = await import('@base-org/account');
-      const { requestSpendPermission } = await import('@base-org/account/spend-permission');
-      const sdk = createBaseAccountSDK({ appName: 'PolyAgent' });
-      const allowance = BigInt(Math.round(budgetUSD * 1_000_000));
-      const permission: any = await requestSpendPermission({
-        account: walletAddress,
-        spender,
-        token: tokenAddress,
-        chainId: 8453,
-        allowance,
-        periodInDays: periodDays,
-        provider: sdk.getProvider()
-      } as any);
-      // 4) Store permission server-side
-      await fetch('/api/spend-permission/store', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: walletAddress,
-          permissionHash: permission?.hash,
-          permission,
-          token: tokenAddress,
-          allowance: Number(allowance.toString()),
-          periodSeconds: periodDays * 86400
-        })
-      });
-      // Merge success line into previous assistant message instead of creating a new one
-      const successLine = pendingTrade
-        ? `✅ Budget set to $${budgetUSD} and spend permission enabled for ${periodDays} days. Proceeding with your trade…`
-        : `✅ Budget set to $${budgetUSD} and spend permission enabled for ${periodDays} days.`;
-      setMessages((prev: any) => {
-        const updated = [...prev];
-        for (let i = updated.length - 1; i >= 0; i--) {
-          if ((updated[i] as any).role === 'assistant') {
-            const existing = getMessageText(updated[i]);
-            const newText = existing ? `${existing}\n\n${successLine}` : successLine;
-            updated[i] = {
-              ...(updated[i] as any),
-              parts: [{ type: 'text', text: newText }]
-            } as any;
-            return updated;
-          }
-        }
-        return [
-          ...prev,
-          {
-            role: 'assistant',
-            parts: [{ type: 'text', text: successLine }],
-            id: `sys-${Date.now()}`
-          } as any
-        ];
-      });
-      if (pendingTrade) {
-        try {
-          await append({
-            role: 'user',
-            content: 'Spend permission complete. Proceed with the pending order.'
-          });
-        } catch {}
-      }
-    } catch (e) {
-      console.error('Spend permission flow failed:', e);
-      const failLine = '❌ Spend permission setup failed or was rejected.';
-      setMessages((prev: any) => {
-        const updated = [...prev];
-        for (let i = updated.length - 1; i >= 0; i--) {
-          if ((updated[i] as any).role === 'assistant') {
-            const existing = getMessageText(updated[i]);
-            const newText = existing ? `${existing}\n\n${failLine}` : failLine;
-            updated[i] = {
-              ...(updated[i] as any),
-              parts: [{ type: 'text', text: newText }]
-            } as any;
-            return updated;
-          }
-        }
-        return [
-          ...prev,
-          {
-            role: 'assistant',
-            parts: [{ type: 'text', text: failLine }],
-            id: `sys-${Date.now()}`
-          } as any
-        ];
-      });
-    } finally {
-      setIsActing(false);
-    }
-  }
+  // Removed spend permission confirmation flow entirely
 
-  // Auto-trigger spend permission when assistant outputs [ACTION:TRIGGER_SPEND_PERMISSION]
-  useEffect(() => {
-    const last = messages[messages.length - 1];
-    if (!last || last.role !== 'assistant') return;
-    if (triggeredIdsRef.current.has(last.id || String(messages.length))) return;
-    const parsed = parseTriggerTag(getMessageText(last));
-    if (!parsed) return;
-    let budget = parsed.budgetUSD;
-    if (budget == null) {
-      try {
-        const cached = localStorage.getItem('tw_budget_usd');
-        if (cached) budget = parseFloat(cached);
-      } catch {}
-    }
-    const period = parsed.periodDays ?? 7;
-    const likelyPending = /order|trade|proceed/i.test(getMessageText(last));
-    if (budget && !isActing) {
-      triggeredIdsRef.current.add(last.id || String(messages.length));
-      onConfirmSpendPermission(budget, period, likelyPending);
-    }
-  }, [messages, isActing]);
+  // Removed auto-trigger spend permission effect
 
   // Log state changes to see what's happening
   useEffect(() => {
@@ -260,6 +118,27 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
     console.log('💬 Chat UI: Messages array updated:', messages);
   }, [messages]);
 
+  // Suggestions and initial assistant intro
+  const suggestions: { label: string; prompt: string }[] = [
+    { label: 'Show top Polymarket markets', prompt: 'show top markets with best upside' },
+    { label: 'Grant $200/week budget', prompt: 'grant $200/week until next month' },
+    {
+      label: 'Buy YES $5 @ 0.44 (paste market URL)',
+      prompt: 'buy YES 5 @ 0.44 on <paste market URL>'
+    },
+    { label: 'Bridge $20 USDC to Polygon', prompt: 'bridge $20 USDC from Base to Polygon' },
+    { label: 'Show my positions', prompt: 'show my positions' },
+    { label: 'Status', prompt: 'status' },
+    { label: 'Revoke spend permission', prompt: 'revoke spend permission' },
+    { label: 'Explain last order', prompt: 'explain last order' }
+  ];
+  const onSuggestion = (prompt: string) => {
+    setInput(prompt);
+    try {
+      if (inputRef.current) inputRef.current.focus();
+    } catch {}
+  };
+
   // Determine if the input/button should be disabled
   const isDisabled = isLoading || !isWalletConnected;
   const placeholderText = !isWalletConnected ? 'Connect wallet to chat' : 'Send a message...';
@@ -278,7 +157,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
 
   return (
     <div
-      className="flex-1 flex flex-col items-center bg-white rounded-2xl overflow-hidden relative"
+      className="flex-1 flex flex-col items-center bg-white rounded-2xl overflow-hidden relative min-h-[60vh] md:min-h-[unset]"
       style={{ boxShadow: '8px 8px 0px 0px #000000' }}
     >
       <div className="p-4 w-full max-w-[50rem] flex items-center">
@@ -290,16 +169,42 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
           <ArrowLeft className="h-4 w-4" />
         </Button>
       </div>
-      <ScrollArea ref={scrollAreaRef} className="flex-1 p-4 w-full max-w-[46rem]">
+      <ScrollArea
+        ref={scrollAreaRef}
+        className="flex-1 p-4 w-full max-w-[46rem] md:max-w-[46rem] max-md:max-w-full"
+      >
         <div className="space-y-4 w-full">
           {messages.length === 0 && (
-            <div className="text-center text-gray-500 my-8">
-              <p>No messages yet. Start a conversation!</p>
-              <p className="text-xs mt-2">
-                {isWalletConnected
-                  ? 'Your wallet is connected. Ask any crypto-related question!'
-                  : 'Connect your wallet to get started with TextWallet'}
-              </p>
+            <div className="flex flex-col gap-4 my-4">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full bg-blue flex items-center justify-center border-2 border-black flex-shrink-0">
+                  <Bot className="w-5 h-5 text-black" />
+                </div>
+                <div
+                  className="max-w-[90%] p-3 rounded-lg border-2 border-black bg-white text-left"
+                  style={{ boxShadow: '4px 4px 0px 0px #000000' }}
+                >
+                  <div className="text-sm">
+                    <div className="font-semibold mb-1">gm, how can I help you?</div>
+                    <div className="text-[12px] leading-6 text-gray-700 space-y-1">
+                      {suggestions.map((s) => (
+                        <div
+                          key={s.label}
+                          className="cursor-pointer select-none hover:opacity-80"
+                          onClick={() => onSuggestion(s.prompt)}
+                        >
+                          {'>'} {s.label}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  {!isWalletConnected && (
+                    <p className="text-xs text-gray-500 mt-3">
+                      Connect your wallet to enable actions.
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
           )}
           {messages.map((message, index) => {
@@ -332,7 +237,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
                     (() => {
                       const baseText = getMessageText(message);
                       const parsed = parseSpendPermissionTag(baseText);
-                      const display = parsed?.cleaned ?? baseText;
+                      const display = baseText;
                       const normalizedDisplay = normalizeMarkdown(display || '');
                       return (
                         <div className="markdown-content text-sm prose prose-sm max-w-none">
@@ -405,56 +310,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
                           >
                             {normalizedDisplay}
                           </ReactMarkdown>
-                          {parsed && (
-                            <div className="mt-3 flex gap-2">
-                              <Button
-                                variant="outline"
-                                className="border-2 border-black"
-                                disabled={isActing}
-                                onClick={() =>
-                                  onConfirmSpendPermission(
-                                    parsed.budgetUSD,
-                                    parsed.periodDays,
-                                    /order|trade|proceed/i.test(display || '')
-                                  )
-                                }
-                              >
-                                Confirm
-                              </Button>
-                              <Button
-                                variant="outline"
-                                className="border-2 border-black"
-                                disabled={isActing}
-                                onClick={() =>
-                                  setMessages((prev: any) => {
-                                    const msg = '👍 Spend permission request cancelled.';
-                                    const updated = [...prev];
-                                    for (let i = updated.length - 1; i >= 0; i--) {
-                                      if ((updated[i] as any).role === 'assistant') {
-                                        const existing = getMessageText(updated[i]);
-                                        const newText = existing ? `${existing}\n\n${msg}` : msg;
-                                        updated[i] = {
-                                          ...(updated[i] as any),
-                                          parts: [{ type: 'text', text: newText }]
-                                        } as any;
-                                        return updated;
-                                      }
-                                    }
-                                    return [
-                                      ...prev,
-                                      {
-                                        role: 'assistant',
-                                        parts: [{ type: 'text', text: msg }],
-                                        id: `sys-${Date.now()}`
-                                      } as any
-                                    ];
-                                  })
-                                }
-                              >
-                                Reject
-                              </Button>
-                            </div>
-                          )}
+                          {/* Spend permission buttons removed */}
                         </div>
                       );
                     })()
@@ -512,7 +368,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
         </div>
       </ScrollArea>
 
-      <div className="p-4 bg-white w-full max-w-[46rem]">
+      <div className="p-4 bg-white w-full max-w-[46rem] md:max-w-[46rem] max-md:max-w-full sticky bottom-0">
         <form className="relative w-full" onSubmit={handleSubmit}>
           <Input
             type="text"
@@ -522,6 +378,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
             disabled={isDisabled}
             className="pr-16 py-6 text-base border-2 border-black rounded-xl"
             style={{ boxShadow: '4px 4px 0px 0px #000000' }}
+            ref={inputRef as any}
           />
           <Button
             type="submit"

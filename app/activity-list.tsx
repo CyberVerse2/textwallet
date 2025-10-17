@@ -15,9 +15,10 @@ interface Activity {
 interface ActivityListProps {
   walletAddress?: string | null;
   refreshTrigger?: number;
+  limit?: number;
 }
 
-export default function ActivityList({ walletAddress, refreshTrigger }: ActivityListProps) {
+export default function ActivityList({ walletAddress, refreshTrigger, limit }: ActivityListProps) {
   const [activities, setActivities] = useState<Activity[]>([]);
 
   useEffect(() => {
@@ -67,7 +68,7 @@ export default function ActivityList({ walletAddress, refreshTrigger }: Activity
 
   return (
     <div className="space-y-3">
-      {activities.map((activity, index) => (
+      {(limit ? activities.slice(0, limit) : activities).map((activity, index) => (
         <div
           key={index}
           className="p-3 rounded-xl border-2 border-black hover:bg-yellow/10 active:translate-y-1 active:shadow-none cursor-pointer transition-all duration-100"
@@ -82,12 +83,12 @@ export default function ActivityList({ walletAddress, refreshTrigger }: Activity
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between">
-                <div className="text-sm font-bold">
-                  {summarizeAddresses(activity.description)}
-                </div>
+                <div className="text-sm font-bold">{summarizeAddresses(activity.description)}</div>
                 <div className={cn('h-2 w-2 rounded-full', getStatusColor(activity.status))}></div>
               </div>
-              <div className="text-sm text-muted-foreground">{humanizeTimestamp(activity.timestamp)}</div>
+              <div className="text-sm text-muted-foreground">
+                {humanizeTimestamp(activity.timestamp)}
+              </div>
             </div>
           </div>
         </div>
