@@ -132,9 +132,9 @@ export default function SwipeDeck() {
   };
 
   return (
-    <div className="h-full flex flex-col items-center justify-center px-4 overflow-hidden">
-      {/* Wallet header centered, reduced width to ~75% */}
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 w-1/4">
+    <div className="h-full flex flex-col items-center justify-start px-4 overflow-hidden">
+      {/* Wallet header becomes part of main flow */}
+      <div className="w-full mb-4 md:mb-16">
         <div
           className="bg-white rounded-xl border-2 border-black p-3 flex items-center justify-between gap-3"
           style={{ boxShadow: '4px 4px 0px 0px #000000' }}

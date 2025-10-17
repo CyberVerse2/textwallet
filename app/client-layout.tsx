@@ -22,12 +22,11 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 // import { Drawer, DrawerContent, DrawerTrigger } from '@/components/ui/drawer';
-import TokenList from './token-list';
 import ActivityList from './activity-list';
 import './globals.css';
 import { ChatProvider, useChatContext } from '@/context/ChatContext';
 import { shortenAddress } from '@/lib/utils'; // Import shortenAddress at the top
-import { EnrichedTokenBalance } from './token-list'; // Import the correct type
+// Assets section removed
 import { useAccount, useDisconnect, useConnect, useConnections } from 'wagmi';
 // Sign in with Base removed; will be reimplemented from scratch
 import ReactMarkdown from 'react-markdown';
@@ -314,7 +313,7 @@ const SidebarTabs = forwardRef<
     walletAddress: string | null;
   }
 >(function SidebarTabs({ isWalletConnected, walletAddress }, ref) {
-  const [activeTab, setActiveTab] = useState<'assets' | 'positions' | 'activity'>('positions');
+  const [activeTab, setActiveTab] = useState<'positions' | 'activity'>('positions');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Function to refresh balances
@@ -330,7 +329,7 @@ const SidebarTabs = forwardRef<
   return (
     <div>
       {/* Tab Buttons - Updated Styling */}
-      <div className="grid grid-cols-3 gap-2 mb-6 p-1 border-2 border-black rounded-xl">
+      <div className="grid grid-cols-2 gap-2 mb-6 p-1 border-2 border-black rounded-xl">
         <button
           className={`w-full py-2 px-3 rounded-lg font-bold transition-all duration-150 flex items-center justify-center gap-2 ${
             activeTab === 'positions'
@@ -341,17 +340,6 @@ const SidebarTabs = forwardRef<
           onClick={() => setActiveTab('positions')}
         >
           <BarChart2 className="h-4 w-4" /> Positions
-        </button>
-        <button
-          className={`w-full py-2 px-3 rounded-lg font-bold transition-all duration-150 flex items-center justify-center gap-2 ${
-            activeTab === 'assets'
-              ? 'bg-blue text-black border-2 border-black'
-              : 'text-black hover:bg-blue/50 active:translate-y-px'
-          }`}
-          style={activeTab === 'assets' ? { boxShadow: '2px 2px 0px 0px #000000' } : {}}
-          onClick={() => setActiveTab('assets')}
-        >
-          <Wallet className="h-4 w-4" /> Assets
         </button>
         <button
           className={`w-full py-2 px-3 rounded-lg font-bold transition-all duration-150 flex items-center justify-center gap-2 ${
@@ -368,9 +356,6 @@ const SidebarTabs = forwardRef<
 
       {/* Tab Content */}
       <div className="space-y-6">
-        {activeTab === 'assets' && (
-          <AssetsSection isWalletConnected={isWalletConnected} walletAddress={walletAddress} />
-        )}
         {activeTab === 'positions' && (
           <PositionsSection isWalletConnected={isWalletConnected} walletAddress={walletAddress} />
         )}
@@ -382,73 +367,7 @@ const SidebarTabs = forwardRef<
   );
 });
 
-function AssetsSection({
-  isWalletConnected,
-  walletAddress
-}: {
-  isWalletConnected: boolean;
-  walletAddress: string | null;
-}) {
-  const [tokens, setTokens] = useState<EnrichedTokenBalance[] | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const run = async () => {
-      if (!walletAddress) {
-        setTokens(null);
-        return;
-      }
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await fetch(`/api/tokens?address=${walletAddress}`);
-        const json = await res.json();
-        const list = Array.isArray(json?.tokens) ? json.tokens : [];
-        const baseOnly = list.filter((t: any) =>
-          String(t?.network || '')
-            .toLowerCase()
-            .includes('base')
-        );
-        setTokens(baseOnly);
-      } catch (e: any) {
-        setError(e?.message || 'failed');
-      } finally {
-        setLoading(false);
-      }
-    };
-    run();
-  }, [walletAddress]);
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-bold text-lg">Assets (Base)</h3>
-        </div>
-        {loading && (
-          <div
-            className="p-4 rounded-xl border-2 border-black animate-pulse"
-            style={{ boxShadow: '2px 2px 0px 0px #000000' }}
-          >
-            Loading…
-          </div>
-        )}
-        {!loading && error && (
-          <div
-            className="p-4 rounded-xl border-2 border-black bg-red-50"
-            style={{ boxShadow: '2px 2px 0px 0px #000000' }}
-          >
-            Failed to load assets
-          </div>
-        )}
-        {!loading && !error && (
-          <TokenList tokens={tokens || []} isLoading={false} walletAddress={walletAddress} />
-        )}
-      </div>
-    </div>
-  );
-}
+// AssetsSection removed
 
 // --- AssetsSection ---
 function PositionsSection({
