@@ -136,6 +136,36 @@ export async function postMarketOrder(params: PostMarketOrderParams): Promise<Po
   }
 }
 
+export interface OrderDetails {
+  id: string;
+  status: string;
+  market: string;
+  original_size: string;
+  outcome: string;
+  maker_address: string;
+  owner: string;
+  price: string;
+  side: string;
+  size_matched: string;
+  asset_id: string;
+  expiration: string;
+  type: string;
+  created_at: string;
+}
+
+export async function getOrder(
+  orderId: string
+): Promise<{ ok: boolean; order?: any; error?: string }> {
+  try {
+    const { client } = await getPolymarketClient();
+    const order = await client.getOrder(orderId);
+    return { ok: true, order };
+  } catch (e: any) {
+    console.error('🧩 Polymarket getOrder error', { orderId, message: e?.message });
+    return { ok: false, error: e?.message || String(e) };
+  }
+}
+
 function normalizeSide(s: PostOrderParams['side']): Side {
   const v = String(s).toLowerCase();
   if (v === 'buy' || v === 'yes') return Side.BUY;

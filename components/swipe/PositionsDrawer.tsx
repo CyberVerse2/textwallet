@@ -4,17 +4,30 @@ import { X, ExternalLink } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 interface Position {
-  market: string;
-  avg: string;
-  now: string;
-  bet: string;
-  toWin: string;
-  value: string;
-  currentPrice: string;
-  previousPrice: string;
-  change: string;
-  changePercent: string;
-  polymarketUrl: string;
+  // Position summary from database aggregation
+  marketId: string;
+  side: string;
+  totalSize: number;
+  avgPrice: number;
+  orderCount: number;
+  latestCreatedAt: string;
+
+  // Supporting details from Polymarket
+  latestOrderId: string;
+  assetId: string;
+  outcome: string;
+  latestOrderStatus: string;
+  latestOrderType: string;
+  latestOrderExpiration: string;
+
+  // Market information
+  market: {
+    id: string;
+    title: string;
+    url: string;
+    outcomes: string[];
+    endDate: string;
+  };
 }
 
 interface PositionsDrawerProps {
@@ -27,69 +40,25 @@ export function PositionsDrawer({ isOpen, onClose, userId }: PositionsDrawerProp
   const [positions, setPositions] = useState<Position[] | null>(null);
   const mock: Position[] = [
     {
-      market: 'Will Tesla (TSLA) beat quarterly earnings?',
-      avg: 'Yes 73¢',
-      now: '1.4 shares',
-      bet: '73¢',
-      toWin: '73¢',
-      value: '$1.00',
-      currentPrice: '$1.37',
-      previousPrice: '$0.99',
-      change: '-$0.01',
-      changePercent: '0.68%',
-      polymarketUrl: 'https://polymarket.com/event/will-tesla-beat-quarterly-earnings'
-    },
-    {
-      market: 'Will the Tampa Bay Buccaneers win Super Bowl 2026?',
-      avg: 'Yes 45¢',
-      now: '2.2 shares',
-      bet: '$0.99',
-      toWin: '$1.21',
-      value: '$2.20',
-      currentPrice: '$1.00',
-      previousPrice: '$0.45',
-      change: '+$0.55',
-      changePercent: '122.22%',
-      polymarketUrl: 'https://polymarket.com/event/will-tampa-bay-buccaneers-win-super-bowl-2026'
-    },
-    {
-      market: 'Will Bitcoin reach $100k by end of 2025?',
-      avg: 'Yes 82¢',
-      now: '0.8 shares',
-      bet: '$0.66',
-      toWin: '$0.14',
-      value: '$0.80',
-      currentPrice: '$1.00',
-      previousPrice: '$0.82',
-      change: '+$0.18',
-      changePercent: '21.95%',
-      polymarketUrl: 'https://polymarket.com/event/will-bitcoin-reach-100k-by-end-of-2025'
-    },
-    {
-      market: 'Will Apple announce a foldable iPhone in 2025?',
-      avg: 'No 35¢',
-      now: '3.0 shares',
-      bet: '$1.05',
-      toWin: '$1.95',
-      value: '$3.00',
-      currentPrice: '$1.00',
-      previousPrice: '$0.35',
-      change: '+$0.65',
-      changePercent: '185.71%',
-      polymarketUrl: 'https://polymarket.com/event/will-apple-announce-foldable-iphone-2025'
-    },
-    {
-      market: 'Will the S&P 500 close above 6000 this year?',
-      avg: 'Yes 68¢',
-      now: '1.5 shares',
-      bet: '$1.02',
-      toWin: '$0.48',
-      value: '$1.50',
-      currentPrice: '$1.00',
-      previousPrice: '$0.68',
-      change: '+$0.32',
-      changePercent: '47.06%',
-      polymarketUrl: 'https://polymarket.com/event/will-sp-500-close-above-6000-this-year'
+      marketId: 'mock-market-1',
+      side: 'yes',
+      totalSize: 2.0,
+      avgPrice: 0.73,
+      orderCount: 1,
+      latestCreatedAt: '2024-01-01T00:00:00Z',
+      latestOrderId: 'mock-order-1',
+      assetId: 'mock-asset-1',
+      outcome: 'Yes',
+      latestOrderStatus: 'filled',
+      latestOrderType: 'FOK',
+      latestOrderExpiration: '0',
+      market: {
+        id: 'mock-market-1',
+        title: 'Will Tesla (TSLA) beat quarterly earnings?',
+        url: 'https://polymarket.com/event/will-tesla-beat-quarterly-earnings',
+        outcomes: ['Yes', 'No'],
+        endDate: '2024-12-31'
+      }
     }
   ];
 
@@ -118,21 +87,8 @@ export function PositionsDrawer({ isOpen, onClose, userId }: PositionsDrawerProp
           return;
         }
         const json = await res.json();
-        const list: any[] = Array.isArray(json?.positions) ? json.positions : [];
-        const mapped: Position[] = list.map((p: any) => ({
-          market: p.title || 'Position',
-          avg: '—',
-          now: `${(p.yesSize ?? 0) + (p.noSize ?? 0)} shares`,
-          bet: '—',
-          toWin: '—',
-          value: `$${((p.yesSize ?? 0) + (p.noSize ?? 0)).toFixed(2)}`,
-          currentPrice: '—',
-          previousPrice: '—',
-          change: '—',
-          changePercent: '—',
-          polymarketUrl: p.url || '#'
-        }));
-        setPositions(mapped.length ? mapped : mock);
+        const list: Position[] = Array.isArray(json?.positions) ? json.positions : [];
+        setPositions(list.length ? list : mock);
       } catch {
         setPositions(mock);
       }
@@ -165,49 +121,73 @@ export function PositionsDrawer({ isOpen, onClose, userId }: PositionsDrawerProp
         <div className="p-3 sm:p-4">
           {(() => {
             const list = positions ?? mock;
-            return list.map((position, index) => (
-              <div
-                key={index}
-                className="mb-3 rounded-xl border-[4px] border-black bg-white p-3 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] sm:p-4"
-              >
-                <h3 className="mb-2 line-clamp-1 text-sm font-black leading-tight text-black sm:text-base">
-                  {position.market}
-                </h3>
-                <div className="mb-2 flex items-center justify-between gap-2 text-xs sm:text-sm">
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-md border-[3px] border-black bg-[#FFD700] px-2 py-1 font-black text-black">
-                      {position.avg}
-                    </span>
-                    <span className="font-bold text-black/70">{position.now}</span>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-base font-black text-black sm:text-lg">
-                      {position.value}
+            return list.map((position, index) => {
+              const pricePercent = (position.avgPrice * 100).toFixed(1);
+              const statusColor =
+                position.latestOrderStatus === 'filled'
+                  ? 'bg-green-400'
+                  : position.latestOrderStatus === 'open'
+                  ? 'bg-yellow-400'
+                  : 'bg-red-400';
+
+              return (
+                <div
+                  key={`${position.marketId}-${position.side}` || index}
+                  className="mb-3 rounded-xl border-[4px] border-black bg-white p-3 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] sm:p-4"
+                >
+                  <h3 className="mb-2 line-clamp-2 text-sm font-black leading-tight text-black sm:text-base">
+                    {position.market.title}
+                  </h3>
+                  <div className="mb-2 flex items-center justify-between gap-2 text-xs sm:text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-md border-[3px] border-black bg-[#FFD700] px-2 py-1 font-black text-black">
+                        {position.outcome} {pricePercent}¢
+                      </span>
+                      <span
+                        className={`rounded-md border-[3px] border-black px-2 py-1 font-black text-black ${statusColor}`}
+                      >
+                        {position.latestOrderStatus.toUpperCase()}
+                      </span>
                     </div>
-                    <div
-                      className={`text-xs font-bold ${
-                        position.change.startsWith('+') ? 'text-green-600' : 'text-red-600'
-                      }`}
+                    <div className="text-right">
+                      <div className="text-base font-black text-black sm:text-lg">
+                        {position.totalSize.toFixed(2)} shares
+                      </div>
+                      <div className="text-xs font-bold text-black/70">
+                        {position.orderCount} order{position.orderCount !== 1 ? 's' : ''}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mb-2 text-xs text-black/60">
+                    <div>Position: {position.side.toUpperCase()}</div>
+                    <div>Latest Order: {position.latestOrderId.slice(0, 8)}...</div>
+                    <div>Type: {position.latestOrderType}</div>
+                    {position.latestOrderExpiration !== '0' && (
+                      <div>
+                        Expires:{' '}
+                        {new Date(
+                          Number(position.latestOrderExpiration) * 1000
+                        ).toLocaleDateString()}
+                      </div>
+                    )}
+                    <div>Last Trade: {new Date(position.latestCreatedAt).toLocaleDateString()}</div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button className="flex-1 rounded-lg border-[3px] border-black bg-[#D50A0A] py-2 text-xs font-black text-white shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none sm:text-sm">
+                      Sell
+                    </button>
+                    <a
+                      href={position.market.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center rounded-lg border-[3px] border-black bg-[#34302B] px-3 py-2 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none"
                     >
-                      {position.change} ({position.changePercent})
-                    </div>
+                      <ExternalLink className="h-4 w-4 text-white" strokeWidth={3} />
+                    </a>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <button className="flex-1 rounded-lg border-[3px] border-black bg-[#D50A0A] py-2 text-xs font-black text-white shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none sm:text-sm">
-                    Sell
-                  </button>
-                  <a
-                    href={position.polymarketUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-center rounded-lg border-[3px] border-black bg-[#34302B] px-3 py-2 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none"
-                  >
-                    <ExternalLink className="h-4 w-4 text-white" strokeWidth={3} />
-                  </a>
-                </div>
-              </div>
-            ));
+              );
+            });
           })()}
           {(() => {
             const list = positions ?? mock;

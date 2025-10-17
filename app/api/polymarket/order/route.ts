@@ -10,10 +10,10 @@ export async function POST(req: NextRequest) {
 
     // Resolve inputs (support swipe payloads)
     const resolvedTokenId = String(tokenID || marketId || '');
-    const resolvedPrice = typeof price === 'number' ? price : undefined;
+    const resolvedPrice = typeof price === 'number' ? price : 0.1;
     // For market orders, compute dollar notional (amountUSD)
     let amountUSD: number | undefined = typeof sizeUsd === 'number' ? sizeUsd : undefined;
-    if (amountUSD == null && typeof size === 'number' && typeof resolvedPrice === 'number') {
+    if (amountUSD == null && typeof size === 'number') {
       amountUSD = Number((size * resolvedPrice).toFixed(2));
     }
 
