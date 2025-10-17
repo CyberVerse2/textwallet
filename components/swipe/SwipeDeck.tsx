@@ -226,7 +226,7 @@ export default function SwipeDeck() {
                 <Menu className="h-5 w-5" />
               </Button>
             </DrawerTrigger>
-            <DrawerContent className="h-[75vh]">
+            <DrawerContent className="h-[90dvh]">
               <div className="p-4 h-full overflow-y-auto">
                 <Sidebar ref={{ current: null } as any} />
               </div>
