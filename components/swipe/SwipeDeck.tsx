@@ -5,7 +5,7 @@ import MarketCard from '@/components/swipe/MarketCard';
 import { SwipeCard } from '@/components/swipe/SwipeCard';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
-import { ArrowUp, Menu, Copy as CopyIcon, Check } from 'lucide-react';
+import { ArrowUp, Menu, Copy as CopyIcon, Check, X } from 'lucide-react';
 import { ActionButtons } from '@/components/swipe/ActionButtons';
 import { useToast } from '@/hooks/use-toast';
 import { useSwipeTrades } from '@/hooks/useSwipeTrades';
@@ -35,6 +35,7 @@ export default function SwipeDeck() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(false);
+  const [showGuides, setShowGuides] = useState(true);
   const { toast } = useToast();
   const { submit } = useSwipeTrades();
   const { address } = useAccount();
@@ -224,6 +225,7 @@ export default function SwipeDeck() {
   }, [markets, loading]);
 
   const handleSwipe = async (market: Market, side: 'yes' | 'no') => {
+    if (showGuides) setShowGuides(false);
     if (cooldown) return;
     setCooldown(true);
     setTimeout(() => setCooldown(false), 1000);
@@ -395,6 +397,33 @@ export default function SwipeDeck() {
           {markets.length === 0 && (
             <div className="text-sm text-muted-foreground">No more markets</div>
           )}
+
+          {/* Swipe Guides (outside the cards) */}
+          {showGuides && (
+            <div className="pointer-events-none absolute inset-0 z-10">
+              {/* Left NO badge */}
+              <div className="absolute left-[-6px] md:left-[-10px] top-1/2 -translate-y-1/2 rotate-[-12deg] rounded-xl border-4 border-black bg-pink-400 px-3 py-1.5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                <div className="flex items-center gap-1">
+                  <X className="h-4 w-4 stroke-[4px] text-black" />
+                  <span className="text-xs font-black text-black">NO</span>
+                </div>
+              </div>
+              {/* Right YES badge */}
+              <div className="absolute right-[-6px] md:right-[-10px] top-1/2 -translate-y-1/2 rotate-[12deg] rounded-xl border-4 border-black bg-green-400 px-3 py-1.5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                <div className="flex items-center gap-1">
+                  <Check className="h-4 w-4 stroke-[4px] text-black" />
+                  <span className="text-xs font-black text-black">YES</span>
+                </div>
+              </div>
+              {/* Top SKIP badge */}
+              <div className="absolute top-[-8px] left-1/2 -translate-x-1/2 rounded-xl border-4 border-black bg-yellow-400 px-3 py-1.5 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                <div className="flex items-center gap-1">
+                  <ArrowUp className="h-4 w-4 stroke-[4px] text-black" />
+                  <span className="text-xs font-black text-black">SKIP</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -402,9 +431,10 @@ export default function SwipeDeck() {
       <div className="mt-16 md:mt-20 shrink-0">
         <ActionButtons
           onNo={() => markets[0] && handleSwipe(markets[0], 'no')}
-          onSkip={() =>
-            markets[0] && setMarkets((prev) => prev.filter((x) => x.id !== markets[0].id))
-          }
+          onSkip={() => {
+            if (showGuides) setShowGuides(false);
+            markets[0] && setMarkets((prev) => prev.filter((x) => x.id !== markets[0].id));
+          }}
           onYes={() => markets[0] && handleSwipe(markets[0], 'yes')}
         />
       </div>
