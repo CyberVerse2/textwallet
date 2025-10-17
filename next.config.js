@@ -21,7 +21,8 @@ const nextConfig = {
     domains: [
       'token.metaswap.codefi.network', // For token logos
       'avatars.githubusercontent.com',
-      'raw.githubusercontent.com'
+      'raw.githubusercontent.com',
+      'ash-nut-bool-anthony.trycloudflare.com'
     ],
     unoptimized: true // For handling dynamic image URLs
   }

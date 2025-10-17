@@ -29,7 +29,7 @@ import { EnrichedTokenBalance } from './token-list'; // Import the correct type
 import { useAccount, useDisconnect, useConnect, useConnections } from 'wagmi';
 // Sign in with Base removed; will be reimplemented from scratch
 import ReactMarkdown from 'react-markdown';
-// Removed Base Account SDK in favor of wagmi baseAccount connector only
+import { getBaseAccountProvider, verifySubAccountCreated } from '@/lib/baseAccountSdk';
 
 // Create a ref to hold the SidebarTabs component
 const sidebarRef = React.createRef<{ refreshBalances: () => void }>();
@@ -247,11 +247,34 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
               className="w-full justify-start border-2 border-black rounded-xl font-bold"
               style={{ boxShadow: '4px 4px 0px 0px #000000' }}
               size="sm"
-              onClick={() => {
-                const baseConnector =
-                  connectors.find((c) => (c.name || '').toLowerCase().includes('base')) ??
-                  connectors[0];
-                if (baseConnector) connect({ connector: baseConnector });
+              onClick={async () => {
+                try {
+                  const provider = getBaseAccountProvider();
+                  // Ensure Base Account quickstart flow runs and creates sub account
+                  console.debug('[SignIn] wallet_connect');
+                  await provider.request({ method: 'wallet_connect', params: [] });
+                  console.debug('[SignIn] eth_requestAccounts');
+                  await provider.request({ method: 'eth_requestAccounts', params: [] });
+                  const verification = await verifySubAccountCreated();
+                  if (verification.verified) {
+                    console.debug('[SignIn] Subaccount verified', {
+                      sub: verification.subAccount,
+                      universal: verification.universalAccount
+                    });
+                    setSubAddress(verification.subAccount || null);
+                    setUniversalAddress(verification.universalAccount || null);
+                  } else {
+                    console.warn('[SignIn] Subaccount verification failed', verification.reason);
+                  }
+                } catch (e) {
+                  // Fallback: continue to wagmi connect even if SDK pre-connect fails
+                  console.error('[SignIn] Base Account SDK connect failed', e);
+                } finally {
+                  const baseConnector =
+                    connectors.find((c) => (c.name || '').toLowerCase().includes('base')) ??
+                    connectors[0];
+                  if (baseConnector) connect({ connector: baseConnector });
+                }
               }}
             >
               Sign In
