@@ -66,6 +66,7 @@ export async function postOrder(params: PostOrderParams): Promise<PostOrderResul
     console.log('🧩 Polymarket postOrder success', { order });
     return { ok: true, order };
   } catch (e: any) {
+    console.error('🧩 Polymarket postOrder error', { message: e?.message });
     return { ok: false, error: e?.message || String(e) };
   }
 }

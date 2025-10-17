@@ -66,6 +66,7 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
   const [isFunding, setIsFunding] = useState(false);
   // USDC balance state
   const [usdcBalance, setUsdcBalance] = useState<string | null>(null);
+  const [subAddress, setSubAddress] = useState<string | null>(null);
   // Create a ref to the SidebarTabs component to access the refresh function
   const tabsRef = useRef<{ refreshBalances: () => void } | null>(null);
 
@@ -178,6 +179,11 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
                 </button>
               </div>
             )}
+            {isWalletEffectivelyConnected && subAddress && (
+              <div className="text-xs text-muted-foreground truncate" title={subAddress}>
+                Sub: {shortenAddress(subAddress)}
+              </div>
+            )}
             {isWalletEffectivelyConnected && usdcBalance && (
               <div className="text-xs text-black mt-1">Base USDC: {usdcBalance}</div>
             )}
@@ -215,6 +221,7 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
                 if (result) {
                   setIsWalletConnected(true);
                   setWalletAddress(result.address);
+                  if (result.subAddress) setSubAddress(result.subAddress);
                 }
               }}
             />
@@ -232,6 +239,7 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
               disconnect();
               setIsWalletConnected(false);
               setWalletAddress(null);
+              setSubAddress(null);
             }}
           >
             <LogOut className="mr-2 h-4 w-4" />

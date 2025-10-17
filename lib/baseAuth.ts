@@ -2,10 +2,11 @@
 
 import { createBaseAccountSDK } from '@base-org/account';
 
-export async function signInWithBase(): Promise<{ address: string } | null> {
+export async function signInWithBase(): Promise<{ address: string; subAddress?: string } | null> {
   try {
-    // Provide required app metadata to the SDK (prevents undefined appName error)
-    const provider = createBaseAccountSDK({ appName: 'PolyAgent' }).getProvider();
+    // Initialize SDK (sub-account creation will be handled via RPC calls below)
+    const sdk = createBaseAccountSDK({ appName: 'PolyAgent' });
+    const provider = sdk.getProvider();
     // Prefetch a nonce from the server to avoid popup blockers and allow server-side replay protection
     let nonce: string;
     try {
@@ -19,7 +20,7 @@ export async function signInWithBase(): Promise<{ address: string } | null> {
     }
 
     // 0 — request accounts first per provider requirements
-    await provider.request({ method: 'eth_requestAccounts' });
+    const accounts = (await provider.request({ method: 'eth_requestAccounts' })) as string[];
 
     await provider.request({
       method: 'wallet_switchEthereumChain',
@@ -37,10 +38,10 @@ export async function signInWithBase(): Promise<{ address: string } | null> {
         }
       ]
     });
-    const accounts = connectResponse?.accounts || [];
-    const { address } = accounts[0] || {};
+    const connectedAccounts = connectResponse?.accounts || [];
+    const { address } = connectedAccounts[0] || {};
     const { message, signature } =
-      accounts[0]?.capabilities?.signInWithEthereum ||
+      connectedAccounts[0]?.capabilities?.signInWithEthereum ||
       (connectResponse?.signInWithEthereum as any) ||
       {};
 
@@ -53,7 +54,34 @@ export async function signInWithBase(): Promise<{ address: string } | null> {
       const text = await res.text();
       throw new Error(`Signature verification failed: ${text}`);
     }
-    return { address };
+    // Ensure or fetch a Sub Account for this app origin
+    let subAddress: string | undefined;
+    try {
+      const universal = Array.isArray(accounts) && accounts.length > 0 ? accounts[0] : address;
+      const subResp = (await provider.request({
+        method: 'wallet_getSubAccounts',
+        params: [
+          {
+            account: universal,
+            domain: window.location.origin
+          }
+        ]
+      })) as { subAccounts?: Array<{ address: `0x${string}` }> };
+      subAddress = subResp?.subAccounts?.[0]?.address;
+      if (!subAddress) {
+        const created = (await provider.request({
+          method: 'wallet_addSubAccount',
+          params: [
+            {
+              account: { type: 'create' }
+            }
+          ]
+        })) as { address: `0x${string}` };
+        subAddress = created?.address;
+      }
+    } catch {}
+
+    return { address, subAddress };
   } catch (err) {
     console.error('SignInWithBase error:', err);
     return null;
