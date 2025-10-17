@@ -11,6 +11,7 @@ interface WalletHeaderProps {
   topUpHref?: string;
   menuButton?: React.ReactNode;
   onConnect?: () => void;
+  onDisconnect?: () => void;
 }
 
 export function WalletHeader({
@@ -20,7 +21,8 @@ export function WalletHeader({
   balance,
   topUpHref = 'https://faucet.circle.com',
   menuButton,
-  onConnect
+  onConnect,
+  onDisconnect
 }: WalletHeaderProps) {
   return (
     <header className="relative w-full">
@@ -40,6 +42,12 @@ export function WalletHeader({
                   aria-label="Copy wallet address"
                 >
                   <Copy className="h-4 w-4 text-white sm:h-5 sm:w-5" />
+                </button>
+                <button
+                  onClick={onDisconnect}
+                  className="ml-1 flex items-center justify-center rounded-xl border-[3px] border-black bg-white px-3 py-1 text-xs font-black text-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none sm:text-sm"
+                >
+                  Disconnect
                 </button>
               </>
             ) : (

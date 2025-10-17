@@ -313,6 +313,24 @@ export default function SwipeDeck() {
           }}
           copied={copied}
           balance={usdcBalance}
+          onConnect={async () => {
+            try {
+              const provider = getBaseAccountProvider();
+              await provider.request({ method: 'wallet_connect', params: [] });
+              await provider.request({ method: 'eth_requestAccounts', params: [] });
+            } catch (e) {
+              console.error('Connect failed', e);
+            }
+          }}
+          onDisconnect={async () => {
+            try {
+              await fetch('/api/auth/logout', { method: 'POST' });
+            } catch {}
+            try {
+              // Best-effort: clear cookie storage rehydration by reloading
+              window.location.reload();
+            } catch {}
+          }}
           menuButton={
             <>
               <button
