@@ -369,10 +369,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
       </ScrollArea>
 
       <div
-        className="fixed md:sticky left-0 right-0 md:left-auto md:right-auto bottom-0 md:bottom-0 z-20 px-2 md:px-0"
+        className="fixed md:sticky inset-x-0 bottom-0 z-20 px-2 md:px-4 w-3/4"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
-        <div className="mx-auto w-full md:max-w-none bg-white md:border-t-2 md:border-black p-2 md:p-4 rounded-t-2xl">
+        <div className="w-full bg-white md:border-t-2 p-2 md:p-4 rounded-t-2xl">
           <form className="relative w-full" onSubmit={handleSubmit}>
             <Input
               type="text"

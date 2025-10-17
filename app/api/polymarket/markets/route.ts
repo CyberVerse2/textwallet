@@ -6,6 +6,8 @@ export async function GET(req: NextRequest) {
     const client = getPolymarketClient();
     const { searchParams } = new URL(req.url);
     const filters: Record<string, any> = {};
+    const limit = Number(searchParams.get('limit') || 20);
+    const cursor = searchParams.get('cursor') || undefined;
     searchParams.forEach((v, k) => {
       // collect multiple values (arrays) using append style
       if (filters[k]) {
@@ -15,8 +17,8 @@ export async function GET(req: NextRequest) {
         filters[k] = v;
       }
     });
-    const markets = await client.fetchMarkets(filters);
-    return NextResponse.json({ markets }, { status: 200 });
+    const { markets, nextCursor } = await client.fetchMarkets({ ...filters, limit, cursor });
+    return NextResponse.json({ markets, cursor: nextCursor }, { status: 200 });
   } catch (err: any) {
     console.error('Polymarket markets error:', err);
     return NextResponse.json({ error: 'Failed to fetch markets' }, { status: 500 });

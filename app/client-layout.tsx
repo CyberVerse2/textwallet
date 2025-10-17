@@ -30,6 +30,7 @@ import { EnrichedTokenBalance } from './token-list'; // Import the correct type
 import { useAccount, useDisconnect, useConnect, useConnections } from 'wagmi';
 // Sign in with Base removed; will be reimplemented from scratch
 import ReactMarkdown from 'react-markdown';
+import Link from 'next/link';
 import { getBaseAccountProvider, verifySubAccountCreated } from '@/lib/baseAccountSdk';
 
 // Create a ref to hold the SidebarTabs component
@@ -118,24 +119,25 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
   const isWalletEffectivelyConnected = isConnected || isWalletConnected;
   const displayAddress = isConnected ? address ?? null : walletAddress;
 
-  // Update context based on Wagmi state
-  useEffect(() => {
-    setIsWalletConnected(isConnected);
-    setWalletAddress(isConnected ? address ?? null : null);
-  }, [address, isConnected, setIsWalletConnected, setWalletAddress]);
-
-  // Derive sub and universal addresses from current connections
+  // Derive wallet state from existing wagmi connections on refresh; avoid any SDK calls here
   useEffect(() => {
     try {
       const flat = connections.flatMap((c) => (c as any).accounts as string[]);
-      const [_sub, universal] = flat;
-      setSubAddress((_sub as any) ?? address ?? null);
-      setUniversalAddress((universal as any) ?? null);
-    } catch {
-      setSubAddress(address ?? null);
-      setUniversalAddress(null);
-    }
-  }, [connections, address]);
+      const [sub, universal] = flat;
+      if (flat.length > 0) {
+        setIsWalletConnected(true);
+        setWalletAddress((sub as any) ?? address ?? null);
+        setSubAddress((sub as any) ?? address ?? null);
+        setUniversalAddress((universal as any) ?? null);
+        return;
+      }
+    } catch {}
+    // Fallback to useAccount when there are no stored connections
+    setIsWalletConnected(isConnected);
+    setWalletAddress(isConnected ? address ?? null : null);
+    setSubAddress(isConnected ? address ?? null : null);
+    setUniversalAddress(null);
+  }, [connections, address, isConnected, setIsWalletConnected, setWalletAddress]);
 
   // Fetch Base USDC balance when address changes
   useEffect(() => {
@@ -255,7 +257,17 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
       {/* Bottom Actions */}
       <div className="space-y-2">
         {isWalletEffectivelyConnected ? (
-          <></>
+          <>
+            <Link href="/swipe" className="block">
+              <Button
+                variant="outline"
+                className="w-full justify-start border-2 border-black hover:bg-yellow/20 active:translate-y-1 active:shadow-none transition-all duration-100 rounded-xl font-bold"
+                style={{ boxShadow: '4px 4px 0px 0px #000000' }}
+              >
+                <span>Open Swipe</span>
+              </Button>
+            </Link>
+          </>
         ) : (
           <div className="w-full">
             <Button
@@ -265,22 +277,14 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
               size="sm"
               onClick={async () => {
                 try {
+                  // Trigger Base Account connect only on user gesture
                   const provider = getBaseAccountProvider();
-                  // Ensure Base Account quickstart flow runs and creates sub account
-                  console.debug('[SignIn] wallet_connect');
                   await provider.request({ method: 'wallet_connect', params: [] });
-                  console.debug('[SignIn] eth_requestAccounts');
                   await provider.request({ method: 'eth_requestAccounts', params: [] });
                   const verification = await verifySubAccountCreated();
                   if (verification.verified) {
-                    console.debug('[SignIn] Subaccount verified', {
-                      sub: verification.subAccount,
-                      universal: verification.universalAccount
-                    });
                     setSubAddress(verification.subAccount || null);
                     setUniversalAddress(verification.universalAccount || null);
-                  } else {
-                    console.warn('[SignIn] Subaccount verification failed', verification.reason);
                   }
                 } catch (e) {
                   // Fallback: continue to wagmi connect even if SDK pre-connect fails
