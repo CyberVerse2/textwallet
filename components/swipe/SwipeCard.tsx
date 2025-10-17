@@ -86,7 +86,7 @@ export function SwipeCard({ card, onSwipe }: SwipeCardProps) {
       onTouchMove={(e) => handleMove(e.touches[0].clientX, e.touches[0].clientY)}
       onTouchEnd={handleEnd}
     >
-      <div className="relative h-5/6 w-full rounded-3xl border-[6px] border-black bg-white p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+      <div className="relative h-[90%] w-full rounded-3xl border-[6px] border-black bg-white p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
         <div className="mb-6 flex items-center justify-between gap-3 w-full">
           <div
             className={cn(

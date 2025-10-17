@@ -28,6 +28,30 @@ export function useSwipeTrades() {
     const controller = new AbortController();
     const signal = controller.signal;
 
+    // Render a persistent PENDING toast at bottom while USDC transfer and order proceed
+    const toastRoot = document.createElement('div');
+    document.body.appendChild(toastRoot);
+    const { createRoot } = await import('react-dom/client');
+    const { SwipeToast } = await import('@/components/swipe/SwipeToast');
+    const root = createRoot(toastRoot);
+    const cleanupToast = () => {
+      try {
+        root.unmount();
+      } catch {}
+      try {
+        document.body.removeChild(toastRoot);
+      } catch {}
+    };
+    root.render(
+      // Pending stays until explicitly closed/updated
+      // @ts-ignore component type is dynamic
+      React.createElement(SwipeToast as any, {
+        type: 'PENDING',
+        marketTitle: `${side.toUpperCase()} • ${market.title}`,
+        onClose: cleanupToast
+      })
+    );
+
     try {
       // 1) Resolve subaccount using Base Account SDK flow (ensure sub exists)
       let from: string | undefined;
@@ -139,7 +163,42 @@ export function useSwipeTrades() {
         controller.abort();
       } catch {}
       track('undo_click', { marketId: market.id, side });
+      cleanupToast();
     };
+
+    // When order promise resolves, replace PENDING with ORDER toast
+    (async () => {
+      try {
+        const res = await resPromise;
+        // success or failure, we replace pending with final toast
+        cleanupToast();
+        const mount = document.createElement('div');
+        document.body.appendChild(mount);
+        const { createRoot } = await import('react-dom/client');
+        const { SwipeToast } = await import('@/components/swipe/SwipeToast');
+        const r = createRoot(mount);
+        const close = () => {
+          try {
+            r.unmount();
+          } catch {}
+          try {
+            document.body.removeChild(mount);
+          } catch {}
+        };
+        const ok = res && 'ok' in (res as any) ? (res as any).ok : true;
+        r.render(
+          // @ts-ignore dynamic props
+          React.createElement(SwipeToast as any, {
+            type: 'ORDER',
+            marketTitle: ok ? `Order posted: ${market.title}` : `Order failed: ${market.title}`,
+            onClose: close
+          })
+        );
+      } catch {
+        // if pending promise rejected, ensure pending toast closes
+        cleanupToast();
+      }
+    })();
 
     return { undo: cancel, pending: resPromise } as const;
   };

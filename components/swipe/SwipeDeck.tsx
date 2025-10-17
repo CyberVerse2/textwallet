@@ -305,7 +305,8 @@ export default function SwipeDeck() {
         ? (market as any).yesTokenId || market.id
         : (market as any).noTokenId || market.id;
     const price = side === 'yes' ? market.yesPrice ?? 0.5 : market.noPrice ?? 0.5;
-    await submit(
+    // Fire-and-forget: do not block UI on transfer/order
+    void submit(
       { id: String(tokenID), title: market.title },
       side,
       SWIPE_SIZE_USD,
