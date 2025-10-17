@@ -4,9 +4,14 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import MarketCard from '@/components/swipe/MarketCard';
 import { Button } from '@/components/ui/button';
 import Image from 'next/image';
-import { ArrowUp } from 'lucide-react';
+import { ArrowUp, Menu, Copy as CopyIcon, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useSwipeTrades } from '@/hooks/useSwipeTrades';
+import { useAccount, useConnect, useConnections } from 'wagmi';
+import { getBaseAccountProvider, verifySubAccountCreated } from '@/lib/baseAccountSdk';
+import { shortenAddress } from '@/lib/utils';
+import { Drawer, DrawerContent, DrawerTrigger } from '@/components/ui/drawer';
+import { Sidebar } from '@/app/client-layout';
 
 type Market = {
   id: string;
@@ -25,6 +30,12 @@ export default function SwipeDeck() {
   const [cooldown, setCooldown] = useState(false);
   const { toast } = useToast();
   const { submit } = useSwipeTrades();
+  const { address } = useAccount();
+  const { connect, connectors } = useConnect();
+  const connections = useConnections();
+  const [displayAddress, setDisplayAddress] = useState<string | null>(null);
+  const [usdcBalance, setUsdcBalance] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     const run = async () => {
@@ -49,6 +60,47 @@ export default function SwipeDeck() {
     };
     run();
   }, []);
+
+  useEffect(() => {
+    try {
+      const flat = connections.flatMap((c) => (c as any).accounts as string[]);
+      const [sub] = flat;
+      setDisplayAddress((sub as any) ?? address ?? null);
+    } catch {
+      setDisplayAddress(address ?? null);
+    }
+  }, [connections, address]);
+
+  useEffect(() => {
+    let abort = false;
+    const fetchUsdc = async () => {
+      try {
+        if (!displayAddress) {
+          setUsdcBalance(null);
+          return;
+        }
+        const res = await fetch(`/api/usdc-balance?address=${displayAddress}`, {
+          cache: 'no-store'
+        });
+        if (!res.ok) throw new Error('usdc_balance_failed');
+        const json = await res.json();
+        if (abort) return;
+        const raw = BigInt(json.balance);
+        const decimals = Number(json.decimals ?? 6);
+        const amount = Number(raw) / 10 ** decimals;
+        const formatted = Math.floor(amount).toLocaleString(undefined, {
+          maximumFractionDigits: 0
+        });
+        setUsdcBalance(`${formatted} USDC`);
+      } catch {
+        if (!abort) setUsdcBalance(null);
+      }
+    };
+    fetchUsdc();
+    return () => {
+      abort = true;
+    };
+  }, [displayAddress]);
 
   // Prefetch when low
   useEffect(() => {
@@ -81,6 +133,107 @@ export default function SwipeDeck() {
 
   return (
     <div className="h-full flex flex-col items-center justify-center px-4 overflow-hidden">
+      {/* Mobile wallet header at top-left, where the menu button lives */}
+      <div className="md:hidden absolute top-4 left-4 right-4 z-40">
+        <div
+          className="bg-white rounded-xl border-2 border-black p-3 flex items-center justify-between gap-3"
+          style={{ boxShadow: '4px 4px 0px 0px #000000' }}
+        >
+          {displayAddress ? (
+            <>
+              {/* Left: address */}
+              <div className="flex items-center gap-2">
+                <div className="text-sm font-semibold">{shortenAddress(displayAddress)}</div>
+                <button
+                  className="p-1 border-2 border-black rounded-md hover:bg-yellow/20"
+                  title="Copy address"
+                  onClick={() => {
+                    try {
+                      navigator.clipboard.writeText(displayAddress);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 1200);
+                    } catch {}
+                  }}
+                >
+                  {copied ? (
+                    <Check className="h-3.5 w-3.5 text-green-600" />
+                  ) : (
+                    <CopyIcon className="h-3.5 w-3.5" />
+                  )}
+                </button>
+              </div>
+              {/* Middle: USDC icon + balance */}
+              <div className="flex-1 flex items-center justify-center gap-2 text-xs font-bold">
+                <Image
+                  src="/usdc.svg"
+                  alt="USDC"
+                  width={25}
+                  height={25}
+                  style={{ boxShadow: '2px 2px 0px 0px #000000', borderRadius: '50%' }}
+                />
+                <span>{usdcBalance || '—'}</span>
+              </div>
+              {/* Right-side menu handled below */}
+            </>
+          ) : (
+            <Button
+              variant="outline"
+              className="w-full justify-center border-2 border-black rounded-xl font-bold"
+              style={{ boxShadow: '2px 2px 0px 0px #000000' }}
+              onClick={async () => {
+                try {
+                  const provider = getBaseAccountProvider();
+                  await provider.request({ method: 'wallet_connect', params: [] });
+                  await provider.request({ method: 'eth_requestAccounts', params: [] });
+                  await verifySubAccountCreated();
+                } catch {}
+                const baseConnector =
+                  connectors.find((c) => (c.name || '').toLowerCase().includes('base')) ??
+                  connectors[0];
+                if (baseConnector) connect({ connector: baseConnector });
+              }}
+            >
+              Sign In
+            </Button>
+          )}
+          {/* Top up button links to Circle faucet */}
+          {displayAddress && (
+            <a
+              href="https://faucet.circle.com"
+              target="_blank"
+              rel="noreferrer"
+              className="ml-2"
+              title="Top up USDC"
+            >
+              <Button
+                variant="outline"
+                className="h-9 px-3 text-xs border-2 border-black rounded-lg"
+                style={{ boxShadow: '2px 2px 0px 0px #000000' }}
+              >
+                Top Up
+              </Button>
+            </a>
+          )}
+          {/* Menu button sits inside the header on mobile */}
+          <Drawer>
+            <DrawerTrigger asChild>
+              <Button
+                variant="outline"
+                className="border-2 border-black rounded-xl font-bold h-9 w-9 p-0"
+                style={{ boxShadow: '2px 2px 0px 0px #000000' }}
+                aria-label="Menu"
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
+            </DrawerTrigger>
+            <DrawerContent className="h-[75vh]">
+              <div className="p-4 h-full overflow-y-auto">
+                <Sidebar ref={{ current: null } as any} />
+              </div>
+            </DrawerContent>
+          </Drawer>
+        </div>
+      </div>
       {loading && <div className="text-sm">Loading…</div>}
       {!loading && error && <div className="text-sm text-red-500">Failed to load markets</div>}
       {!loading && !error && (

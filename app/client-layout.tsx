@@ -20,7 +20,7 @@ import {
   Check
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Drawer, DrawerContent, DrawerTrigger } from '@/components/ui/drawer';
+// import { Drawer, DrawerContent, DrawerTrigger } from '@/components/ui/drawer';
 import TokenList from './token-list';
 import ActivityList from './activity-list';
 import './globals.css';
@@ -42,31 +42,11 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
       <div className="flex h-[100dvh] md:h-screen bg-background overflow-hidden">
         <div className="w-full mx-auto flex gap-4 md:gap-6 h-full items-stretch min-h-0 min-w-0 px-4 md:px-6 py-4 md:py-6">
           {/* Sidebar (desktop only) */}
-          <div className="hidden md:block overflow-hidden">
+          <div className="hidden md:block md:overflow-visible">
             <Sidebar ref={sidebarRef} />
           </div>
 
-          {/* Mobile header with drawer */}
-          <div className="md:hidden absolute top-4 left-4 z-50">
-            <Drawer>
-              <div>
-                <DrawerTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="border-2 border-black rounded-xl font-bold"
-                    style={{ boxShadow: '4px 4px 0px 0px #000000' }}
-                  >
-                    Menu
-                  </Button>
-                </DrawerTrigger>
-              </div>
-              <DrawerContent className="h-[75vh]">
-                <div className="p-4 h-full overflow-y-auto">
-                  <Sidebar ref={sidebarRef} />
-                </div>
-              </DrawerContent>
-            </Drawer>
-          </div>
+          {/* Mobile header with drawer moved into SwipeDeck */}
 
           {/* Main Content */}
           <div
@@ -86,7 +66,10 @@ interface SidebarProps {
 }
 
 // Create a forwardRef component for Sidebar to properly handle refs
-const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar(props, ref) {
+export const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar(
+  props,
+  ref
+) {
   // Use Chat context setters and Wagmi account
   const { isWalletConnected, walletAddress, setIsWalletConnected, setWalletAddress } =
     useChatContext();
@@ -191,7 +174,7 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
 
   return (
     <aside
-      className="w-full md:w-[28rem] h-auto md:h-full bg-white rounded-2xl p-4 flex flex-col justify-between border-2 border-black overflow-hidden"
+      className="w-full md:w-[28rem] h-auto md:h-full bg-white rounded-2xl p-4 flex flex-col justify-between border-2 border-black overflow-hidden md:overflow-visible"
       style={{ boxShadow: '8px 8px 0px 0px #000000' }}
     >
       <div>
