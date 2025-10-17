@@ -5,17 +5,25 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function GET(req: NextRequest) {
   try {
     const incoming = new URL(req.url);
-    const limit = incoming.searchParams.get('limit') || '50';
+    const limit = incoming.searchParams.get('limit') || '20';
+    const active = incoming.searchParams.get('active') || 'true';
+    const archived = incoming.searchParams.get('archived') || 'false';
+    const tag = incoming.searchParams.get('tag_slug') || 'politics';
+    const closed = incoming.searchParams.get('closed') || 'false';
+    const order = incoming.searchParams.get('order') || 'volume24hr';
+    const ascending = incoming.searchParams.get('ascending') || 'false';
+    const offset = incoming.searchParams.get('offset') || '60';
 
     const url = new URL('https://gamma-api.polymarket.com/events/pagination');
     // Required filters per request (match user-provided criteria)
     url.searchParams.set('limit', limit);
-    url.searchParams.set('active', 'true');
-    url.searchParams.set('archived', 'false');
-    url.searchParams.set('tag_slug', 'finance');
-    url.searchParams.set('closed', 'false');
-    url.searchParams.set('order', 'volume');
-    url.searchParams.set('ascending', 'false');
+    url.searchParams.set('active', active);
+    url.searchParams.set('archived', archived);
+    url.searchParams.set('tag_slug', tag);
+    url.searchParams.set('closed', closed);
+    url.searchParams.set('order', order);
+    url.searchParams.set('ascending', ascending);
+    url.searchParams.set('offset', offset);
 
     const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) throw new Error(`polymarket_${res.status}`);

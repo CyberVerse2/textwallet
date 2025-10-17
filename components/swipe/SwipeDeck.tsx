@@ -15,6 +15,7 @@ import { shortenAddress } from '@/lib/utils';
 import { Drawer, DrawerContent, DrawerTrigger } from '@/components/ui/drawer';
 import { WalletHeader } from '@/components/swipe/WalletHeader';
 import { PositionsDrawer } from '@/components/swipe/PositionsDrawer';
+import { SwipeToast } from '@/components/swipe/SwipeToast';
 import { Sidebar } from '@/app/client-layout';
 
 type Market = {
@@ -234,6 +235,29 @@ export default function SwipeDeck() {
     setTimeout(() => setCooldown(false), 1000);
     await submit(market, side, SWIPE_SIZE_USD, SLIPPAGE);
     setMarkets((prev) => prev.filter((m) => m.id !== market.id));
+    // Show swipe toast
+    const type = side === 'yes' ? 'YES' : ('NO' as const);
+    const toastRoot = document.createElement('div');
+    document.body.appendChild(toastRoot);
+    const cleanup = () => {
+      try {
+        document.body.removeChild(toastRoot);
+      } catch {}
+    };
+    // Render via React portal API
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const ReactDOM = require('react-dom');
+    ReactDOM.render(
+      <SwipeToast
+        type={type}
+        marketTitle={market.title}
+        onUndo={() => {
+          cleanup();
+        }}
+        onClose={cleanup}
+      />,
+      toastRoot
+    );
   };
 
   return (
@@ -362,6 +386,28 @@ export default function SwipeDeck() {
           onSkip={() => {
             if (showGuides) setShowGuides(false);
             markets[0] && setMarkets((prev) => prev.filter((x) => x.id !== markets[0].id));
+            // Skip toast
+            const m = markets[0];
+            if (m) {
+              const toastRoot = document.createElement('div');
+              document.body.appendChild(toastRoot);
+              const cleanup = () => {
+                try {
+                  document.body.removeChild(toastRoot);
+                } catch {}
+              };
+              // eslint-disable-next-line @typescript-eslint/no-var-requires
+              const ReactDOM = require('react-dom');
+              ReactDOM.render(
+                <SwipeToast
+                  type={'SKIP'}
+                  marketTitle={m.title}
+                  onUndo={cleanup}
+                  onClose={cleanup}
+                />,
+                toastRoot
+              );
+            }
           }}
           onYes={() => markets[0] && handleSwipe(markets[0], 'yes')}
         />
