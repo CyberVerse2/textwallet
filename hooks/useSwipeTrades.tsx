@@ -5,7 +5,6 @@ import { track } from '@/lib/analytics';
 import { getBaseAccountProvider } from '@/lib/baseAccountSdk';
 import { encodeFunctionData, erc20Abi } from 'viem';
 import { baseSepolia } from 'viem/chains';
-import { useConnections } from 'wagmi';
 
 export type SwipeSide = 'yes' | 'no';
 
@@ -14,7 +13,6 @@ const USDC_BASE_SEPOLIA = '0x036CbD53842c5426634e7929541eC2318f3dCF7e' as const;
 export function useSwipeTrades() {
   const cooldownRef = useRef(false);
   const UNDO_MS = 2000;
-  const connections = useConnections();
 
   const submit = async (
     market: { id: string; title: string },
@@ -75,14 +73,6 @@ export function useSwipeTrades() {
           from = subAddress || universal;
         }
       } catch {}
-      // Fallback to wagmi connections if SDK flow above failed
-      if (!from) {
-        try {
-          const flat = connections.flatMap((c) => (c as any).accounts as string[]);
-          if (flat.length > 0) from = flat[0];
-        } catch {}
-      }
-
       // 2) Resolve server wallet address
       const statusRes = await fetch('/api/status', { cache: 'no-store' });
       if (!statusRes.ok) throw new Error('status_failed');
