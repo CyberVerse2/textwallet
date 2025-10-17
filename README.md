@@ -5,11 +5,11 @@ TextWallet is a modular network of interoperable DeFi agents designed to bring t
 
 ## Features
 
-- **Base Account (client)**: SIWE auth and Spend Permissions (grant/revoke) with budgets.
+- **Base Account (client)**: SIWE auth and subaccounts.
 - **CDP Server Wallet (server)**: Trusted spender that executes on users’ behalf.
-- **Spend Permissions (JIT escrow)**: Pull Base USDC from user to CDP wallet at order time.
+- **(Removed) Spend Permissions/JIT escrow**: No budgets or spend-permission flows.
 - **Polymarket trading**: Market orders via CLOB; tokenIds derived from `clobTokenIds`.
-- **Supabase-backed state**: users, chat, budgets, spend_permissions, orders.
+- **Supabase-backed state**: users, chat, orders.
 
 ## Tech Stack
 

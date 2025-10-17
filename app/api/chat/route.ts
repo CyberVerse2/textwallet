@@ -999,7 +999,7 @@ export async function POST(req: Request) {
               return { error: e?.message || 'order_failed' };
             }
           }
-        }),
+        })
         // spend-permission tools removed
         // duplicate removed
       };
