@@ -13,7 +13,6 @@ import { getPolymarketClient } from '@/lib/polymarket/client';
 // Zora custom actions removed
 import supabaseAdmin from '@/lib/supabaseAdmin';
 import { getServerWalletAddress, getUsdcAddress } from '@/lib/cdp';
-import { spendFromPermission } from '@/lib/base/spend';
 // import { zora } from 'viem/chains';
 
 // ---------- Local scoring helpers (adapted from events strategy) ----------
@@ -865,52 +864,7 @@ export async function POST(req: Request) {
               } catch {}
               return { error: 'insufficient_budget' };
             }
-            // Deduct budget
-            const nowIso = new Date().toISOString();
-            const { error: updErr } = await supabaseAdmin
-              .from('budgets')
-              .update({ remaining_cents: remaining - costCents, updated_at: nowIso })
-              .eq('user_id', normalizedUserId);
-            if (updErr) return { error: updErr.message };
-            try {
-              console.log('✅ budget_deducted', {
-                userId: normalizedUserId,
-                before_cents: remaining,
-                after_cents: remaining - costCents
-              });
-            } catch {}
-
-            // Pull Base USDC via spend permission (amount is dollar notional)
-            try {
-              const usdcUnits = BigInt(Math.round(amountUSD * 1_000_000));
-              try {
-                console.log('🔐 spendFromPermission ATTEMPT', {
-                  userId: normalizedUserId,
-                  usdc_units: usdcUnits.toString()
-                });
-              } catch {}
-              const spend = await spendFromPermission(normalizedUserId, usdcUnits);
-              if (!spend.ok) throw new Error(spend.error || 'spend_failed');
-              try {
-                console.log('🔐 spendFromPermission SUCCESS', {
-                  userId: normalizedUserId,
-                  result: { ok: spend.ok }
-                });
-              } catch {}
-            } catch (e: any) {
-              try {
-                console.error('❌ spendFromPermission ERROR', {
-                  userId: normalizedUserId,
-                  message: e?.message,
-                  stack: e?.stack
-                });
-              } catch {}
-              await supabaseAdmin
-                .from('budgets')
-                .update({ remaining_cents: remaining, updated_at: nowIso })
-                .eq('user_id', normalizedUserId);
-              return { error: e?.message || 'spend_failed' };
-            }
+            // Budgets and spend-permission flow removed
 
             // Post a Polymarket MARKET order (FOK) using the dollar amount
             try {
@@ -1018,38 +972,7 @@ export async function POST(req: Request) {
               });
             } catch {}
 
-            // Pull Base USDC via spend permission
-            try {
-              const usdcUnits = BigInt(Math.round(amountUSD * 1_000_000));
-              try {
-                console.log('🔐 spendFromPermission ATTEMPT (market)', {
-                  userId: normalizedUserId,
-                  usdc_units: usdcUnits.toString()
-                });
-              } catch {}
-              const { spendFromPermission } = await import('@/lib/base/spend');
-              const spend = await spendFromPermission(normalizedUserId, usdcUnits);
-              if (!spend.ok) throw new Error(spend.error || 'spend_failed');
-              try {
-                console.log('🔐 spendFromPermission SUCCESS (market)', {
-                  userId: normalizedUserId,
-                  result: { ok: spend.ok }
-                });
-              } catch {}
-            } catch (e: any) {
-              try {
-                console.error('❌ spendFromPermission ERROR (market)', {
-                  userId: normalizedUserId,
-                  message: e?.message,
-                  stack: e?.stack
-                });
-              } catch {}
-              await supabaseAdmin
-                .from('budgets')
-                .update({ remaining_cents: remaining, updated_at: nowIso })
-                .eq('user_id', normalizedUserId);
-              return { error: e?.message || 'spend_failed' };
-            }
+            // Budgets and spend-permission flow removed
 
             // Post the market order FOK
             try {
@@ -1077,63 +1000,7 @@ export async function POST(req: Request) {
             }
           }
         }),
-        request_spend_permission_prompt: defineTool({
-          description:
-            'Ask the client to show a spend-permission confirmation UI with a weekly budget. Returns UI metadata for the client to render.',
-          inputSchema: z.object({
-            budgetUSD: z.number().positive(),
-            periodDays: z.number().int().min(1).optional()
-          }),
-          execute: async ({ budgetUSD, periodDays }: { budgetUSD: number; periodDays: number }) => {
-            const spender = await getServerWalletAddress();
-            const tokenAddress = getUsdcAddress('base');
-            return {
-              ui: {
-                kind: 'request_spend_permission',
-                budgetUSD,
-                periodDays,
-                token: 'BaseUSDC',
-                message: `Set your weekly budget to $${budgetUSD} and enable spend permissions for ${periodDays} days?`,
-                buttons: [
-                  {
-                    label: 'Confirm',
-                    value: 'confirm',
-                    onConfirm: {
-                      actions: [
-                        { type: 'set_budget', amountCents: Math.round(budgetUSD * 100) },
-                        {
-                          type: 'trigger_spend_permission',
-                          spender,
-                          chainId: 8453,
-                          tokenAddress
-                        }
-                      ]
-                    }
-                  },
-                  { label: 'Reject', value: 'reject' }
-                ]
-              }
-            };
-          }
-        }),
-        trigger_spend_permission: defineTool({
-          description:
-            'Instruct the client to initiate a Base spend-permission signing flow. Returns spender/token details.',
-          inputSchema: z.object({}),
-          execute: async () => {
-            const spender = await getServerWalletAddress();
-            const tokenAddress = getUsdcAddress('base');
-            return {
-              ui: {
-                kind: 'trigger_spend_permission',
-                spender,
-                chainId: 8453,
-                tokenAddress,
-                message: 'Opening Base spend-permission flow…'
-              }
-            };
-          }
-        })
+        // spend-permission tools removed
         // duplicate removed
       };
       // Web search temporarily disabled

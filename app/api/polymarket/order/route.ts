@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'missing_params' }, { status: 400 });
     }
 
-    // Place the Polymarket order directly (no budgets or spend permissions)
+    // Place the Polymarket order directly (no budgets or spend permissions)`
     const result = await postOrder({
       tokenID: resolvedTokenId,
       price: resolvedPrice,
@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
       feeRateBps
     });
     if (!result.ok) {
+      console.log(result);
       return NextResponse.json({ error: result.error }, { status: 500 });
     }
 
