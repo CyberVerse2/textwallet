@@ -157,10 +157,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
 
   return (
     <div
-      className="flex-1 flex flex-col items-center bg-white rounded-2xl overflow-hidden relative min-h-[60vh] md:min-h-[unset]"
+      className="flex h-[100dvh] md:h-full min-h-0 flex-col items-center bg-white rounded-2xl overflow-hidden relative"
       style={{ boxShadow: '8px 8px 0px 0px #000000' }}
     >
-      <div className="p-4 w-full max-w-[50rem] flex items-center">
+      <div className="p-2 md:p-4 w-full max-w-[50rem] flex items-center flex-none">
         <Button
           variant="outline"
           className="hidden items-center justify-center h-auto py-2 px-4 border-2 border-black bg-blue hover:bg-blue/90 active:translate-y-px active:shadow-none transition-all duration-100 rounded-xl font-medium"
@@ -171,7 +171,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
       </div>
       <ScrollArea
         ref={scrollAreaRef}
-        className="flex-1 p-4 w-full max-w-[46rem] md:max-w-[46rem] max-md:max-w-full"
+        className="flex-1 min-h-0 overflow-hidden md:overflow-auto p-2 md:p-4 w-full max-w-[46rem] md:max-w-[46rem] max-md:max-w-full pb-0 md:pb-40"
       >
         <div className="space-y-4 w-full">
           {messages.length === 0 && (
@@ -368,7 +368,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = () => {
         </div>
       </ScrollArea>
 
-      <div className="p-4 bg-white w-full max-w-[46rem] md:max-w-[46rem] max-md:max-w-full sticky bottom-0">
+      <div className="p-4 bg-white w-full max-w-[46rem] md:max-w-[46rem] max-md:max-w-full sticky bottom-0 z-20 border-t-2 border-black">
         <form className="relative w-full" onSubmit={handleSubmit}>
           <Input
             type="text"

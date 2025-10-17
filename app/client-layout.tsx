@@ -38,17 +38,17 @@ const sidebarRef = React.createRef<{ refreshBalances: () => void }>();
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   return (
     <ChatProvider>
-      <div className="flex min-h-screen md:h-screen bg-background p-4 md:p-6 overflow-x-hidden overflow-y-auto md:overflow-hidden">
-        <div className="w-full mx-auto flex gap-4 md:gap-6 min-h-screen md:h-screen items-stretch min-h-0">
+      <div className="flex h-[100dvh] md:h-screen bg-background p-4 md:p-6 overflow-hidden">
+        <div className="w-full mx-auto flex gap-4 md:gap-6 h-full items-stretch min-h-0 min-w-0">
           {/* Sidebar (desktop only) */}
           <div className="hidden md:block">
             <Sidebar ref={sidebarRef} />
           </div>
 
           {/* Mobile header with drawer */}
-          <div className="md:hidden w-full">
+          <div className="md:hidden absolute top-4 left-4 z-50">
             <Drawer>
-              <div className="mb-3">
+              <div>
                 <DrawerTrigger asChild>
                   <Button
                     variant="outline"
@@ -59,8 +59,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                   </Button>
                 </DrawerTrigger>
               </div>
-              <DrawerContent className="max-w-[75vw] ml-auto mr-0 rounded-tl-2xl rounded-tr-none">
-                <div className="p-4 w-[75vw]">
+              <DrawerContent className="h-[75vh]">
+                <div className="p-4 h-full overflow-y-auto">
                   <Sidebar ref={sidebarRef} />
                 </div>
               </DrawerContent>
@@ -69,10 +69,10 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
           {/* Main Content */}
           <div
-            className="flex-1 bg-white rounded-2xl flex flex-col relative h-full md:h-full min-h-0 overflow-hidden"
+            className="flex-1 bg-white rounded-2xl flex flex-col relative h-full md:h-full min-h-0 min-w-0 overflow-hidden"
             style={{ boxShadow: '8px 8px 0px 0px #000000' }}
           >
-            {children}
+            <div className="flex-1 min-h-0 overflow-hidden md:overflow-auto">{children}</div>
           </div>
         </div>
       </div>
@@ -189,7 +189,7 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
 
   return (
     <aside
-      className="w-full md:w-[28rem] h-auto md:h-full bg-white rounded-2xl p-4 flex flex-col justify-between border-2 border-black overflow-hidden"
+      className="w-full md:w-[28rem] h-auto md:h-full bg-white rounded-2xl p-4 flex flex-col justify-between border-2 border-black overflow-y-auto"
       style={{ boxShadow: '8px 8px 0px 0px #000000' }}
     >
       <div>
@@ -348,9 +348,9 @@ const SidebarTabs = forwardRef<
   return (
     <div>
       {/* Tab Buttons - Updated Styling */}
-      <div className="flex mb-6 p-1 border-2 border-black rounded-xl overflow-x-auto">
+      <div className="grid grid-cols-3 gap-2 mb-6 p-1 border-2 border-black rounded-xl">
         <button
-          className={`md:flex-1 flex-none py-2 md:py-2 px-3 md:px-4 rounded-lg font-bold transition-all duration-150 flex items-center justify-center gap-2 ${
+          className={`w-full py-2 px-3 rounded-lg font-bold transition-all duration-150 flex items-center justify-center gap-2 ${
             activeTab === 'positions'
               ? 'bg-blue text-black border-2 border-black'
               : 'text-black hover:bg-blue/50 active:translate-y-px'
@@ -361,7 +361,7 @@ const SidebarTabs = forwardRef<
           <BarChart2 className="h-4 w-4" /> Positions
         </button>
         <button
-          className={`md:flex-1 flex-none py-2 md:py-2 px-3 md:px-4 rounded-lg font-bold transition-all duration-150 flex items-center justify-center gap-2 ${
+          className={`w-full py-2 px-3 rounded-lg font-bold transition-all duration-150 flex items-center justify-center gap-2 ${
             activeTab === 'assets'
               ? 'bg-blue text-black border-2 border-black'
               : 'text-black hover:bg-blue/50 active:translate-y-px'
@@ -372,7 +372,7 @@ const SidebarTabs = forwardRef<
           <Wallet className="h-4 w-4" /> Assets
         </button>
         <button
-          className={`md:flex-1 flex-none py-2 md:py-2 px-3 md:px-4 rounded-lg font-bold transition-all duration-150 flex items-center justify-center gap-2 ${
+          className={`w-full py-2 px-3 rounded-lg font-bold transition-all duration-150 flex items-center justify-center gap-2 ${
             activeTab === 'activity'
               ? 'bg-blue text-black border-2 border-black'
               : 'text-black hover:bg-blue/50 active:translate-y-px'
