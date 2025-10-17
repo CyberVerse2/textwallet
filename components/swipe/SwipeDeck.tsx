@@ -133,8 +133,8 @@ export default function SwipeDeck() {
 
   return (
     <div className="h-full flex flex-col items-center justify-center px-4 overflow-hidden">
-      {/* Mobile wallet header at top-left, where the menu button lives */}
-      <div className="md:hidden absolute top-4 left-4 right-4 z-40">
+      {/* Wallet header centered, reduced width to ~75% */}
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 w-1/4">
         <div
           className="bg-white rounded-xl border-2 border-black p-3 flex items-center justify-between gap-3"
           style={{ boxShadow: '4px 4px 0px 0px #000000' }}
@@ -226,9 +226,11 @@ export default function SwipeDeck() {
                 <Menu className="h-5 w-5" />
               </Button>
             </DrawerTrigger>
-            <DrawerContent className="h-[90dvh]">
-              <div className="p-4 h-full overflow-y-auto">
-                <Sidebar ref={{ current: null } as any} />
+            <DrawerContent className="h-[90dvh] md:h-[90dvh]">
+              <div className="p-4 h-full overflow-y-auto md:flex md:items-stretch md:justify-center">
+                <div className="w-full md:w-auto md:h-full">
+                  <Sidebar ref={{ current: null } as any} />
+                </div>
               </div>
             </DrawerContent>
           </Drawer>

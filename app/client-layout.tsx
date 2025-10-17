@@ -8,6 +8,7 @@ import React, {
   useImperativeHandle,
   useMemo
 } from 'react';
+import { usePathname } from 'next/navigation';
 import {
   ChevronDown,
   Image,
@@ -37,14 +38,18 @@ import { getBaseAccountProvider, verifySubAccountCreated } from '@/lib/baseAccou
 const sidebarRef = React.createRef<{ refreshBalances: () => void }>();
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const hideSidebar = pathname === '/' || pathname === '/swipe';
   return (
     <ChatProvider>
       <div className="flex h-[100dvh] md:h-screen bg-background overflow-hidden">
         <div className="w-full mx-auto flex gap-4 md:gap-6 h-full items-stretch min-h-0 min-w-0 px-4 md:px-6 py-4 md:py-6">
           {/* Sidebar (desktop only) */}
-          <div className="hidden md:block md:overflow-visible">
-            <Sidebar ref={sidebarRef} />
-          </div>
+          {!hideSidebar && (
+            <div className="hidden md:block md:overflow-visible">
+              <Sidebar ref={sidebarRef} />
+            </div>
+          )}
 
           {/* Mobile header with drawer moved into SwipeDeck */}
 
