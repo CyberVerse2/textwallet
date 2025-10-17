@@ -75,7 +75,7 @@ export function SwipeCard({ card, onSwipe }: SwipeCardProps) {
       )}
       style={{
         transform: `translate(${position.x}px, ${position.y}px) rotate(${rotation}deg)`,
-        opacity: isDragging ? opacity : 1,
+        opacity: 1,
         transition: isDragging ? 'none' : 'transform 0.3s ease, opacity 0.3s ease'
       }}
       onMouseDown={(e) => handleStart(e.clientX, e.clientY)}
@@ -86,8 +86,8 @@ export function SwipeCard({ card, onSwipe }: SwipeCardProps) {
       onTouchMove={(e) => handleMove(e.touches[0].clientX, e.touches[0].clientY)}
       onTouchEnd={handleEnd}
     >
-      <div className="relative h-full w-full rounded-3xl border-[6px] border-black bg-white p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
-        <div className="mb-6 flex items-center gap-3">
+      <div className="relative h-5/6 w-full rounded-3xl border-[6px] border-black bg-white p-6 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
+        <div className="mb-6 flex items-center justify-between gap-3 w-full">
           <div
             className={cn(
               'inline-flex items-center justify-center rounded-2xl border-4 border-black px-6 py-4',
