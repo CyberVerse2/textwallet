@@ -1,10 +1,12 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import MarketCard from './MarketCard';
+import MarketCard from '@/components/swipe/MarketCard';
 import { Button } from '@/components/ui/button';
+import Image from 'next/image';
+import { ArrowUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useSwipeTrades } from '@/hooks/useSwipeTrades.tsx';
+import { useSwipeTrades } from '@/hooks/useSwipeTrades';
 
 type Market = {
   id: string;
@@ -82,7 +84,7 @@ export default function SwipeDeck() {
       {loading && <div className="text-sm">Loading…</div>}
       {!loading && error && <div className="text-sm text-red-500">Failed to load markets</div>}
       {!loading && !error && (
-        <div className="relative w-full max-w-md h-[70vh] overflow-hidden">
+        <div className="relative w-full max-w-md h-[65vh] md:h-[60vh] overflow-visible mx-auto">
           {markets.slice(0, 3).map((m, i) => (
             <div
               key={m.id}
@@ -93,6 +95,7 @@ export default function SwipeDeck() {
                 market={m}
                 onSwipeLeft={() => handleSwipe(m, 'no')}
                 onSwipeRight={() => handleSwipe(m, 'yes')}
+                onSwipeUp={() => setMarkets((prev) => prev.filter((x) => x.id !== m.id))}
               />
             </div>
           ))}
@@ -102,28 +105,35 @@ export default function SwipeDeck() {
         </div>
       )}
 
-      {/* Bottom actions (mobile) */}
-      <div className="mt-4 flex gap-4">
+      {/* Bottom actions */}
+      <div className="mt-16 md:mt-20 flex gap-8 shrink-0 items-center">
         <Button
           variant="outline"
-          className="rounded-full h-12 w-12"
+          className="rounded-full h-12 w-12 md:h-20 md:w-20 p-0 flex items-center justify-center border-2 border-black bg-white hover:bg-yellow/20"
+          style={{ boxShadow: '4px 4px 0px 0px #000000' }}
           onClick={() => markets[0] && handleSwipe(markets[0], 'no')}
         >
-          ✕
+          <Image src="/bad.svg" alt="No" width={28} height={28} className="md:w-10 md:h-10" />
         </Button>
         <Button
           variant="outline"
-          className="rounded-full h-12 w-12"
-          onClick={() => setMarkets((p) => [...p.slice(1), p[0]].filter(Boolean))}
+          className="rounded-full h-10 w-10 md:h-16 md:w-16 p-0 flex items-center justify-center border-2 border-black bg-white hover:bg-yellow/20"
+          style={{ boxShadow: '4px 4px 0px 0px #000000' }}
+          onClick={() =>
+            markets[0] && setMarkets((prev) => prev.filter((x) => x.id !== markets[0].id))
+          }
+          aria-label="Skip"
+          title="Skip"
         >
-          ⟳
+          <ArrowUp className="h-6 w-6 md:h-8 md:w-8" />
         </Button>
         <Button
           variant="outline"
-          className="rounded-full h-12 w-12"
+          className="rounded-full h-12 w-12 md:h-20 md:w-20 p-0 flex items-center justify-center border-2 border-black bg-white hover:bg-yellow/20"
+          style={{ boxShadow: '4px 4px 0px 0px #000000' }}
           onClick={() => markets[0] && handleSwipe(markets[0], 'yes')}
         >
-          ✓
+          <Image src="/good.svg" alt="Yes" width={28} height={28} className="md:w-10 md:h-10" />
         </Button>
       </div>
     </div>

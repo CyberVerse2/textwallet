@@ -30,7 +30,7 @@ import { EnrichedTokenBalance } from './token-list'; // Import the correct type
 import { useAccount, useDisconnect, useConnect, useConnections } from 'wagmi';
 // Sign in with Base removed; will be reimplemented from scratch
 import ReactMarkdown from 'react-markdown';
-import Link from 'next/link';
+// import Link from 'next/link';
 import { getBaseAccountProvider, verifySubAccountCreated } from '@/lib/baseAccountSdk';
 
 // Create a ref to hold the SidebarTabs component
@@ -73,7 +73,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
             className="flex-1 bg-white rounded-2xl flex flex-col relative h-full md:h-full min-h-0 min-w-0 overflow-hidden"
             style={{ boxShadow: '8px 8px 0px 0px #000000' }}
           >
-            <div className="flex-1 min-h-0 overflow-hidden md:overflow-auto">{children}</div>
+            <div className="flex-1 min-h-0 overflow-hidden">{children}</div>
           </div>
         </div>
       </div>
@@ -257,17 +257,7 @@ const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function Sidebar
       {/* Bottom Actions */}
       <div className="space-y-2">
         {isWalletEffectivelyConnected ? (
-          <>
-            <Link href="/swipe" className="block">
-              <Button
-                variant="outline"
-                className="w-full justify-start border-2 border-black hover:bg-yellow/20 active:translate-y-1 active:shadow-none transition-all duration-100 rounded-xl font-bold"
-                style={{ boxShadow: '4px 4px 0px 0px #000000' }}
-              >
-                <span>Open Swipe</span>
-              </Button>
-            </Link>
-          </>
+          <>{/* Open Swipe removed per request */}</>
         ) : (
           <div className="w-full">
             <Button
