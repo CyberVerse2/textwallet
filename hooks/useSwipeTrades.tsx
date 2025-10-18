@@ -198,8 +198,28 @@ export function useSwipeTrades() {
 
       try {
         console.log('[SwipeTrades] Attempting first transfer...');
-        await sendCalls();
-        console.log('[SwipeTrades] Transfer successful!');
+        const transferResult = await sendCalls();
+        console.log('[SwipeTrades] Transfer successful! Transfer result:', transferResult);
+
+        // Wait a moment for the transfer to be processed
+        console.log('[SwipeTrades] Waiting 3 seconds for transfer to be processed...');
+        await new Promise((r) => setTimeout(r, 3000));
+
+        // Check server wallet balance after transfer
+        console.log('[SwipeTrades] Checking server wallet balance after transfer...');
+        try {
+          const balanceRes = await fetch(`/api/usdc-balance?address=${serverWallet}`, {
+            cache: 'no-store'
+          });
+          if (balanceRes.ok) {
+            const balanceData = await balanceRes.json();
+            console.log('[SwipeTrades] Server wallet balance after transfer:', balanceData);
+          } else {
+            console.warn('[SwipeTrades] Failed to check server wallet balance');
+          }
+        } catch (balanceError) {
+          console.error('[SwipeTrades] Error checking server wallet balance:', balanceError);
+        }
       } catch (err: any) {
         console.error('[SwipeTrades] Transfer failed:', err);
         const code = err?.code;
