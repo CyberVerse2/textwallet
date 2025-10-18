@@ -38,6 +38,7 @@ interface PositionsDrawerProps {
 
 export function PositionsDrawer({ isOpen, onClose, userId }: PositionsDrawerProps) {
   const [positions, setPositions] = useState<Position[] | null>(null);
+  const [isVisible, setIsVisible] = useState(false);
   const mock: Position[] = [
     {
       marketId: 'mock-market-1',
@@ -55,7 +56,7 @@ export function PositionsDrawer({ isOpen, onClose, userId }: PositionsDrawerProp
       market: {
         id: 'mock-market-1',
         title: 'Will Tesla (TSLA) beat quarterly earnings?',
-        url: 'https://polymarket.com/event/will-tesla-beat-quarterly-earnings',
+        url: 'https://polymarket.com/event/mock-market-1',
         outcomes: ['Yes', 'No'],
         endDate: '2024-12-31'
       }
@@ -65,8 +66,11 @@ export function PositionsDrawer({ isOpen, onClose, userId }: PositionsDrawerProp
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
+      // Trigger animation after a brief delay
+      setTimeout(() => setIsVisible(true), 10);
     } else {
       document.body.style.overflow = 'unset';
+      setIsVisible(false);
     }
     return () => {
       document.body.style.overflow = 'unset';
@@ -101,11 +105,17 @@ export function PositionsDrawer({ isOpen, onClose, userId }: PositionsDrawerProp
   return (
     <>
       <div
-        className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+        className={`fixed inset-0 z-40 bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${
+          isVisible ? 'opacity-100' : 'opacity-0'
+        }`}
         onClick={onClose}
         aria-hidden="true"
       />
-      <div className="fixed right-0 top-0 z-50 h-full w-full overflow-y-auto border-l-[6px] border-black bg-[#FFF8F0] shadow-[-8px_0px_0px_0px_rgba(0,0,0,1)] sm:w-[500px]">
+      <div
+        className={`fixed right-0 top-0 z-50 h-full w-full overflow-y-auto border-l-[6px] border-black bg-[#FFF8F0] shadow-[-8px_0px_0px_0px_rgba(0,0,0,1)] sm:w-[500px] transform transition-transform duration-300 ease-out ${
+          isVisible ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
         <div className="sticky top-0 z-10 border-b-[5px] border-black bg-[#D50A0A] p-3 sm:p-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-black text-white sm:text-2xl">Your Positions</h2>
@@ -177,7 +187,7 @@ export function PositionsDrawer({ isOpen, onClose, userId }: PositionsDrawerProp
                       Sell
                     </button>
                     <a
-                      href={position.market.url}
+                      href={`https://polymarket.com/event/${position.marketId}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center justify-center rounded-lg border-[3px] border-black bg-[#34302B] px-3 py-2 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none"

@@ -60,7 +60,7 @@ export function WalletHeader({
             )}
           </div>
 
-          {/* Balance Card - Prominent Display with Top Up and Menu on Mobile */}
+          {/* Balance Card - Prominent Display with Top Up and Menu */}
           <div className="flex items-center gap-2 rounded-lg border-[3px] border-black bg-[#D50A0A] p-2 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] sm:gap-3 sm:rounded-xl sm:border-[4px] sm:p-3 sm:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] md:rounded-2xl md:border-[5px] md:p-4">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border-2 border-black bg-[#FFD700] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] sm:h-10 sm:w-10 sm:rounded-lg sm:border-3 md:h-12 md:w-12 md:rounded-xl md:border-4">
               <DollarSign
@@ -75,48 +75,31 @@ export function WalletHeader({
               <span className="text-xs font-bold text-[#FFF8F0] sm:text-sm">USDC</span>
             </div>
 
-            {/* Mobile Top Up and Menu Buttons */}
-            <div className="flex items-center gap-2 sm:hidden">
+            {/* Top Up and Menu Buttons - Always visible */}
+            <div className="flex items-center gap-2">
               {/* Top Up Button */}
               <a href={topUpHref} target="_blank" rel="noreferrer">
-                <button className="flex items-center justify-center rounded-md border-2 border-black bg-[#FF6B35] px-2 py-1 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none">
-                  <span className="text-xs font-black text-white">Top Up</span>
+                <button className="flex items-center justify-center rounded-md border-2 border-black bg-[#FF6B35] px-2 py-1 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none sm:rounded-lg sm:border-3 sm:px-3 sm:py-2 sm:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] md:rounded-xl md:border-4 md:px-4 md:py-3 md:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">
+                  <span className="text-xs font-black text-white sm:text-sm md:text-base">
+                    Top Up
+                  </span>
                 </button>
               </a>
 
               {/* Menu Button */}
               {menuButton ?? (
                 <button
-                  className="flex h-8 w-8 items-center justify-center rounded-md border-2 border-black bg-[#34302B] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
+                  className="flex h-8 w-8 items-center justify-center rounded-md border-2 border-black bg-[#34302B] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none sm:h-10 sm:w-10 sm:rounded-lg sm:border-3 sm:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] md:h-12 md:w-12 md:rounded-xl md:border-4 md:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]"
                   aria-label="Menu"
                 >
-                  <Menu className="h-4 w-4 text-white" strokeWidth={3} />
+                  <Menu
+                    className="h-4 w-4 text-white sm:h-5 sm:w-5 md:h-6 md:w-6"
+                    strokeWidth={3}
+                  />
                 </button>
               )}
             </div>
           </div>
-        </div>
-
-        {/* Right Section - Top Up and Menu (Desktop only) */}
-        <div className="flex flex-row items-stretch gap-2 sm:w-auto sm:gap-3">
-          {/* Top Up Button */}
-          <a href={topUpHref} target="_blank" rel="noreferrer" className="flex-1 sm:w-auto">
-            <button className="flex w-full items-center justify-center rounded-lg border-[3px] border-black bg-[#FF6B35] px-3 py-2 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none sm:w-32 sm:flex-col sm:rounded-xl sm:border-[4px] sm:px-4 sm:py-3 sm:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] md:rounded-2xl md:border-[5px] md:px-4 md:py-6">
-              <span className="whitespace-nowrap text-sm font-black text-white sm:text-base md:text-lg md:[writing-mode:vertical-rl]">
-                Top Up
-              </span>
-            </button>
-          </a>
-
-          {/* Menu Button */}
-          {menuButton ?? (
-            <button
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border-[3px] border-black bg-[#34302B] shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none sm:h-12 sm:w-12 sm:rounded-xl sm:border-[4px] sm:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] md:h-auto md:w-16 md:rounded-2xl md:border-[5px]"
-              aria-label="Menu"
-            >
-              <Menu className="h-5 w-5 text-white sm:h-6 sm:w-6 md:h-8 md:w-8" strokeWidth={3} />
-            </button>
-          )}
         </div>
       </div>
 

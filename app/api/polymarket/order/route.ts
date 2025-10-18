@@ -10,6 +10,7 @@ export async function POST(req: NextRequest) {
 
     // Resolve inputs (support swipe payloads)
     const resolvedTokenId = String(tokenID || marketId || '');
+    const resolvedMarketId = String(marketId || tokenID || ''); // Use marketId if available, fallback to tokenID
     const resolvedPrice = typeof price === 'number' ? price : 0.1;
     // For market orders, compute dollar notional (amountUSD)
     let amountUSD: number | undefined = typeof sizeUsd === 'number' ? sizeUsd : undefined;
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
         .from('orders')
         .insert({
           user_id: userId.toLowerCase(),
-          market_id: resolvedTokenId,
+          market_id: resolvedMarketId, // Store the actual market ID
           side: String(side).toLowerCase() === 'no' ? 'no' : 'yes',
           price: resolvedPrice ?? null,
           size: 1,
