@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useSwipeTrades } from '@/hooks/useSwipeTrades';
 import { useAccount, useConnect, useConnections, useBalance, useDisconnect } from 'wagmi';
 import { getBaseAccountProvider, verifySubAccountCreated } from '@/lib/baseAccountSdk';
+import { getUsdcBalance } from '@/lib/cdp';
 import { shortenAddress } from '@/lib/utils';
 import { Drawer, DrawerContent, DrawerTrigger } from '@/components/ui/drawer';
 import { WalletHeader } from '@/components/swipe/WalletHeader';
@@ -97,27 +98,36 @@ export default function SwipeDeck() {
   const displayAddress = walletAddress;
   const [usdcBalance, setUsdcBalance] = useState<string | null>(null);
 
-  // Universal account USDC balance via wagmi (Base Sepolia) with automatic refetching
-  const { data: universalBalance } = useBalance({
-    address: (universalAccountAddr || address || undefined) as any,
-    token: USDC_BASE_SEPOLIA as any,
-    query: {
-      enabled: !!(universalAccountAddr || address),
-      refetchInterval: 10000, // Refetch every 10 seconds
-      refetchIntervalInBackground: true // Continue refetching when tab is not active
-    }
-  });
+  // Fetch USDC balance using CDP function
+  useEffect(() => {
+    const fetchBalance = async () => {
+      if (!subAccountAddr && !universalAccountAddr) {
+        setUsdcBalance(null);
+        return;
+      }
 
-  // Sub account USDC balance via wagmi (Base Sepolia) with automatic refetching
-  const { data: subBalance } = useBalance({
-    address: (subAccountAddr || address || undefined) as any,
-    token: USDC_BASE_SEPOLIA as any,
-    query: {
-      enabled: !!(subAccountAddr || address),
-      refetchInterval: 10000, // Refetch every 10 seconds
-      refetchIntervalInBackground: true // Continue refetching when tab is not active
-    }
-  });
+      try {
+        // Try sub account first, then universal account
+        const addressToUse = subAccountAddr || universalAccountAddr;
+        const { balance, decimals } = await getUsdcBalance('base-sepolia', addressToUse as any);
+
+        const amount = Number(balance) / 10 ** decimals;
+        const formatted = Math.floor(amount).toLocaleString(undefined, {
+          maximumFractionDigits: 0
+        });
+        setUsdcBalance(`${formatted} USDC`);
+      } catch (error) {
+        console.error('Failed to fetch USDC balance:', error);
+        setUsdcBalance(null);
+      }
+    };
+
+    fetchBalance();
+
+    // Set up interval to refetch every 10 seconds
+    const interval = setInterval(fetchBalance, 10000);
+    return () => clearInterval(interval);
+  }, [subAccountAddr, universalAccountAddr]);
 
   useEffect(() => {
     // Show disclaimer once per device
@@ -217,27 +227,6 @@ export default function SwipeDeck() {
     };
     run();
   }, [swipedIds]);
-
-  // Update balance display from wagmi balances
-  useEffect(() => {
-    // Prefer universal balance (main account), fallback to sub balance
-    const balanceToUse = universalBalance || subBalance;
-
-    if (!balanceToUse) {
-      setUsdcBalance(null);
-      return;
-    }
-
-    try {
-      const raw = balanceToUse.value;
-      const decimals = balanceToUse.decimals ?? 6;
-      const amount = Number(raw) / 10 ** decimals;
-      const formatted = Math.floor(amount).toLocaleString(undefined, { maximumFractionDigits: 0 });
-      setUsdcBalance(`${formatted} USDC`);
-    } catch {
-      setUsdcBalance(null);
-    }
-  }, [universalBalance, subBalance]);
 
   // Prefetch when low
   useEffect(() => {
