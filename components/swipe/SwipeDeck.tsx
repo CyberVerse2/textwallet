@@ -316,8 +316,15 @@ export default function SwipeDeck() {
     // Fire-and-forget: do not block UI on transfer/order
     (async () => {
       try {
+        console.log('[SwipeDeck] Submitting order:', {
+          marketId: market.id,
+          tokenID: String(tokenID),
+          side,
+          userId: address ?? null
+        });
+
         const out = await submit(
-          { id: String(tokenID), title: market.title },
+          { id: market.id, title: market.title, tokenID: String(tokenID) },
           side,
           SWIPE_SIZE_USD,
           SLIPPAGE,

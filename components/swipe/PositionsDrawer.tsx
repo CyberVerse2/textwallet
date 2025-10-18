@@ -41,6 +41,7 @@ interface PositionsDrawerProps {
 export function PositionsDrawer({ isOpen, onClose, userId }: PositionsDrawerProps) {
   const [positions, setPositions] = useState<Position[] | null>(null);
   const [isVisible, setIsVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [processingPositions, setProcessingPositions] = useState<Set<string>>(new Set());
   const [swipedPositions, setSwipedPositions] = useState<Set<string>>(new Set());
 
@@ -62,20 +63,24 @@ export function PositionsDrawer({ isOpen, onClose, userId }: PositionsDrawerProp
     const run = async () => {
       if (!isOpen) return;
       if (!userId) {
-        setPositions([]); // Show empty instead of mock
+        setPositions([]);
         return;
       }
+
+      setIsLoading(true);
       try {
         const res = await fetch(`/api/positions?userId=${userId}`, { cache: 'no-store' });
         if (!res.ok) {
-          setPositions([]); // Show empty instead of mock
+          setPositions([]);
           return;
         }
         const json = await res.json();
         const list: Position[] = Array.isArray(json?.positions) ? json.positions : [];
-        setPositions(list); // Remove fallback to mock
+        setPositions(list);
       } catch {
-        setPositions([]); // Show empty instead of mock
+        setPositions([]);
+      } finally {
+        setIsLoading(false);
       }
     };
     run();
@@ -226,95 +231,105 @@ export function PositionsDrawer({ isOpen, onClose, userId }: PositionsDrawerProp
           </div>
         </div>
         <div className="p-3 sm:p-4">
-          {(() => {
-            const list = positions ?? [];
-            const filteredList = list.filter((position) => {
-              const positionKey = `${position.marketId}-${position.side}`;
-              return !swipedPositions.has(positionKey);
-            });
-            return filteredList.map((position, index) => {
-              const pricePercent = (position.avgPrice * 100).toFixed(1);
-              const statusColor =
-                position.latestOrderStatus === 'filled'
-                  ? 'bg-green-400'
-                  : position.latestOrderStatus === 'open'
-                  ? 'bg-yellow-400'
-                  : 'bg-red-400';
-
-              return (
-                <div
-                  key={`${position.marketId}-${position.side}` || index}
-                  className="mb-3 rounded-xl border-[4px] border-black bg-white p-3 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] sm:p-4"
-                >
-                  <h3 className="mb-2 line-clamp-2 text-sm font-black leading-tight text-black sm:text-base">
-                    {position.market.title}
-                  </h3>
-                  <div className="mb-2 flex items-center justify-between gap-2 text-xs sm:text-sm">
-                    <div className="flex items-center gap-2">
-                      <span className="rounded-md border-[3px] border-black bg-[#FFD700] px-2 py-1 font-black text-black">
-                        {position.outcome} {pricePercent}¢
-                      </span>
-                      <span
-                        className={`rounded-md border-[3px] border-black px-2 py-1 font-black text-black ${statusColor}`}
-                      >
-                        {position.latestOrderStatus.toUpperCase()}
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-base font-black text-black sm:text-lg">
-                        {position.totalSize.toFixed(2)} shares
-                      </div>
-                      <div className="text-xs font-bold text-black/70">
-                        {position.orderCount} order{position.orderCount !== 1 ? 's' : ''}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mb-2 text-xs text-black/60">
-                    <div>Position: {position.side.toUpperCase()}</div>
-                    <div>Latest Order: {position.latestOrderId.slice(0, 8)}...</div>
-                    <div>Type: {position.latestOrderType}</div>
-                    {position.latestOrderExpiration !== '0' && (
-                      <div>
-                        Expires:{' '}
-                        {new Date(
-                          Number(position.latestOrderExpiration) * 1000
-                        ).toLocaleDateString()}
-                      </div>
-                    )}
-                    <div>Last Trade: {new Date(position.latestCreatedAt).toLocaleDateString()}</div>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleSellPosition(position)}
-                      className="flex-1 rounded-lg border-[3px] border-black bg-[#D50A0A] py-2 text-xs font-black text-white shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none sm:text-sm hover:bg-[#B80808]"
-                    >
-                      Sell
-                    </button>
-                    <a
-                      href={`https://polymarket.com/event/${position.marketId}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-center rounded-lg border-[3px] border-black bg-[#34302B] px-3 py-2 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none"
-                      title="View on Polymarket"
-                    >
-                      <ExternalLink className="h-4 w-4 text-white" strokeWidth={3} />
-                    </a>
-                  </div>
-                </div>
-              );
-            });
-          })()}
-          {(() => {
-            const list = positions ?? [];
-            const filteredList = list.filter((position) => {
-              const positionKey = `${position.marketId}-${position.side}`;
-              return !swipedPositions.has(positionKey);
-            });
-            return filteredList.length === 0;
-          })() && (
+          {isLoading ? (
             <div className="rounded-2xl border-[5px] border-black bg-white p-8 text-center shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
-              <p className="text-lg font-black text-black/50">No positions yet</p>
+              <p className="text-lg font-black text-black/50">Loading positions...</p>
             </div>
+          ) : (
+            <>
+              {(() => {
+                const list = positions ?? [];
+                const filteredList = list.filter((position) => {
+                  const positionKey = `${position.marketId}-${position.side}`;
+                  return !swipedPositions.has(positionKey);
+                });
+                return filteredList.map((position, index) => {
+                  const pricePercent = (position.avgPrice * 100).toFixed(1);
+                  const statusColor =
+                    position.latestOrderStatus === 'filled'
+                      ? 'bg-green-400'
+                      : position.latestOrderStatus === 'open'
+                      ? 'bg-yellow-400'
+                      : 'bg-red-400';
+
+                  return (
+                    <div
+                      key={`${position.marketId}-${position.side}` || index}
+                      className="mb-3 rounded-xl border-[4px] border-black bg-white p-3 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] sm:p-4"
+                    >
+                      <h3 className="mb-2 line-clamp-2 text-sm font-black leading-tight text-black sm:text-base">
+                        {position.market.title}
+                      </h3>
+                      <div className="mb-2 flex items-center justify-between gap-2 text-xs sm:text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="rounded-md border-[3px] border-black bg-[#FFD700] px-2 py-1 font-black text-black">
+                            {position.outcome} {pricePercent}¢
+                          </span>
+                          <span
+                            className={`rounded-md border-[3px] border-black px-2 py-1 font-black text-black ${statusColor}`}
+                          >
+                            {position.latestOrderStatus.toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-base font-black text-black sm:text-lg">
+                            {position.totalSize.toFixed(2)} shares
+                          </div>
+                          <div className="text-xs font-bold text-black/70">
+                            {position.orderCount} order{position.orderCount !== 1 ? 's' : ''}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mb-2 text-xs text-black/60">
+                        <div>Position: {position.side.toUpperCase()}</div>
+                        <div>Latest Order: {position.latestOrderId.slice(0, 8)}...</div>
+                        <div>Type: {position.latestOrderType}</div>
+                        {position.latestOrderExpiration !== '0' && (
+                          <div>
+                            Expires:{' '}
+                            {new Date(
+                              Number(position.latestOrderExpiration) * 1000
+                            ).toLocaleDateString()}
+                          </div>
+                        )}
+                        <div>
+                          Last Trade: {new Date(position.latestCreatedAt).toLocaleDateString()}
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleSellPosition(position)}
+                          className="flex-1 rounded-lg border-[3px] border-black bg-[#D50A0A] py-2 text-xs font-black text-white shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none sm:text-sm hover:bg-[#B80808]"
+                        >
+                          Sell
+                        </button>
+                        <a
+                          href={`https://polymarket.com/event/${position.marketId}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center justify-center rounded-lg border-[3px] border-black bg-[#34302B] px-3 py-2 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none"
+                          title="View on Polymarket"
+                        >
+                          <ExternalLink className="h-4 w-4 text-white" strokeWidth={3} />
+                        </a>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+              {(() => {
+                const list = positions ?? [];
+                const filteredList = list.filter((position) => {
+                  const positionKey = `${position.marketId}-${position.side}`;
+                  return !swipedPositions.has(positionKey);
+                });
+                return filteredList.length === 0;
+              })() && (
+                <div className="rounded-2xl border-[5px] border-black bg-white p-8 text-center shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
+                  <p className="text-lg font-black text-black/50">No positions yet</p>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

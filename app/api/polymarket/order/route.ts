@@ -9,8 +9,8 @@ export async function POST(req: NextRequest) {
       body || {};
 
     // Resolve inputs (support swipe payloads)
-    const resolvedTokenId = String(tokenID || marketId || '');
-    const resolvedMarketId = String(marketId || ''); // Only use marketId, no fallback to tokenID
+    const resolvedTokenId = String(tokenID || ''); // Use tokenID for Polymarket orders
+    const resolvedMarketId = String(marketId || ''); // Use marketId for database storage
     const resolvedPrice = typeof price === 'number' ? price : 0.1;
     // For market orders, compute dollar notional (amountUSD)
     let amountUSD: number | undefined = typeof sizeUsd === 'number' ? sizeUsd : undefined;
@@ -36,6 +36,14 @@ export async function POST(req: NextRequest) {
 
     // Record order
     let dbOrderId: string | null = null;
+    console.log('[Order API] Database insertion params:', {
+      userId,
+      resolvedMarketId,
+      resolvedTokenId,
+      side,
+      polymarketOrderId: String(result.order?.orderId || result.order?.id || '')
+    });
+
     if (userId) {
       const { data, error } = await supabaseAdmin
         .from('orders')
@@ -51,9 +59,19 @@ export async function POST(req: NextRequest) {
         .select('id')
         .single();
       if (error) {
+        console.error('[Order API] Database insertion error:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+          fullError: error
+        });
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
       dbOrderId = String(data?.id ?? '');
+      console.log('[Order API] Database insertion success:', { dbOrderId });
+    } else {
+      console.warn('[Order API] No userId provided, skipping database insertion');
     }
 
     return NextResponse.json({ ok: true, order: result.order, dbOrderId }, { status: 200 });
