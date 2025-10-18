@@ -26,7 +26,7 @@ export function WalletHeader({
 }: WalletHeaderProps) {
   return (
     <header className="relative w-full">
-      <div className="relative flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
+      <div className="relative flex flex-col gap-2">
         {/* Left Section - Wallet & Balance */}
         <div className="flex flex-1 flex-col gap-2 sm:gap-3">
           {/* Wallet Address Card */}
@@ -60,7 +60,7 @@ export function WalletHeader({
             )}
           </div>
 
-          {/* Balance Card - Prominent Display */}
+          {/* Balance Card - Prominent Display with Top Up and Menu on Mobile */}
           <div className="flex items-center gap-2 rounded-lg border-[3px] border-black bg-[#D50A0A] p-2 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] sm:gap-3 sm:rounded-xl sm:border-[4px] sm:p-3 sm:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] md:rounded-2xl md:border-[5px] md:p-4">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border-2 border-black bg-[#FFD700] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] sm:h-10 sm:w-10 sm:rounded-lg sm:border-3 md:h-12 md:w-12 md:rounded-xl md:border-4">
               <DollarSign
@@ -68,16 +68,36 @@ export function WalletHeader({
                 strokeWidth={3}
               />
             </div>
-            <div className="flex flex-col">
+            <div className="flex flex-1 flex-col">
               <span className="text-lg font-black leading-none text-white sm:text-xl md:text-2xl">
                 {balance ?? '—'}
               </span>
               <span className="text-xs font-bold text-[#FFF8F0] sm:text-sm">USDC</span>
             </div>
+
+            {/* Mobile Top Up and Menu Buttons */}
+            <div className="flex items-center gap-2 sm:hidden">
+              {/* Top Up Button */}
+              <a href={topUpHref} target="_blank" rel="noreferrer">
+                <button className="flex items-center justify-center rounded-md border-2 border-black bg-[#FF6B35] px-2 py-1 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none">
+                  <span className="text-xs font-black text-white">Top Up</span>
+                </button>
+              </a>
+
+              {/* Menu Button */}
+              {menuButton ?? (
+                <button
+                  className="flex h-8 w-8 items-center justify-center rounded-md border-2 border-black bg-[#34302B] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none"
+                  aria-label="Menu"
+                >
+                  <Menu className="h-4 w-4 text-white" strokeWidth={3} />
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Right Section - Top Up and Menu */}
+        {/* Right Section - Top Up and Menu (Desktop only) */}
         <div className="flex flex-row items-stretch gap-2 sm:w-auto sm:gap-3">
           {/* Top Up Button */}
           <a href={topUpHref} target="_blank" rel="noreferrer" className="flex-1 sm:w-auto">

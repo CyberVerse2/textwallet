@@ -450,7 +450,7 @@ export default function SwipeDeck() {
       {loading && <div className="text-sm">Loading…</div>}
       {!loading && error && <div className="text-sm text-red-500">Failed to load markets</div>}
       {!loading && !error && (
-        <div className="relative w-full max-w-sm sm:max-w-md h-[60vh] sm:h-[65vh] md:h-[60vh] overflow-visible mx-auto">
+        <div className="relative w-full max-w-sm sm:max-w-md h-[70vh] sm:h-[65vh] md:h-[60vh] overflow-visible mx-auto">
           {markets.slice(0, 3).map((m, i) => {
             const yesAmount =
               typeof m.yesPrice === 'number' && isFinite(m.yesPrice)
@@ -544,7 +544,7 @@ export default function SwipeDeck() {
       )}
 
       {/* Bottom actions */}
-      <div className="mt-12 sm:mt-16 md:mt-20 shrink-0">
+      <div className="mb-2 sm:mt-6 md:mt-12 shrink-0">
         <ActionButtons
           onNo={() => markets[0] && handleSwipe(markets[0], 'no')}
           onSkip={() => {
