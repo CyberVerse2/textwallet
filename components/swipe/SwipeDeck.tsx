@@ -19,6 +19,7 @@ import { SwipeToast } from '@/components/swipe/SwipeToast';
 import { createRoot } from 'react-dom/client';
 import { Sidebar } from '@/app/client-layout';
 import { DisclaimerModal } from '@/components/swipe/DisclaimerModal';
+import { useChatContext } from '@/context/ChatContext';
 
 type Market = {
   id: string;
@@ -48,11 +49,13 @@ export default function SwipeDeck() {
   const { connect, connectors } = useConnect();
   const connections = useConnections();
   const { disconnect } = useDisconnect();
-  const [displayAddress, setDisplayAddress] = useState<string | null>(null);
-  const [usdcBalance, setUsdcBalance] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [showDisclaimer, setShowDisclaimer] = useState(false);
   const [swipedIds, setSwipedIds] = useState<Set<string>>(new Set());
+
+  // Use ChatContext for wallet state
+  const { isWalletConnected, walletAddress, setIsWalletConnected, setWalletAddress } =
+    useChatContext();
 
   // Load swiped market ids
   useEffect(() => {
@@ -90,11 +93,30 @@ export default function SwipeDeck() {
     }
   }, [connections, address]);
 
-  // Universal account USDC balance via wagmi (Base Sepolia)
+  // Use ChatContext wallet address as display address
+  const displayAddress = walletAddress;
+  const [usdcBalance, setUsdcBalance] = useState<string | null>(null);
+
+  // Universal account USDC balance via wagmi (Base Sepolia) with automatic refetching
   const { data: universalBalance } = useBalance({
-    address: (universalAccountAddr || undefined) as any,
+    address: (universalAccountAddr || address || undefined) as any,
     token: USDC_BASE_SEPOLIA as any,
-    query: { enabled: !!universalAccountAddr, refetchInterval: 10000 }
+    query: {
+      enabled: !!(universalAccountAddr || address),
+      refetchInterval: 10000, // Refetch every 10 seconds
+      refetchIntervalInBackground: true // Continue refetching when tab is not active
+    }
+  });
+
+  // Sub account USDC balance via wagmi (Base Sepolia) with automatic refetching
+  const { data: subBalance } = useBalance({
+    address: (subAccountAddr || address || undefined) as any,
+    token: USDC_BASE_SEPOLIA as any,
+    query: {
+      enabled: !!(subAccountAddr || address),
+      refetchInterval: 10000, // Refetch every 10 seconds
+      refetchIntervalInBackground: true // Continue refetching when tab is not active
+    }
   });
 
   useEffect(() => {
@@ -196,61 +218,26 @@ export default function SwipeDeck() {
     run();
   }, [swipedIds]);
 
+  // Update balance display from wagmi balances
   useEffect(() => {
-    try {
-      const flat = connections.flatMap((c) => (c as any).accounts as string[]);
-      const [sub] = flat;
-      setDisplayAddress((sub as any) ?? address ?? null);
-    } catch {
-      setDisplayAddress(address ?? null);
+    // Prefer universal balance (main account), fallback to sub balance
+    const balanceToUse = universalBalance || subBalance;
+
+    if (!balanceToUse) {
+      setUsdcBalance(null);
+      return;
     }
-  }, [connections, address]);
 
-  useEffect(() => {
-    let abort = false;
-    const fetchUsdc = async () => {
-      try {
-        if (!displayAddress) {
-          setUsdcBalance(null);
-          return;
-        }
-        const res = await fetch(
-          `/api/usdc-balance?address=${displayAddress}&network=base-sepolia`,
-          {
-            cache: 'no-store'
-          }
-        );
-        if (!res.ok) throw new Error('usdc_balance_failed');
-        const json = await res.json();
-        if (abort) return;
-        const raw = BigInt(json.balance);
-        const decimals = Number(json.decimals ?? 6);
-        const amount = Number(raw) / 10 ** decimals;
-        const formatted = Math.floor(amount).toLocaleString(undefined, {
-          maximumFractionDigits: 0
-        });
-        setUsdcBalance(`${formatted} USDC`);
-      } catch {
-        if (!abort) setUsdcBalance(null);
-      }
-    };
-    fetchUsdc();
-    return () => {
-      abort = true;
-    };
-  }, [displayAddress]);
-
-  // Prefer wagmi universal balance if available
-  useEffect(() => {
-    if (!universalBalance) return;
     try {
-      const raw = universalBalance.value;
-      const decimals = universalBalance.decimals ?? 6;
+      const raw = balanceToUse.value;
+      const decimals = balanceToUse.decimals ?? 6;
       const amount = Number(raw) / 10 ** decimals;
       const formatted = Math.floor(amount).toLocaleString(undefined, { maximumFractionDigits: 0 });
       setUsdcBalance(`${formatted} USDC`);
-    } catch {}
-  }, [universalBalance]);
+    } catch {
+      setUsdcBalance(null);
+    }
+  }, [universalBalance, subBalance]);
 
   // Prefetch when low
   useEffect(() => {
@@ -404,7 +391,22 @@ export default function SwipeDeck() {
             try {
               const provider = getBaseAccountProvider();
               await provider.request({ method: 'wallet_connect', params: [] });
-              await provider.request({ method: 'eth_requestAccounts', params: [] });
+              const accounts = await provider.request({
+                method: 'eth_requestAccounts',
+                params: []
+              });
+
+              // If we got accounts, immediately update ChatContext
+              if (accounts && Array.isArray(accounts) && accounts.length > 0) {
+                const connectedAddress = accounts[0] as string;
+                setIsWalletConnected(true);
+                setWalletAddress(connectedAddress);
+
+                // Store in localStorage for persistence
+                try {
+                  localStorage.setItem('tw_address', connectedAddress.toLowerCase());
+                } catch {}
+              }
             } catch (e) {
               console.error('Connect failed', e);
             }
@@ -426,7 +428,9 @@ export default function SwipeDeck() {
               // Best-effort; some providers implement an explicit disconnect
               await (provider as any).request?.({ method: 'wallet_disconnect', params: [] });
             } catch {}
-            setDisplayAddress(null);
+            // Update ChatContext immediately
+            setIsWalletConnected(false);
+            setWalletAddress(null);
             setUsdcBalance(null);
           }}
           menuButton={

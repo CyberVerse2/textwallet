@@ -56,16 +56,27 @@ export function ChatProvider({ children }: { children: ReactNode }): JSX.Element
 
   // Derive wallet connection state from Wagmi account
   useEffect(() => {
-    // Bootstrap from localStorage if wagmi address missing
-    let effective = address ?? null;
-    try {
-      if (!effective) {
-        const cached = localStorage.getItem('tw_address');
-        if (cached) effective = cached as any;
-      }
-    } catch {}
-    setIsWalletConnected(Boolean(effective));
-    setWalletAddress(effective);
+    // If address is null (disconnected), check localStorage for pending connection
+    if (!address) {
+      try {
+        const cachedAddress = localStorage.getItem('tw_address');
+        if (cachedAddress) {
+          // We have a cached address but no wagmi address yet - connection in progress
+          setIsWalletConnected(true);
+          setWalletAddress(cachedAddress);
+          return;
+        }
+      } catch {}
+
+      // No cached address either - truly disconnected
+      setIsWalletConnected(false);
+      setWalletAddress(null);
+      return;
+    }
+
+    // If address exists, set connected state
+    setIsWalletConnected(true);
+    setWalletAddress(address);
   }, [address]);
 
   // Initialize Vercel AI Chat with session-based ID so reload starts fresh

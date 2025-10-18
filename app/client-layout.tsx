@@ -27,11 +27,14 @@ import './globals.css';
 import { ChatProvider, useChatContext } from '@/context/ChatContext';
 import { shortenAddress } from '@/lib/utils'; // Import shortenAddress at the top
 // Assets section removed
-import { useAccount, useDisconnect, useConnect, useConnections } from 'wagmi';
+import { useAccount, useDisconnect, useConnect, useConnections, useBalance } from 'wagmi';
 // Sign in with Base removed; will be reimplemented from scratch
 import ReactMarkdown from 'react-markdown';
 // import Link from 'next/link';
 import { getBaseAccountProvider, verifySubAccountCreated } from '@/lib/baseAccountSdk';
+
+// Base Sepolia USDC
+const USDC_BASE_SEPOLIA = '0x036CbD53842c5426634e7929541eC2318f3dCF7e' as const;
 
 // Create a ref to hold the SidebarTabs component
 const sidebarRef = React.createRef<{ refreshBalances: () => void }>();
@@ -97,6 +100,27 @@ export const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function 
   // Create a ref to the SidebarTabs component to access the refresh function
   const tabsRef = useRef<{ refreshBalances: () => void } | null>(null);
 
+  // Use wagmi useBalance for automatic balance updates
+  const { data: subBalance } = useBalance({
+    address: (subAddress || undefined) as any,
+    token: USDC_BASE_SEPOLIA as any,
+    query: {
+      enabled: !!subAddress,
+      refetchInterval: 10000, // Refetch every 10 seconds
+      refetchIntervalInBackground: true // Continue refetching when tab is not active
+    }
+  });
+
+  const { data: universalBalance } = useBalance({
+    address: (universalAddress || undefined) as any,
+    token: USDC_BASE_SEPOLIA as any,
+    query: {
+      enabled: !!universalAddress,
+      refetchInterval: 10000, // Refetch every 10 seconds
+      refetchIntervalInBackground: true // Continue refetching when tab is not active
+    }
+  });
+
   // Expose the refreshBalances method to parent components
   useImperativeHandle(ref, () => ({
     refreshBalances: () => {
@@ -130,37 +154,29 @@ export const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function 
     setUniversalAddress(null);
   }, [connections, address, isConnected, setIsWalletConnected, setWalletAddress]);
 
-  // Fetch Base USDC balance when address changes
+  // Update balance display from wagmi balances
   useEffect(() => {
-    let abort = false;
-    const fetchUsdc = async () => {
-      try {
-        if (!displayAddress) {
-          setUsdcBalance(null);
-          return;
-        }
-        const res = await fetch(`/api/usdc-balance?address=${displayAddress}`, {
-          cache: 'no-store'
-        });
-        if (!res.ok) throw new Error('usdc_balance_failed');
-        const json = await res.json();
-        if (abort) return;
-        const raw = BigInt(json.balance);
-        const decimals = Number(json.decimals ?? 6);
-        const formatted = (Number(raw) / 10 ** decimals).toLocaleString(undefined, {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2
-        });
-        setUsdcBalance(`${formatted} USDC`);
-      } catch {
-        if (!abort) setUsdcBalance(null);
-      }
-    };
-    fetchUsdc();
-    return () => {
-      abort = true;
-    };
-  }, [displayAddress]);
+    // Prefer sub balance (trading account), fallback to universal balance
+    const balanceToUse = subBalance || universalBalance;
+
+    if (!balanceToUse) {
+      setUsdcBalance(null);
+      return;
+    }
+
+    try {
+      const raw = balanceToUse.value;
+      const decimals = balanceToUse.decimals ?? 6;
+      const amount = Number(raw) / 10 ** decimals;
+      const formatted = amount.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+      setUsdcBalance(`${formatted} USDC`);
+    } catch {
+      setUsdcBalance(null);
+    }
+  }, [subBalance, universalBalance]);
 
   // Funding/export actions removed with Privy
   const handleFundWallet = async () => {};
@@ -261,7 +277,23 @@ export const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function 
                   // Trigger Base Account connect only on user gesture
                   const provider = getBaseAccountProvider();
                   await provider.request({ method: 'wallet_connect', params: [] });
-                  await provider.request({ method: 'eth_requestAccounts', params: [] });
+                  const accounts = await provider.request({
+                    method: 'eth_requestAccounts',
+                    params: []
+                  });
+
+                  // If we got accounts, immediately update ChatContext
+                  if (accounts && Array.isArray(accounts) && accounts.length > 0) {
+                    const connectedAddress = accounts[0] as string;
+                    setIsWalletConnected(true);
+                    setWalletAddress(connectedAddress);
+
+                    // Store in localStorage for persistence
+                    try {
+                      localStorage.setItem('tw_address', connectedAddress.toLowerCase());
+                    } catch {}
+                  }
+
                   const verification = await verifySubAccountCreated();
                   if (verification.verified) {
                     setSubAddress(verification.subAccount || null);
@@ -292,6 +324,7 @@ export const Sidebar = forwardRef<{ refreshBalances: () => void }, {}>(function 
                 await fetch('/api/auth/logout', { method: 'POST' });
               } catch {}
               disconnect();
+              // Update ChatContext immediately
               setIsWalletConnected(false);
               setWalletAddress(null);
               setSubAddress(null);

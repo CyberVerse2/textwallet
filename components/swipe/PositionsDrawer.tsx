@@ -1,7 +1,9 @@
 'use client';
 
-import { X, ExternalLink } from 'lucide-react';
+import { X, ExternalLink, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { createRoot } from 'react-dom/client';
+import { SwipeToast } from './SwipeToast';
 
 interface Position {
   // Position summary from database aggregation
@@ -39,29 +41,8 @@ interface PositionsDrawerProps {
 export function PositionsDrawer({ isOpen, onClose, userId }: PositionsDrawerProps) {
   const [positions, setPositions] = useState<Position[] | null>(null);
   const [isVisible, setIsVisible] = useState(false);
-  const mock: Position[] = [
-    {
-      marketId: 'mock-market-1',
-      side: 'yes',
-      totalSize: 2.0,
-      avgPrice: 0.73,
-      orderCount: 1,
-      latestCreatedAt: '2024-01-01T00:00:00Z',
-      latestOrderId: 'mock-order-1',
-      assetId: 'mock-asset-1',
-      outcome: 'Yes',
-      latestOrderStatus: 'filled',
-      latestOrderType: 'FOK',
-      latestOrderExpiration: '0',
-      market: {
-        id: 'mock-market-1',
-        title: 'Will Tesla (TSLA) beat quarterly earnings?',
-        url: 'https://polymarket.com/event/mock-market-1',
-        outcomes: ['Yes', 'No'],
-        endDate: '2024-12-31'
-      }
-    }
-  ];
+  const [processingPositions, setProcessingPositions] = useState<Set<string>>(new Set());
+  const [swipedPositions, setSwipedPositions] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (isOpen) {
@@ -81,24 +62,140 @@ export function PositionsDrawer({ isOpen, onClose, userId }: PositionsDrawerProp
     const run = async () => {
       if (!isOpen) return;
       if (!userId) {
-        setPositions(mock);
+        setPositions([]); // Show empty instead of mock
         return;
       }
       try {
         const res = await fetch(`/api/positions?userId=${userId}`, { cache: 'no-store' });
         if (!res.ok) {
-          setPositions(mock);
+          setPositions([]); // Show empty instead of mock
           return;
         }
         const json = await res.json();
         const list: Position[] = Array.isArray(json?.positions) ? json.positions : [];
-        setPositions(list.length ? list : mock);
+        setPositions(list); // Remove fallback to mock
       } catch {
-        setPositions(mock);
+        setPositions([]); // Show empty instead of mock
       }
     };
     run();
   }, [isOpen, userId]);
+
+  const handleSellPosition = async (position: Position) => {
+    if (!userId) {
+      return;
+    }
+
+    const positionKey = `${position.marketId}-${position.side}`;
+
+    // Add to processing set
+    setProcessingPositions((prev) => new Set(prev).add(positionKey));
+
+    // Immediately swipe the card (remove from view)
+    setSwipedPositions((prev) => new Set(prev).add(positionKey));
+
+    // Create toast
+    const toastRoot = document.createElement('div');
+    document.body.appendChild(toastRoot);
+    const root = createRoot(toastRoot);
+
+    const cleanup = () => {
+      try {
+        root.unmount();
+      } catch {}
+      try {
+        document.body.removeChild(toastRoot);
+      } catch {}
+    };
+
+    const undo = () => {
+      // Remove from swiped set to bring back the card
+      setSwipedPositions((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(positionKey);
+        return newSet;
+      });
+      cleanup();
+    };
+
+    // Show PENDING toast immediately
+    root.render(
+      <SwipeToast
+        type="PENDING"
+        marketTitle={`Selling ${position.side.toUpperCase()} position: ${position.market.title}`}
+        onClose={cleanup}
+      />
+    );
+
+    // Process sell in background
+    try {
+      const res = await fetch('/api/polymarket/sell', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          marketId: position.marketId,
+          side: position.side,
+          size: position.totalSize,
+          source: 'positions-drawer'
+        })
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        throw new Error(json.error || 'Sell failed');
+      }
+
+      // Update toast to success
+      root.render(
+        <SwipeToast
+          type="ORDER"
+          marketTitle={`Sold ${position.side.toUpperCase()} position: ${position.market.title}`}
+          onClose={cleanup}
+        />
+      );
+
+      // Auto-close after 3 seconds
+      setTimeout(cleanup, 3000);
+
+      // Refresh positions after successful sell
+      const refreshRes = await fetch(`/api/positions?userId=${userId}`, { cache: 'no-store' });
+      if (refreshRes.ok) {
+        const refreshJson = await refreshRes.json();
+        const list: Position[] = Array.isArray(refreshJson?.positions) ? refreshJson.positions : [];
+        setPositions(list);
+      }
+    } catch (error: any) {
+      console.error('Sell error:', error);
+
+      // Update toast to show error
+      root.render(
+        <SwipeToast
+          type="ORDER"
+          marketTitle={`Failed to sell: ${error.message}`}
+          onClose={cleanup}
+        />
+      );
+
+      // Auto-close after 5 seconds
+      setTimeout(cleanup, 5000);
+
+      // Bring back the card on error
+      setSwipedPositions((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(positionKey);
+        return newSet;
+      });
+    } finally {
+      // Remove from processing set
+      setProcessingPositions((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(positionKey);
+        return newSet;
+      });
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -130,8 +227,12 @@ export function PositionsDrawer({ isOpen, onClose, userId }: PositionsDrawerProp
         </div>
         <div className="p-3 sm:p-4">
           {(() => {
-            const list = positions ?? mock;
-            return list.map((position, index) => {
+            const list = positions ?? [];
+            const filteredList = list.filter((position) => {
+              const positionKey = `${position.marketId}-${position.side}`;
+              return !swipedPositions.has(positionKey);
+            });
+            return filteredList.map((position, index) => {
               const pricePercent = (position.avgPrice * 100).toFixed(1);
               const statusColor =
                 position.latestOrderStatus === 'filled'
@@ -183,7 +284,10 @@ export function PositionsDrawer({ isOpen, onClose, userId }: PositionsDrawerProp
                     <div>Last Trade: {new Date(position.latestCreatedAt).toLocaleDateString()}</div>
                   </div>
                   <div className="flex gap-2">
-                    <button className="flex-1 rounded-lg border-[3px] border-black bg-[#D50A0A] py-2 text-xs font-black text-white shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none sm:text-sm">
+                    <button
+                      onClick={() => handleSellPosition(position)}
+                      className="flex-1 rounded-lg border-[3px] border-black bg-[#D50A0A] py-2 text-xs font-black text-white shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none sm:text-sm hover:bg-[#B80808]"
+                    >
                       Sell
                     </button>
                     <a
@@ -191,6 +295,7 @@ export function PositionsDrawer({ isOpen, onClose, userId }: PositionsDrawerProp
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center justify-center rounded-lg border-[3px] border-black bg-[#34302B] px-3 py-2 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none"
+                      title="View on Polymarket"
                     >
                       <ExternalLink className="h-4 w-4 text-white" strokeWidth={3} />
                     </a>
@@ -200,8 +305,12 @@ export function PositionsDrawer({ isOpen, onClose, userId }: PositionsDrawerProp
             });
           })()}
           {(() => {
-            const list = positions ?? mock;
-            return list.length === 0;
+            const list = positions ?? [];
+            const filteredList = list.filter((position) => {
+              const positionKey = `${position.marketId}-${position.side}`;
+              return !swipedPositions.has(positionKey);
+            });
+            return filteredList.length === 0;
           })() && (
             <div className="rounded-2xl border-[5px] border-black bg-white p-8 text-center shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
               <p className="text-lg font-black text-black/50">No positions yet</p>
