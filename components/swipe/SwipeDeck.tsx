@@ -375,9 +375,9 @@ export default function SwipeDeck() {
   };
 
   return (
-    <div className="h-full flex flex-col items-center justify-start px-4 overflow-hidden">
+    <div className="h-full flex flex-col items-center justify-start px-3 sm:px-4 overflow-hidden">
       {/* Wallet header becomes part of main flow */}
-      <div className="w-full max-w-md mx-auto mb-4 md:mb-16">
+      <div className="w-full max-w-sm sm:max-w-md mx-auto mb-3 sm:mb-4 md:mb-16">
         {showDisclaimer && (
           <DisclaimerModal
             onClose={() => {
@@ -433,10 +433,10 @@ export default function SwipeDeck() {
             <>
               <button
                 onClick={() => setIsPositionsOpen(true)}
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border-[4px] border-black bg-[#34302B] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:translate-x-[5px] active:translate-y-[5px] active:shadow-none sm:h-auto sm:w-16 sm:rounded-2xl sm:border-[5px]"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border-[3px] border-black bg-[#34302B] shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none sm:h-12 sm:w-12 sm:rounded-xl sm:border-[4px] sm:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] sm:hover:translate-x-[2px] sm:hover:translate-y-[2px] md:h-auto md:w-16 md:rounded-2xl md:border-[5px]"
                 aria-label="Menu"
               >
-                <Menu className="h-6 w-6 text-white sm:h-8 sm:w-8" strokeWidth={3} />
+                <Menu className="h-5 w-5 text-white sm:h-6 sm:w-6 md:h-8 md:w-8" strokeWidth={3} />
               </button>
               <PositionsDrawer
                 isOpen={isPositionsOpen}
@@ -450,7 +450,7 @@ export default function SwipeDeck() {
       {loading && <div className="text-sm">Loading…</div>}
       {!loading && error && <div className="text-sm text-red-500">Failed to load markets</div>}
       {!loading && !error && (
-        <div className="relative w-full max-w-md h-[65vh] md:h-[60vh] overflow-visible mx-auto">
+        <div className="relative w-full max-w-sm sm:max-w-md h-[60vh] sm:h-[65vh] md:h-[60vh] overflow-visible mx-auto">
           {markets.slice(0, 3).map((m, i) => {
             const yesAmount =
               typeof m.yesPrice === 'number' && isFinite(m.yesPrice)
@@ -544,7 +544,7 @@ export default function SwipeDeck() {
       )}
 
       {/* Bottom actions */}
-      <div className="mt-16 md:mt-20 shrink-0">
+      <div className="mt-12 sm:mt-16 md:mt-20 shrink-0">
         <ActionButtons
           onNo={() => markets[0] && handleSwipe(markets[0], 'no')}
           onSkip={() => {

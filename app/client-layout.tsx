@@ -42,7 +42,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   return (
     <ChatProvider>
       <div className="flex h-[100dvh] md:h-screen bg-background overflow-hidden">
-        <div className="w-full mx-auto flex gap-4 md:gap-6 h-full items-stretch min-h-0 min-w-0 px-4 md:px-6 py-4 md:py-6">
+        <div className="w-full mx-auto flex gap-2 sm:gap-4 md:gap-6 h-full items-stretch min-h-0 min-w-0 px-2 sm:px-4 md:px-6 py-2 sm:py-4 md:py-6">
           {/* Sidebar (desktop only) */}
           {!hideSidebar && (
             <div className="hidden md:block md:overflow-visible">
@@ -57,8 +57,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
             <div className="flex-1 min-h-0 overflow-hidden">{children}</div>
           ) : (
             <div
-              className="flex-1 bg-white rounded-2xl flex flex-col relative h-full md:h-full min-h-0 min-w-0 overflow-hidden"
-              style={{ boxShadow: '8px 8px 0px 0px #000000' }}
+              className="flex-1 bg-white rounded-xl flex flex-col relative h-full md:h-full min-h-0 min-w-0 overflow-hidden sm:rounded-2xl"
+              style={{ boxShadow: '6px 6px 0px 0px #000000' }}
             >
               <div className="flex-1 min-h-0 overflow-hidden">{children}</div>
             </div>
