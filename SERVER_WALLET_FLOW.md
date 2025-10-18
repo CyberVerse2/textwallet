@@ -1,8 +1,8 @@
-# TextWallet Server Wallet Flow
+# Polyflip Server Wallet Flow
 
 ## Overview
 
-TextWallet now uses a fully server-managed wallet system. Users **do not need** to transfer funds from their embedded wallet to a server wallet. Instead, each user automatically gets their own dedicated server wallet that the AI uses for all blockchain interactions.
+Polyflip now uses a fully server-managed wallet system. Users **do not need** to transfer funds from their embedded wallet to a server wallet. Instead, each user automatically gets their own dedicated server wallet that the AI uses for all blockchain interactions.
 
 ## Implementation Details
 

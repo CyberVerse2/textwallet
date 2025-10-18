@@ -2,21 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import supabaseAdmin from '@/lib/supabaseAdmin';
 import { getOrder, type OrderDetails } from '@/lib/polymarket/trading';
 
-// Helper to fetch market details by token ID
-async function fetchMarketByTokenId(tokenId: string) {
+// Helper to fetch market details by market ID
+async function fetchMarketByMarketId(marketId: string) {
   try {
-    const url = `https://gamma-api.polymarket.com/markets`;
-    const params = new URLSearchParams({ token_id: tokenId, limit: '1' });
-    const response = await fetch(`${url}?${params}`, {
+    const url = `https://gamma-api.polymarket.com/markets/${marketId}`;
+    const response = await fetch(url, {
       method: 'GET',
       headers: { accept: 'application/json' },
       cache: 'no-store'
     });
 
     if (!response.ok) return null;
-    const markets = await response.json();
-    const market = Array.isArray(markets) ? markets[0] : null;
-    if (!market) return null;
+    const market = await response.json();
 
     return {
       id: market.id,
@@ -101,11 +98,11 @@ export async function GET(req: NextRequest) {
 
     for (const [key, position] of marketPositions) {
       try {
-        // Get market details using tokenId (with caching)
+        // Get market details using marketId (with caching)
         let market = marketCache.get(position.marketId);
         if (!market) {
-          console.log(`[Positions API] Fetching market details for tokenId: ${position.marketId}`);
-          market = await fetchMarketByTokenId(position.marketId);
+          console.log(`[Positions API] Fetching market details for marketId: ${position.marketId}`);
+          market = await fetchMarketByMarketId(position.marketId);
           if (market) {
             marketCache.set(position.marketId, market);
             console.log(`[Positions API] Market details received:`, {
@@ -115,7 +112,7 @@ export async function GET(req: NextRequest) {
             });
           } else {
             console.warn(
-              `[Positions API] Failed to fetch market details for tokenId: ${position.marketId}`
+              `[Positions API] Failed to fetch market details for marketId: ${position.marketId}`
             );
           }
         }

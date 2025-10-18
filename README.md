@@ -1,7 +1,7 @@
-# Textwallet
+# Polyflip
 
-![text wallet](/public/home.png)
-TextWallet is a modular network of interoperable DeFi agents designed to bring the full functionality of EVM-compatible crypto wallets (and more) to a text-based interface. Interact with DeFi protocols, manage assets, conduct research, and get portfolio insights, all through text commands.
+![polyflip](/public/home.png)
+Polyflip is a modular network of interoperable DeFi agents designed to bring the full functionality of EVM-compatible crypto wallets (and more) to a text-based interface. Interact with DeFi protocols, manage assets, conduct research, and get portfolio insights, all through text commands.
 
 ## Features
 
@@ -32,8 +32,8 @@ Follow these instructions to set up and run the project locally.
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/cyberverse2/textwallet
-   cd textwallet
+   git clone https://github.com/cyberverse2/polyflip
+   cd polyflip
    ```
 
 2. Install dependencies:

@@ -20,7 +20,7 @@ export function getBaseAccountProvider(): BaseAccountProvider {
   if (!sdkInstance) {
     console.debug('[BaseAccountSDK] Initializing SDK (singleton)');
     sdkInstance = createBaseAccountSDK({
-      appName: 'TextWallet',
+      appName: 'Polyflip',
       appLogoUrl: 'https://base.org/logo.png',
       appChainIds: [baseSepolia.id],
       subAccounts: {

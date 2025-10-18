@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
 
     // Resolve inputs (support swipe payloads)
     const resolvedTokenId = String(tokenID || marketId || '');
-    const resolvedMarketId = String(marketId || tokenID || ''); // Use marketId if available, fallback to tokenID
+    const resolvedMarketId = String(marketId || ''); // Only use marketId, no fallback to tokenID
     const resolvedPrice = typeof price === 'number' ? price : 0.1;
     // For market orders, compute dollar notional (amountUSD)
     let amountUSD: number | undefined = typeof sizeUsd === 'number' ? sizeUsd : undefined;
@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
       amountUSD = Number((size * resolvedPrice).toFixed(2));
     }
 
-    if (!resolvedTokenId || !side || typeof amountUSD !== 'number') {
+    if (!resolvedTokenId || !side || typeof amountUSD !== 'number' || !resolvedMarketId) {
       return NextResponse.json({ error: 'missing_params' }, { status: 400 });
     }
 

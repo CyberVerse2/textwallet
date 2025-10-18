@@ -7,7 +7,7 @@ export function getConfig() {
     chains: [baseSepolia],
     connectors: [
       baseAccount({
-        appName: 'TextWallet',
+        appName: 'Polyflip',
         subAccounts: {
           creation: 'on-connect',
           defaultAccount: 'sub'

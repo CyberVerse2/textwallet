@@ -1,4 +1,4 @@
--- TextWallet: All-in-one schema setup (wallet-based identity)
+-- Polyflip: All-in-one schema setup (wallet-based identity)
 -- Safe to run on a fresh database
 
 -- Extensions

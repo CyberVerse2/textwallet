@@ -1,6 +1,6 @@
-# TextWallet Supabase Integration
+# Polyflip Supabase Integration
 
-This document provides instructions for setting up TextWallet with Supabase for per-user server wallets.
+This document provides instructions for setting up Polyflip with Supabase for per-user server wallets.
 
 ## Environment Variables
 
